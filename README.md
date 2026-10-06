@@ -6,7 +6,12 @@ The memo maps obligations to clauses. It is not legal advice.
 
 ## Status
 
-The repository is new and holds no code yet. It will have two apps, `api/` in Python and `web/` in Next.js, and a `docs/` folder with the product brief, the behavior specification and the architecture decision records (ADRs).
+The repository holds no code yet. Two documents describe the product:
+
+- [docs/brief.md](docs/brief.md): who the product is for, what it must do for them, and which assumptions the design is based on.
+- [docs/spec.md](docs/spec.md): how the product must behave.
+
+The repository will have two apps, `api/` in Python and `web/` in Next.js. Architecture decision records (ADRs) will go in `docs/`.
 
 ## Process
 
