@@ -1,0 +1,23 @@
+[project]
+name = "obligations-agent"
+version = "0.1.0"
+description = "Python service of obligations-agent"
+requires-python = ">=3.14"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "pyright[nodejs]>=1.1.414",
+    "pytest>=9.1.1",
+    "ruff>=0.16.10",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.23,<0.13.0"]
+build-backend = "uv_build"
+
+[tool.uv]
+exclude-newer = "7 days"
+
+[tool.pyright]
+typeCheckingMode = "strict"

@@ -6,12 +6,26 @@ The memo maps obligations to clauses. It is not legal advice.
 
 ## Status
 
-The repository holds no code yet. Two documents describe the product:
+The repository holds no product code yet. Two documents describe the product:
 
 - [docs/brief.md](docs/brief.md): who the product is for, what it must do for them, and which assumptions the design is based on.
 - [docs/spec.md](docs/spec.md): how the product must behave.
 
-The repository will have two apps, `api/` in Python and `web/` in Next.js. Architecture decision records (ADRs) will go in `docs/`.
+`api/` holds the Python project. So far it contains only the setup for the checks and one test of that setup. The web app will go in `web/` (Next.js), and architecture decision records (ADRs) will go in `docs/`.
+
+## Checks
+
+CI runs these commands in `api/` on every pull request and on every push to main:
+
+```sh
+uv sync --locked
+uv run ruff check
+uv run ruff format --check
+uv run pyright
+uv run pytest
+```
+
+`uv sync --locked` fails when `uv.lock` does not match `pyproject.toml`. A new version of a package is used only when it is at least 7 days old (`exclude-newer` in `api/pyproject.toml`).
 
 ## Process
 
@@ -19,7 +33,7 @@ The repository is run with the process that a team would use. A part is checked 
 
 - [ ] Instructions for coding agents in `AGENTS.md`, with a one-line `CLAUDE.md` that points to it.
 - [ ] Agent permissions and one hook, committed to the repository.
-- [ ] CI that installs from a fixed lockfile.
+- [x] CI that installs from a fixed lockfile.
 - [ ] A branch ruleset that requires pull requests and passing checks.
 - [ ] A pull request template with a checklist that a pull request must pass before review, and a decision log.
 - [ ] Decisions recorded as ADRs.
