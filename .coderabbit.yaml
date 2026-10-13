@@ -1,0 +1,10 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: en-US
+reviews:
+  profile: chill
+  # The author writes the summary. CodeRabbit does not change the pull request description.
+  high_level_summary: false
+  auto_review:
+    enabled: true
+  path_filters:
+    - "!api/uv.lock"
