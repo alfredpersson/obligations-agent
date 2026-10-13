@@ -7,6 +7,9 @@ on:
 jobs:
   claude-review:
     runs-on: ubuntu-latest
+    # Removes credentials from the environment of the commands that Claude starts.
+    env:
+      CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: "1"
     permissions:
       contents: read
       pull-requests: read
