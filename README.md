@@ -31,11 +31,11 @@ uv run pytest
 
 The repository is run with the process that a team would use. A part is checked in the list below when it is in place.
 
-- [ ] Instructions for coding agents in `AGENTS.md`, with a one-line `CLAUDE.md` that points to it.
-- [ ] Agent permissions and one hook, committed to the repository.
+- [x] Instructions for coding agents in `AGENTS.md`, with a one-line `CLAUDE.md` that points to it.
+- [x] Agent permissions and one hook, committed to the repository.
 - [x] CI that installs from a fixed lockfile.
-- [ ] A branch ruleset that requires pull requests and passing checks.
-- [ ] A pull request template with a checklist that a pull request must pass before review, and a decision log.
+- [x] A branch ruleset that requires pull requests and passing checks.
+- [x] A pull request template with a checklist that a pull request must pass before review, and a decision log.
 - [ ] Decisions recorded as ADRs.
 - [ ] GitHub issues as the place where each part is specified in detail and its plan is reviewed before the work starts.
 - [ ] Two AI reviewers from different vendors, which comment and never merge.
