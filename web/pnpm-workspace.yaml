@@ -1,0 +1,7 @@
+# A new version of a package is used only when it is at least 7 days old (in minutes).
+minimumReleaseAge: 10080
+
+# Build scripts that do not run. create-next-app sets these two.
+allowBuilds:
+  sharp: false
+  unrs-resolver: false

@@ -10,11 +10,13 @@ obligations-agent turns a description of one AI product into an obligations memo
 - `docs/spec.md`: how the product must behave. Every requirement has an id, for example `INTAKE-3`.
 - `README.md`: the process that every change follows.
 
-`api/` holds the Python service. `web/` will hold the Next.js web app.
+`api/` holds the Python service, and `web/` holds the Next.js web app.
 
 ## Commands
 
-Run these in `api/`. CI runs the same five commands, and all of them must pass before a pull request is opened.
+CI runs the same commands, and all of them must pass before a pull request is opened.
+
+In `api/`:
 
 ```sh
 uv sync --locked
@@ -26,11 +28,21 @@ uv run pytest
 
 `uv run ruff format` fixes the formatting.
 
+In `web/`:
+
+```sh
+pnpm install --frozen-lockfile
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm build
+```
+
 ## Rules
 
 - No agent framework. The question loop, the rules, the retrieval and the memo steps are project code.
-- Do not weaken a check to make it pass. This covers `# type: ignore`, `# noqa`, skipped or deleted tests, and changed settings for Ruff, pyright, pytest or CI. If a check seems wrong, stop and ask the author.
-- Do not add a dependency without the author's approval. Add an approved one with `uv add`, so that `pyproject.toml` and `uv.lock` change together.
+- Do not weaken a check to make it pass. This covers `# type: ignore`, `# noqa`, `eslint-disable` and `@ts-expect-error` comments, skipped or deleted tests, and changed settings for Ruff, pyright, pytest, ESLint, TypeScript, Vitest or CI. If a check seems wrong, stop and ask the author.
+- Do not add a dependency without the author's approval. Add an approved one with `uv add` in `api/` or `pnpm add` in `web/`, so that the package list and the lockfile change together.
 - When a change alters behavior that `docs/spec.md` describes, change the specification in the same pull request. Requirement ids stay in sequence without gaps.
 - Secrets stay out of the repository and out of prompts.
 

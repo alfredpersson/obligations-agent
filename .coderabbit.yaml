@@ -10,6 +10,7 @@ reviews:
     enabled: true
   path_filters:
     - "!api/uv.lock"
+    - "!web/pnpm-lock.yaml"
   # CodeRabbit only comments. It does not commit to a branch or open a pull request.
   finishing_touches:
     docstrings:
