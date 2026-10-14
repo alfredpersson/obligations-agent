@@ -1,0 +1,48 @@
+name: Claude review
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review, reopened]
+
+jobs:
+  claude-review:
+    runs-on: ubuntu-latest
+    # Removes credentials from the environment of the commands that Claude starts.
+    env:
+      CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: "1"
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+      # With the setting above, Claude Code runs the review commands in their own
+      # process namespace, so that they cannot read the token from a parent process.
+      # That needs bubblewrap and socat. On Ubuntu 24.04, bubblewrap also needs a
+      # security profile that lets it create namespaces. The profile applies to
+      # bubblewrap only. The last command fails the job if no namespace can be created.
+      - name: Install the isolation tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends bubblewrap socat
+          sudo tee /etc/apparmor.d/bwrap > /dev/null <<'EOF'
+          abi <abi/4.0>,
+          include <tunables/global>
+
+          profile bwrap /usr/bin/bwrap flags=(unconfined) {
+            userns,
+            include if exists <local/bwrap>
+          }
+          EOF
+          sudo systemctl reload apparmor
+          bwrap --unshare-pid --ro-bind / / --proc /proc --dev /dev sh -c 'echo "processes visible in the namespace: $(ls /proc | grep -c "^[0-9]")"'
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          plugin_marketplaces: "https://github.com/anthropics/claude-code.git"
+          plugins: "code-review@claude-code-plugins"
+          prompt: "/code-review:code-review --comment ${{ github.repository }}/pull/${{ github.event.pull_request.number }}"
+          claude_args: '--allowedTools "mcp__github_inline_comment__create_inline_comment"'

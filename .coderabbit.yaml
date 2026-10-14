@@ -1,0 +1,24 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: en-US
+reviews:
+  profile: chill
+  # The author writes the summary. CodeRabbit does not change the pull request description.
+  high_level_summary: false
+  # An approval from an AI reviewer is not a review, so the author cannot ask for one.
+  allow_author_approval: false
+  auto_review:
+    enabled: true
+  path_filters:
+    - "!api/uv.lock"
+  # CodeRabbit only comments. It does not commit to a branch or open a pull request.
+  finishing_touches:
+    docstrings:
+      enabled: false
+    unit_tests:
+      enabled: false
+    autofix:
+      enabled: false
+    fix_ci:
+      enabled: false
+    resolve_merge_conflict:
+      enabled: false
