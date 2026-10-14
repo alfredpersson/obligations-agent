@@ -1,5 +1,6 @@
 """The fact schema: reads and checks schema.yaml (FACT-1 and FACT-2 in docs/spec.md)."""
 
+from collections.abc import Hashable
 from importlib.resources import files
 from typing import Any
 
@@ -10,7 +11,24 @@ NOT_SURE = "not_sure"
 
 
 class SchemaError(Exception):
-    """A slot in schema.yaml does not have the form that FACT-1 and FACT-2 require."""
+    """A problem in schema.yaml: a key used twice, or a slot without the form that FACT-1 and FACT-2 require."""
+
+
+class _UniqueKeyLoader(yaml.SafeLoader):
+    """The safe loader, but a key used twice in one mapping is an error. PyYAML would keep only the last value."""
+
+    def construct_mapping(
+        self, node: yaml.MappingNode, deep: bool = False
+    ) -> dict[Hashable, Any]:
+        keys: list[Any] = []
+        for key_node, _ in node.value:
+            if key_node.value in keys:
+                line = key_node.start_mark.line + 1
+                raise SchemaError(
+                    f"line {line}: the key {key_node.value} is used twice"
+                )
+            keys.append(key_node.value)
+        return super().construct_mapping(node, deep=deep)
 
 
 class Value(BaseModel):
@@ -39,8 +57,8 @@ class Schema(BaseModel):
 
 
 def parse_schema(text: str) -> Schema:
-    """Reads a schema from YAML text. The error for a broken slot names it by id, or by position when the id is missing."""
-    data: Any = yaml.safe_load(text)
+    """Reads a schema from YAML text. The error for a broken slot names it by id, or by position when the id is missing; a key used twice is named with its line."""
+    data: Any = yaml.load(text, Loader=_UniqueKeyLoader)
     slots: list[Slot] = []
     for position, raw in enumerate(data["slots"], start=1):
         name = raw.get("id", position)

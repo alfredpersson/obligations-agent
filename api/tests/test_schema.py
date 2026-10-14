@@ -101,6 +101,38 @@ slots:
         parse_schema(text)
 
 
+def test_a_second_slots_key_is_refused_with_its_line() -> None:
+    # Without the check, PyYAML keeps only the last value of a repeated key.
+    text = """\
+description: {label: Description, question: Describe the product., max_length: 1500}
+slots:
+  - {id: a, label: A, question: Q, relevant: always, unit: u, values: [{id: not_sure, label: Not sure}]}
+slots:
+  - {id: b, label: B, question: Q, relevant: always, unit: u, values: [{id: not_sure, label: Not sure}]}
+"""
+
+    with pytest.raises(SchemaError, match=r"\bline 4\b.*\bslots\b"):
+        parse_schema(text)
+
+
+def test_a_second_label_line_in_a_slot_is_refused_with_its_line() -> None:
+    text = """\
+description: {label: Description, question: Describe the product., max_length: 1500}
+slots:
+  - id: personal_data
+    label: Personal data
+    label: Personal data processing
+    question: Does the product process personal data?
+    relevant: always
+    unit: "gdpr:art4(1)"
+    values:
+      - {id: not_sure, label: Not sure}
+"""
+
+    with pytest.raises(SchemaError, match=r"\bline 5\b.*\blabel\b"):
+        parse_schema(text)
+
+
 def test_a_slot_id_used_twice_is_refused_with_its_name() -> None:
     slot = {**SECOND_SLOT, "id": "under_own_name"}
 
