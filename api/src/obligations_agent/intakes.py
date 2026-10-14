@@ -1,23 +1,27 @@
 """Intakes: the form answers and the description, checked against the fact schema (FACT-2, FACT-4, FACT-5)."""
 
-import secrets
-from dataclasses import dataclass
+from typing import Literal
+
+from pydantic import BaseModel
 
 from obligations_agent.schema import NOT_SURE, Schema
 
+ErrorCode = Literal["invalid_slot", "invalid_value", "not_found"]
 
-@dataclass(frozen=True)
-class Intake:
-    description: str
+
+class Intake(BaseModel):
+    """The form answers and the description: the body of POST /intakes, and the stored intake."""
+
     answers: dict[str, str]
+    description: str
 
 
 class IntakeError(Exception):
-    """A refused request. The code is one of the stable error codes of the API."""
+    """A refused request, with one of the stable error codes of the API."""
 
-    def __init__(self, code: str, field: str | None = None) -> None:
+    def __init__(self, code: ErrorCode, field: str | None = None) -> None:
         super().__init__(code)
-        self.code = code
+        self.code: ErrorCode = code
         self.field = field
 
 
@@ -32,14 +36,10 @@ def create_intake(schema: Schema, answers: dict[str, str], description: str) -> 
             raise IntakeError("invalid_value", slot.id)
     if not description.strip() or len(description) > schema.description.max_length:
         raise IntakeError("invalid_value", "description")
-    return Intake(description, {slot_id: answers[slot_id] for slot_id in form_slots})
+    ordered = {slot_id: answers[slot_id] for slot_id in form_slots}
+    return Intake(answers=ordered, description=description)
 
 
 def open_slots(intake: Intake) -> list[str]:
     """The slots answered "not sure", in schema order."""
     return [slot_id for slot_id, value in intake.answers.items() if value == NOT_SURE]
-
-
-def new_intake_id() -> str:
-    """A random id of 128 bits, as 22 URL-safe characters."""
-    return secrets.token_urlsafe(16)

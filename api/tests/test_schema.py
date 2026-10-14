@@ -13,17 +13,19 @@ DESCRIPTION_FIELD = {
     "max_length": 1500,
 }
 
+YES_NO_NOT_SURE = [
+    {"id": "yes", "label": "Yes"},
+    {"id": "no", "label": "No"},
+    {"id": "not_sure", "label": "Not sure"},
+]
+
 FIRST_SLOT = {
     "id": "under_own_name",
     "label": "Under own name or trademark",
     "question": "Do you place the product on the market under your own name?",
     "relevant": "always",
     "unit": "aia:art3(3)",
-    "values": [
-        {"id": "yes", "label": "Yes"},
-        {"id": "no", "label": "No"},
-        {"id": "not_sure", "label": "Not sure"},
-    ],
+    "values": YES_NO_NOT_SURE,
 }
 
 SECOND_SLOT = {
@@ -32,11 +34,7 @@ SECOND_SLOT = {
     "question": "Does the product process personal data?",
     "relevant": "always",
     "unit": "gdpr:art4(1)",
-    "values": [
-        {"id": "yes", "label": "Yes"},
-        {"id": "no", "label": "No"},
-        {"id": "not_sure", "label": "Not sure"},
-    ],
+    "values": YES_NO_NOT_SURE,
 }
 
 
