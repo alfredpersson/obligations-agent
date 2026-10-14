@@ -11,11 +11,13 @@ The repository holds no product code yet. Two documents describe the product:
 - [docs/brief.md](docs/brief.md): who the product is for, what it must do for them, and which assumptions the design is based on.
 - [docs/spec.md](docs/spec.md): how the product must behave.
 
-`api/` holds the Python project. So far it contains only the setup for the checks and one test of that setup. The web app will go in `web/` (Next.js), and architecture decision records (ADRs) will go in `docs/`.
+`api/` holds the Python service and `web/` the Next.js web app. So far both contain only the setup for their checks and one test of that setup. Architecture decision records (ADRs) will go in `docs/`.
 
 ## Checks
 
-CI runs these commands in `api/` on every pull request and on every push to main:
+CI runs the checks of both apps on every pull request and on every push to main.
+
+In `api/`:
 
 ```sh
 uv sync --locked
@@ -26,6 +28,20 @@ uv run pytest
 ```
 
 `uv sync --locked` fails when `uv.lock` does not match `pyproject.toml`. A new version of a package is used only when it is at least 7 days old (`exclude-newer` in `api/pyproject.toml`).
+
+In `web/`:
+
+```sh
+pnpm install --frozen-lockfile
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm build
+```
+
+`pnpm install --frozen-lockfile` fails when `pnpm-lock.yaml` does not match `package.json`. The same 7-day rule applies (`minimumReleaseAge` in `web/pnpm-workspace.yaml`), and `pnpm lint` also fails on warnings.
+
+The web app runs on the Node.js version in `web/.nvmrc`. With nvm, `nvm install` in `web/` installs that version and switches to it. pnpm switches by itself to the version in the `packageManager` field of `web/package.json`.
 
 ## Process
 
