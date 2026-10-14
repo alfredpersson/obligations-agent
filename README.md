@@ -53,8 +53,8 @@ The repository is run with the process that a team would use. A part is checked 
 - [x] A branch ruleset that requires pull requests and passing checks.
 - [x] A pull request template with a checklist that a pull request must pass before review, and a decision log.
 - [ ] Decisions recorded as ADRs.
-- [ ] GitHub issues as the place where each part is specified in detail and its plan is reviewed before the work starts.
-- [ ] Two AI reviewers from different vendors, which comment and never merge.
+- [x] GitHub issues as the place where each part is specified in detail and its plan is reviewed before the work starts.
+- [x] Two AI reviewers from different vendors, which comment and never merge.
 
 One part is adapted because the project has one author. GitHub does not let an author approve their own pull request. The human review is therefore a self-review by the author, done line by line. The author confirms it in the pull request and writes down any findings there. The findings of the AI reviewers are input to that review and never the final decision.
 
