@@ -26,7 +26,7 @@ uv run pyright
 uv run pytest
 ```
 
-`uv run ruff format` fixes the formatting.
+`uv run ruff format` fixes the formatting. `uv run uvicorn obligations_agent.server:app --reload` starts the service on http://127.0.0.1:8000.
 
 In `web/`:
 

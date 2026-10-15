@@ -1,0 +1,48 @@
+# The fact schema (FACT-1 in docs/spec.md). Every slot has an id, a label, a
+# question, the allowed values, a relevance condition and the unit that defines
+# it, and every slot has the value not_sure (FACT-2). Slot ids are unique, and
+# so are the value ids within a slot. Quote yes, no, Yes and No: without quotes,
+# PyYAML reads them as true and false.
+
+description:
+  label: Description
+  question: "Describe the product in two or three sentences: what it does, who uses it and what data it handles."
+  max_length: 1500
+
+slots:
+  - id: personal_data
+    label: Personal data
+    question: Does the product process personal data?
+    relevant: always
+    unit: "gdpr:art4(1)"
+    values:
+      - { id: "yes", label: "Yes" }
+      - { id: "no", label: "No" }
+      - { id: not_sure, label: Not sure }
+
+  - id: under_own_name
+    label: Under own name or trademark
+    question: Do you place the product on the market or put it into service under your own name or trademark?
+    relevant: always
+    unit: "aia:art3(3)"
+    values:
+      - { id: "yes", label: "Yes" }
+      - { id: "no", label: "No" }
+      - { id: not_sure, label: Not sure }
+
+  - id: use_case_area
+    label: Use-case area
+    question: Which of these areas is the product intended to be used in?
+    relevant: always
+    unit: "aia:art6(2)"
+    values:
+      - { id: biometrics, label: Biometrics }
+      - { id: critical_infrastructure, label: Critical infrastructure }
+      - { id: education, label: Education and vocational training }
+      - { id: employment, label: "Employment, workers' management and access to self-employment" }
+      - { id: essential_services, label: Access to and enjoyment of essential private services and essential public services and benefits }
+      - { id: law_enforcement, label: Law enforcement }
+      - { id: migration, label: "Migration, asylum and border control management" }
+      - { id: justice, label: Administration of justice and democratic processes }
+      - { id: none, label: None of these }
+      - { id: not_sure, label: Not sure }

@@ -67,6 +67,8 @@ The prompts therefore implement only part of the specification. A prompt cannot 
 
 **FACT-4.** The description is the only input where the user writes free text. It can be at most 1500 characters long.
 
+**FACT-5.** The form can be sent only when every slot on it has an answer and the description is filled in. "Not sure" counts as an answer.
+
 **GATE-1.** Each gate is a decision table in `gates.yaml` and names the unit that defines it.
 
 **GATE-2.** A gate has three possible results: applies, does not apply, or conditional. If the result of a gate depends on an open slot, the result is conditional and names that slot. A gate never gives the result "does not apply" because information is missing.
