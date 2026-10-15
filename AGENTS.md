@@ -41,6 +41,7 @@ pnpm build
 ## Rules
 
 - No agent framework. The question loop, the rules, the retrieval and the memo steps are project code.
+- Write the simplest code that meets the issue. Before adding a type or a helper, check whether the code base has one with the same purpose, and use it. Do not add a wrapper, class, setting or option that the issue does not need, such as a one-line function that only one place calls.
 - Do not weaken a check to make it pass. This covers `# type: ignore`, `# noqa`, `eslint-disable` and `@ts-expect-error` comments, skipped or deleted tests, and changed settings for Ruff, pyright, pytest, ESLint, TypeScript, Vitest or CI. If a check seems wrong, stop and ask the author.
 - Do not add a dependency without the author's approval. Add an approved one with `uv add` in `api/` or `pnpm add` in `web/`, so that the package list and the lockfile change together.
 - When a change alters behavior that `docs/spec.md` describes, change the specification in the same pull request. Requirement ids stay in sequence without gaps.
@@ -52,9 +53,10 @@ pnpm build
 2. Post the plan as a comment on the issue, and wait for the author's review before writing code.
 3. Create a short branch from `main`, named `<type>/<short-name>`. The type is `feat`, `fix`, `docs` or `chore`. Never commit to `main`.
 4. Write the tests from the acceptance criteria first, then the code.
-5. Commit and push only when the author asks. Every commit message discloses AI assistance with a `Co-Authored-By` trailer.
-6. Open a small pull request with the template in `.github/pull_request_template.md`. Fill in the decision log: what was tried and what was ruled out.
-7. The author reviews and merges. Agents do not merge.
+5. When the tests pass, check the changed code for types and helpers that repeat existing ones and for code that can be simpler, and fix the findings within the scope of the issue. In Claude Code, `/simplify` runs this check.
+6. Commit and push only when the author asks. Every commit message discloses AI assistance with a `Co-Authored-By` trailer.
+7. Open a small pull request with the template in `.github/pull_request_template.md`. Fill in the decision log: what was tried and what was ruled out.
+8. The author reviews and merges. Agents do not merge.
 
 ## Writing
 

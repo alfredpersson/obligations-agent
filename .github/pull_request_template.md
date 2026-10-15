@@ -24,6 +24,7 @@ Low: documents and text.
 - [ ] The summary says what the change does and why.
 - [ ] The diff has fewer than about 400 changed lines, not counting generated files such as `uv.lock`.
 - [ ] The tests ran, and the result is under Testing.
+- [ ] The changed code was checked for types and helpers that repeat existing ones and for code that can be simpler (see the workflow in `AGENTS.md`), and the decision log says what was changed or left.
 - [ ] The decision log is filled in.
 - [ ] The risk tier is stated.
 
