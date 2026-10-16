@@ -102,6 +102,30 @@ test("a sent form creates the intake and opens the screen with the recorded answ
   });
 });
 
+test("Send is disabled while the answers are sent, so that a second click sends nothing", async () => {
+  let fail: (error: Error) => void = () => {};
+  const fetchMock = vi.fn<typeof fetch>((input) =>
+    input === "/api/schema"
+      ? Promise.resolve(Response.json(testSchema))
+      : new Promise<Response>((_, reject) => {
+          fail = reject;
+        }),
+  );
+  vi.stubGlobal("fetch", fetchMock);
+  render(<IntakeForm />);
+  await fillIn();
+
+  fireEvent.click(sendButton());
+  await waitFor(() => expect(sendButton().disabled).toBe(true));
+  fireEvent.click(sendButton());
+  expect(fetchMock.mock.calls.filter(([url]) => url === "/api/intakes")).toHaveLength(1);
+
+  // After a failure, Send can be used again.
+  fail(new TypeError("fetch failed"));
+  await screen.findByRole("alert");
+  expect(sendButton().disabled).toBe(false);
+});
+
 test.each([
   ["a 500 response", new Response(null, { status: 500 })],
   ["a fetch that fails", new TypeError("fetch failed")],
