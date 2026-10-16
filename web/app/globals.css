@@ -1,0 +1,42 @@
+/* Width, spacing and readable text. The browser's defaults do the rest. */
+
+body {
+  max-width: 40rem;
+  margin: 2rem auto;
+  padding: 0 1rem;
+  font-family: system-ui, sans-serif;
+  line-height: 1.5;
+}
+
+fieldset {
+  margin: 0 0 1rem;
+}
+
+fieldset label {
+  display: block;
+}
+
+textarea {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 6rem;
+  margin: 0.25rem 0 1rem;
+  font: inherit;
+}
+
+button {
+  font: inherit;
+}
+
+dt {
+  font-weight: bold;
+}
+
+dd {
+  margin: 0 0 0.5rem;
+}
+
+[role="alert"] {
+  color: #b00020;
+}

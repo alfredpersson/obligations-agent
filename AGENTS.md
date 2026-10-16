@@ -38,6 +38,13 @@ pnpm test
 pnpm build
 ```
 
+`pnpm dev` starts the web app, which forwards calls under `/api` to the service. The browser test starts the service and the web app by itself. Install its browser once for each Playwright version:
+
+```sh
+pnpm exec playwright install --only-shell chromium
+pnpm e2e
+```
+
 ## Rules
 
 - No agent framework. The question loop, the rules, the retrieval and the memo steps are project code.
