@@ -23,7 +23,7 @@ Not goals for now: legal advice, regulations other than these two, answering que
 ## Journey
 
 1. Open the page. Read what the tool does and the one line that says it maps obligations to clauses and is not legal advice. Load the example product or start with your own.
-2. Fill in the form: eight to twelve questions, nearly all with fixed choices, and a description of two or three sentences. This takes about three to five minutes.
+2. Fill in the form: first a short description in three fields (what the product does, who uses it, and what data it handles), then eight to twelve questions, nearly all with fixed choices. This takes about three to five minutes.
 3. Answer the follow-up questions one at a time. There are at most eight, with fixed choices where possible, and "not sure" is always an allowed answer. This takes about two to four minutes.
 4. Check all the facts on one screen. Correct anything that is wrong, and answer any open question you can.
 5. Wait for the memo, which takes less than a minute.

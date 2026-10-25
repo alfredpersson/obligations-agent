@@ -1,4 +1,4 @@
-"""The fact schema: reads and checks schema.yaml (FACT-1 and FACT-2 in docs/spec.md)."""
+"""The fact schema: reads and checks schema.yaml (FACT-1, FACT-2 and FACT-4 in docs/spec.md)."""
 
 from collections.abc import Hashable
 from importlib.resources import files
@@ -11,7 +11,7 @@ NOT_SURE = "not_sure"
 
 
 class SchemaError(Exception):
-    """A problem in schema.yaml: a key used twice, or a slot without the form that FACT-1 and FACT-2 require."""
+    """A problem in schema.yaml: a key used twice, a slot without the form that FACT-1 and FACT-2 require, or an id used twice."""
 
 
 class _UniqueKeyLoader(yaml.SafeLoader):
@@ -46,18 +46,19 @@ class Slot(BaseModel):
 
 
 class DescriptionField(BaseModel):
+    id: str
     label: str
     question: str
     max_length: int
 
 
 class Schema(BaseModel):
-    description: DescriptionField
+    description: list[DescriptionField]
     slots: list[Slot]
 
 
 def parse_schema(text: str) -> Schema:
-    """Reads a schema from YAML text. The error for a broken slot names it by id, or by position when the id is missing; a key used twice is named with its line."""
+    """Reads a schema from YAML text. The error for a broken slot names it by id, or by position when the id is missing; a description field whose id is already used is named by its id; a key used twice is named with its line."""
     data: Any = yaml.load(text, Loader=_UniqueKeyLoader)
     slots: list[Slot] = []
     for position, raw in enumerate(data["slots"], start=1):
@@ -74,7 +75,13 @@ def parse_schema(text: str) -> Schema:
         if slot.id in [earlier.id for earlier in slots]:
             raise SchemaError(f"slot {name}: the id is used by an earlier slot")
         slots.append(slot)
-    description = DescriptionField.model_validate(data["description"])
+    description: list[DescriptionField] = []
+    for raw in data["description"]:
+        field = DescriptionField.model_validate(raw)
+        # The field of an error names a slot or a description field, so their ids must not overlap.
+        if field.id in [earlier.id for earlier in [*description, *slots]]:
+            raise SchemaError(f"description field {field.id}: the id is used twice")
+        description.append(field)
     return Schema(description=description, slots=slots)
 
 

@@ -1,5 +1,12 @@
 import { expect, test } from "@playwright/test";
 
+// The start of each description question in schema.yaml, and the text to fill in.
+const DESCRIPTION = [
+  ["What does the product do?", "Answers questions about orders in an online shop."],
+  ["Who uses the product?", "The shop's support team. The shop's customers chat with it."],
+  ["What data does the product handle?", "Order numbers, and the names and email addresses of customers."],
+];
+
 // After a navigation, Next.js keeps the previous page in the document, hidden. The test finds
 // elements by role, because role queries skip hidden elements.
 test("a filled-in form leads to the screen with the recorded answers", async ({ page }) => {
@@ -18,19 +25,15 @@ test("a filled-in form leads to the screen with the recorded answers", async ({ 
     .getByRole("group", { name: "Which of these areas is the product intended to be used in?" })
     .getByRole("radio", { name: "None of these" })
     .check();
-  await page
-    .getByRole("textbox", {
-      name: "Describe the product in two or three sentences: what it does, who uses it and what data it handles.",
-    })
-    .fill("An assistant in an online shop that answers questions about orders.");
+  for (const [question, text] of DESCRIPTION) {
+    await page.getByRole("textbox", { name: question }).fill(text);
+  }
   await page.getByRole("button", { name: "Send" }).click();
 
   await expect(page).toHaveURL(/\/intakes\/[A-Za-z0-9_-]{22}$/);
-  await expect(
-    page.getByRole("paragraph").filter({
-      hasText: "An assistant in an online shop that answers questions about orders.",
-    }),
-  ).toBeVisible();
+  for (const [, text] of DESCRIPTION) {
+    await expect(page.getByRole("paragraph").filter({ hasText: text })).toBeVisible();
+  }
   await expect(page.getByRole("term")).toHaveText([
     "Personal data",
     "Under own name or trademark",

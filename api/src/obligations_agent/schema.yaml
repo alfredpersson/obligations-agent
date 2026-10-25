@@ -1,13 +1,23 @@
 # The fact schema (FACT-1 in docs/spec.md). Every slot has an id, a label, a
 # question, the allowed values, a relevance condition and the unit that defines
-# it, and every slot has the value not_sure (FACT-2). Slot ids are unique, and
-# so are the value ids within a slot. Quote yes, no, Yes and No: without quotes,
-# PyYAML reads them as true and false.
+# it, and every slot has the value not_sure (FACT-2). The description fields are
+# the text that the user writes (FACT-4). The ids of the description fields and
+# the slots are unique together, and so are the value ids within a slot. Quote
+# yes, no, Yes and No: without quotes, PyYAML reads them as true and false.
 
 description:
-  label: Description
-  question: "Describe the product in two or three sentences: what it does, who uses it and what data it handles."
-  max_length: 1500
+  - id: what_it_does
+    label: What it does
+    question: What does the product do?
+    max_length: 500
+  - id: who_uses_it
+    label: Who uses it
+    question: "Who uses the product? If it also talks to or makes decisions about other people, name them too. For example, a company uses a chatbot to answer its own customers."
+    max_length: 500
+  - id: data_it_handles
+    label: What data it handles
+    question: What data does the product handle?
+    max_length: 500
 
 slots:
   - id: personal_data

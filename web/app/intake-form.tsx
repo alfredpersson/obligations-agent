@@ -4,12 +4,13 @@ import { useRouter } from "next/navigation";
 import { type SubmitEvent, useEffect, useState, useTransition } from "react";
 import type { Schema } from "./service";
 
-// The form: one group of choices for each slot in the schema, and the description (FACT-3 to FACT-5).
+// The form: the description fields, then one group of choices for each slot in the schema
+// (FACT-3 to FACT-5).
 export default function IntakeForm() {
   const router = useRouter();
   const [schema, setSchema] = useState<Schema | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
-  const [description, setDescription] = useState("");
+  const [description, setDescription] = useState<Record<string, string>>({});
   const [message, setMessage] = useState<string | null>(null);
   const [sending, startTransition] = useTransition();
 
@@ -28,7 +29,9 @@ export default function IntakeForm() {
   }
 
   // "Not sure" counts as an answer.
-  const complete = schema.slots.every((slot) => slot.id in answers) && description.trim() !== "";
+  const complete =
+    schema.slots.every((slot) => slot.id in answers) &&
+    schema.description.every((field) => (description[field.id] ?? "").trim() !== "");
 
   function send(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -54,14 +57,16 @@ export default function IntakeForm() {
 
   return (
     <form onSubmit={send}>
-      <label>
-        {schema.description.question}
-        <textarea
-          value={description}
-          maxLength={schema.description.max_length}
-          onChange={(event) => setDescription(event.target.value)}
-        />
-      </label>
+      {schema.description.map((field) => (
+        <label key={field.id}>
+          {field.question}
+          <textarea
+            value={description[field.id] ?? ""}
+            maxLength={field.max_length}
+            onChange={(event) => setDescription({ ...description, [field.id]: event.target.value })}
+          />
+        </label>
+      ))}
       {schema.slots.map((slot) => (
         <fieldset key={slot.id}>
           <legend>{slot.question}</legend>

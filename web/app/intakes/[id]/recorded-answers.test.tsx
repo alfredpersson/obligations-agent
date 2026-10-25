@@ -7,7 +7,7 @@ vi.mock("next/navigation", () => ({ useParams: () => ({ id: "kq2V8yZx0bP4mT7nLw3
 
 const intake = {
   id: "kq2V8yZx0bP4mT7nLw3sAg",
-  description: "A door camera. <b>It records video.</b>",
+  description: { purpose: "A door camera. <b>It records video.</b>", people: "Building staff." },
   answers: { uses_camera: "yes", audience: "not_sure" },
   open_slots: ["audience"],
   step: { type: "ready_to_confirm" },
@@ -18,7 +18,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-test("the screen shows the description as text, each slot with the label of its value, and the open slots", async () => {
+test("the screen shows each description field under its label as text, each slot with the label of its value, and the open slots", async () => {
   stubFetch({
     "/api/intakes/kq2V8yZx0bP4mT7nLw3sAg": Response.json(intake),
     "/api/schema": Response.json(testSchema),
@@ -27,6 +27,13 @@ test("the screen shows the description as text, each slot with the label of its 
 
   expect(await screen.findByText("A door camera. <b>It records video.</b>")).toBeTruthy();
   expect(document.querySelector("b")).toBeNull();
+  const texts = [
+    ["Purpose", "A door camera. <b>It records video.</b>"],
+    ["People", "Building staff."],
+  ];
+  for (const [label, text] of texts) {
+    expect(screen.getByRole("heading", { name: label }).nextElementSibling?.textContent).toBe(text);
+  }
   expect(screen.getAllByRole("term").map((term) => term.textContent)).toEqual(["Camera", "Audience"]);
   expect(screen.getAllByRole("definition").map((value) => value.textContent)).toEqual([
     "Yes",

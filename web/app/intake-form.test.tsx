@@ -17,23 +17,28 @@ function radio(question: string, label: string) {
   return within(group).getByRole("radio", { name: label }) as HTMLInputElement;
 }
 
-function description() {
-  return screen.getByRole("textbox", { name: "What does the product do?" }) as HTMLTextAreaElement;
+// The questions of the two description fields in the test schema.
+const PURPOSE = "What is the product for?";
+const PEOPLE = "Who works with the product?";
+
+function descriptionField(question: string) {
+  return screen.getByRole("textbox", { name: question }) as HTMLTextAreaElement;
 }
 
 function sendButton() {
   return screen.getByRole("button", { name: "Send" }) as HTMLButtonElement;
 }
 
-// Answers both slots, the second with "Not sure", and fills in the description.
+// Answers both slots, the second with "Not sure", and fills in both description fields.
 async function fillIn() {
   await screen.findByRole("button", { name: "Send" });
   fireEvent.click(radio("Does the product use a camera?", "Yes"));
   fireEvent.click(radio("Who uses the product?", "Not sure"));
-  fireEvent.change(description(), { target: { value: "A door camera." } });
+  fireEvent.change(descriptionField(PURPOSE), { target: { value: "A door camera." } });
+  fireEvent.change(descriptionField(PEOPLE), { target: { value: "Building staff." } });
 }
 
-test("the form shows the description and every slot from the schema, in order, with no choice selected", async () => {
+test("the form shows the description fields and every slot from the schema, in order, with no choice selected", async () => {
   stubFetch({ "/api/schema": Response.json(testSchema) });
   render(<IntakeForm />);
 
@@ -48,35 +53,43 @@ test("the form shows the description and every slot from the schema, in order, w
     for (const label of labels) expect(radio(question, label).checked).toBe(false);
   }
   expect(screen.getAllByRole("radio")).toHaveLength(6);
-  expect(description().maxLength).toBe(300);
+  expect(descriptionField(PURPOSE).maxLength).toBe(300);
+  expect(descriptionField(PEOPLE).maxLength).toBe(200);
 });
 
-test("the description is the first field, so that the product is described before the questions", async () => {
+test("the description fields are the first fields, so that the product is described before the questions", async () => {
   stubFetch({ "/api/schema": Response.json(testSchema) });
   render(<IntakeForm />);
   await screen.findByRole("button", { name: "Send" });
 
-  expect(description().form?.elements[0]).toBe(description());
+  const fields = descriptionField(PURPOSE).form?.elements;
+  expect(fields?.[0]).toBe(descriptionField(PURPOSE));
+  expect(fields?.[1]).toBe(descriptionField(PEOPLE));
 });
 
-test("the form cannot be sent until every slot has an answer and the description is filled in", async () => {
+test("the form cannot be sent until every slot has an answer and every description field is filled in", async () => {
   stubFetch({ "/api/schema": Response.json(testSchema) });
   render(<IntakeForm />);
   await screen.findByRole("button", { name: "Send" });
   expect(sendButton().disabled).toBe(true);
 
   fireEvent.click(radio("Does the product use a camera?", "Yes"));
-  fireEvent.change(description(), { target: { value: "A door camera." } });
+  fireEvent.change(descriptionField(PURPOSE), { target: { value: "A door camera." } });
+  fireEvent.change(descriptionField(PEOPLE), { target: { value: "Building staff." } });
   expect(sendButton().disabled).toBe(true);
 
   // "Not sure" counts as an answer.
   fireEvent.click(radio("Who uses the product?", "Not sure"));
   expect(sendButton().disabled).toBe(false);
 
-  fireEvent.change(description(), { target: { value: "   " } });
+  fireEvent.change(descriptionField(PEOPLE), { target: { value: "   " } });
   expect(sendButton().disabled).toBe(true);
 
-  fireEvent.change(description(), { target: { value: "" } });
+  fireEvent.change(descriptionField(PEOPLE), { target: { value: "" } });
+  expect(sendButton().disabled).toBe(true);
+
+  fireEvent.change(descriptionField(PEOPLE), { target: { value: "Building staff." } });
+  fireEvent.change(descriptionField(PURPOSE), { target: { value: "" } });
   expect(sendButton().disabled).toBe(true);
 });
 
@@ -98,7 +111,7 @@ test("a sent form creates the intake and opens the screen with the recorded answ
   expect(new Headers(init?.headers).get("Content-Type")).toBe("application/json");
   expect(JSON.parse(String(init?.body))).toEqual({
     answers: { uses_camera: "yes", audience: "not_sure" },
-    description: "A door camera.",
+    description: { purpose: "A door camera.", people: "Building staff." },
   });
 });
 
@@ -152,6 +165,7 @@ test.each([
   expect((await screen.findByRole("alert")).textContent).not.toBe("");
   expect(radio("Does the product use a camera?", "Yes").checked).toBe(true);
   expect(radio("Who uses the product?", "Not sure").checked).toBe(true);
-  expect(description().value).toBe("A door camera.");
+  expect(descriptionField(PURPOSE).value).toBe("A door camera.");
+  expect(descriptionField(PEOPLE).value).toBe("Building staff.");
   expect(push).not.toHaveBeenCalled();
 });
