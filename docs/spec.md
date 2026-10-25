@@ -9,6 +9,7 @@ It covers what a user does when the web app and the Python service run on the us
 - **Unit**: one piece of regulation text that can be cited on its own (an article paragraph or point, a recital, or an annex point), with a fixed id such as `aia:art50(1)`.
 - **Slot**: one fact about the product, with a fixed list of allowed values. The fact schema is the list of all slots. A slot answered "not sure" is called open.
 - **Intake**: one run through the form, the follow-up questions and the confirmation, for one AI system.
+- **Description**: the three texts that the user writes about the product on the form (FACT-4).
 - **Gate**: a rule in code that reads slot values and decides whether one regulation, one role or one risk tier applies to the product. The same slot values always give the same answer, and no model takes part. Example: the provider gate decides whether the user is a provider under the AI Act.
 - **Scope object**: the combined result of all gates: every regulation, role and risk tier that applies to the product, the slot values that decided each one, and the open slots.
 - **Row**: one obligation in the memo. Each row belongs to exactly one unit.
@@ -65,9 +66,9 @@ The prompts therefore implement only part of the specification. A prompt cannot 
 
 **FACT-3.** The form shows the slots that are always relevant. Every other slot is asked as a follow-up question when it becomes relevant.
 
-**FACT-4.** The description is the only input where the user writes free text. It can be at most 1500 characters long.
+**FACT-4.** The description is the only input where the user writes free text. It has three fields, defined in `schema.yaml`: what the product does, who uses it, and what data it handles. Each can be at most 500 characters long.
 
-**FACT-5.** The form can be sent only when every slot on it has an answer and the description is filled in. "Not sure" counts as an answer.
+**FACT-5.** The form can be sent only when every slot on it has an answer and every field of the description is filled in. "Not sure" counts as an answer.
 
 **GATE-1.** Each gate is a decision table in `gates.yaml` and names the unit that defines it.
 

@@ -1,9 +1,13 @@
 import { vi } from "vitest";
+import type { Schema } from "./service";
 
-// A schema with two slots that are not in schema.yaml, and a limit other than 1500, so that the
-// tests show that the web app follows the schema it receives.
+// A schema with two description fields and two slots that are not in schema.yaml, and limits other
+// than 500, so that the tests show that the web app follows the schema it receives.
 export const testSchema = {
-  description: { label: "Description", question: "What does the product do?", max_length: 300 },
+  description: [
+    { id: "purpose", label: "Purpose", question: "What is the product for?", max_length: 300 },
+    { id: "people", label: "People", question: "Who works with the product?", max_length: 200 },
+  ],
   slots: [
     {
       id: "uses_camera",
@@ -26,7 +30,7 @@ export const testSchema = {
       ],
     },
   ],
-};
+} satisfies Schema;
 
 // Replaces fetch in a test. Each URL gets a response, or an error for fetch to throw.
 export function stubFetch(results: Record<string, Response | Error>) {

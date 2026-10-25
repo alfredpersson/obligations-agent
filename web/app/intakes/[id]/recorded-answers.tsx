@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import type { Intake, Schema } from "../../service";
 
 // The recorded answers of one intake, with the labels from the schema (INTAKE-5).
@@ -33,8 +33,12 @@ export default function RecordedAnswers() {
   const open = schema.slots.filter((slot) => intake.open_slots.includes(slot.id));
   return (
     <>
-      <h2>{schema.description.label}</h2>
-      <p>{intake.description}</p>
+      {schema.description.map((field) => (
+        <Fragment key={field.id}>
+          <h2>{field.label}</h2>
+          <p>{intake.description[field.id]}</p>
+        </Fragment>
+      ))}
       <h2>Answers</h2>
       <dl>
         {schema.slots.map((slot) => (

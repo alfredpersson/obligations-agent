@@ -13,7 +13,7 @@ class Intake(BaseModel):
     """The form answers and the description: the body of POST /intakes, and the stored intake."""
 
     answers: dict[str, str]
-    description: str
+    description: dict[str, str]
 
 
 class IntakeError(Exception):
@@ -25,8 +25,10 @@ class IntakeError(Exception):
         self.field = field
 
 
-def create_intake(schema: Schema, answers: dict[str, str], description: str) -> Intake:
-    """Checks slots that are not on the form, then each form slot in schema order, then the description."""
+def create_intake(
+    schema: Schema, answers: dict[str, str], description: dict[str, str]
+) -> Intake:
+    """Checks the answers, then the description: first ids that are not in the schema, then each entry in schema order."""
     form_slots = [slot.id for slot in schema.slots]
     for slot_id in answers:
         if slot_id not in form_slots:
@@ -34,10 +36,18 @@ def create_intake(schema: Schema, answers: dict[str, str], description: str) -> 
     for slot in schema.slots:
         if answers.get(slot.id) not in [value.id for value in slot.values]:
             raise IntakeError("invalid_value", slot.id)
-    if not description.strip() or len(description) > schema.description.max_length:
-        raise IntakeError("invalid_value", "description")
-    ordered = {slot_id: answers[slot_id] for slot_id in form_slots}
-    return Intake(answers=ordered, description=description)
+    fields = [field.id for field in schema.description]
+    for field_id in description:
+        if field_id not in fields:
+            raise IntakeError("invalid_value", field_id)
+    for field in schema.description:
+        text = description.get(field.id, "")
+        if not text.strip() or len(text) > field.max_length:
+            raise IntakeError("invalid_value", field.id)
+    return Intake(
+        answers={slot_id: answers[slot_id] for slot_id in form_slots},
+        description={field_id: description[field_id] for field_id in fields},
+    )
 
 
 def open_slots(intake: Intake) -> list[str]:
