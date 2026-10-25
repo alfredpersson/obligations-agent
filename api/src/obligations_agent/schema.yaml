@@ -1,9 +1,12 @@
 # The fact schema (FACT-1 in docs/spec.md). Every slot has an id, a label, a
 # question, the allowed values, a relevance condition and the unit that defines
-# it, and every slot has the value not_sure (FACT-2). The description fields are
-# the text that the user writes (FACT-4). The ids of the description fields and
-# the slots are unique together, and so are the value ids within a slot. Quote
-# yes, no, Yes and No: without quotes, PyYAML reads them as true and false.
+# it, and every slot has the value not_sure (FACT-2). The condition is always for
+# the slots on the form (FACT-3). For a follow-up slot, it lists earlier slots,
+# each with values: the slot is relevant when each listed slot has one of its
+# values. The description fields are the text that the user writes (FACT-4). The
+# ids of the description fields and the slots are unique together, and so are
+# the value ids within a slot. Quote yes, no, Yes and No: without quotes, PyYAML
+# reads them as true and false.
 
 description:
   - id: what_it_does
@@ -55,4 +58,71 @@ slots:
       - { id: migration, label: "Migration, asylum and border control management" }
       - { id: justice, label: Administration of justice and democratic processes }
       - { id: none, label: None of these }
+      - { id: not_sure, label: Not sure }
+
+  - id: decides_purposes
+    label: Decides why and how personal data is processed
+    question: Do you decide, alone or together with others, what the personal data is used for and how it is processed?
+    relevant:
+      personal_data: ["yes", not_sure]
+    unit: "gdpr:art4(7)"
+    values:
+      - { id: "yes", label: "Yes" }
+      - { id: "no", label: "No" }
+      - { id: not_sure, label: Not sure }
+
+  - id: processes_for_customer
+    label: Processes personal data for a customer
+    question: Do you process personal data on behalf of a customer, following the customer's instructions?
+    relevant:
+      personal_data: ["yes", not_sure]
+    unit: "gdpr:art4(8)"
+    values:
+      - { id: "yes", label: "Yes" }
+      - { id: "no", label: "No" }
+      - { id: not_sure, label: Not sure }
+
+  - id: special_categories
+    label: Special categories of personal data
+    question: Does the product process data that shows a person's racial or ethnic origin, political opinions, religious or philosophical beliefs or trade union membership, or genetic data, biometric data used to identify a person, health data, or data about a person's sex life or sexual orientation?
+    relevant:
+      personal_data: ["yes", not_sure]
+    unit: "gdpr:art9(1)"
+    values:
+      - { id: "yes", label: "Yes" }
+      - { id: "no", label: "No" }
+      - { id: not_sure, label: Not sure }
+
+  - id: automated_decisions
+    label: Automated decisions about people
+    question: Does the product make decisions about people without a person taking part, where the decision has a legal effect on them or affects them in a similarly significant way, for example refusing a credit application or a job application?
+    relevant:
+      personal_data: ["yes", not_sure]
+    unit: "gdpr:art22(1)"
+    values:
+      - { id: "yes", label: "Yes" }
+      - { id: "no", label: "No" }
+      - { id: not_sure, label: Not sure }
+
+  - id: interacts_with_people
+    label: Interacts with people
+    question: Do people interact with the product directly, for example by chatting with it or talking to it?
+    relevant:
+      under_own_name: ["yes", not_sure]
+    unit: "aia:art50(1)"
+    values:
+      - { id: "yes", label: "Yes" }
+      - { id: "no", label: "No" }
+      - { id: not_sure, label: Not sure }
+
+  - id: profiling
+    label: Profiling
+    question: Does the product use personal data to evaluate or predict things about individual people, such as their performance at work, economic situation, health, personal preferences, interests, reliability, behaviour, location or movements?
+    relevant:
+      use_case_area: [biometrics, critical_infrastructure, education, employment, essential_services, law_enforcement, migration, justice, not_sure]
+      personal_data: ["yes", not_sure]
+    unit: "aia:art6(3)"
+    values:
+      - { id: "yes", label: "Yes" }
+      - { id: "no", label: "No" }
       - { id: not_sure, label: Not sure }
