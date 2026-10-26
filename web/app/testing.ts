@@ -1,8 +1,9 @@
 import { vi } from "vitest";
 import type { Schema } from "./service";
 
-// A schema with two description fields and two slots that are not in schema.yaml, and limits other
-// than 500, so that the tests show that the web app follows the schema it receives.
+// A schema with two description fields, two form slots and two follow-up slots that are not in
+// schema.yaml, and limits other than 500, so that the tests show that the web app follows the
+// schema it receives.
 export const testSchema = {
   description: [
     { id: "purpose", label: "Purpose", question: "What is the product for?", max_length: 300 },
@@ -26,6 +27,28 @@ export const testSchema = {
       values: [
         { id: "staff", label: "Staff" },
         { id: "public", label: "The public" },
+        { id: "not_sure", label: "Not sure" },
+      ],
+    },
+  ],
+  follow_up_slots: [
+    {
+      id: "stores_video",
+      label: "Video storage",
+      question: "Does the product store video?",
+      values: [
+        { id: "yes", label: "Yes" },
+        { id: "no", label: "No" },
+        { id: "not_sure", label: "Not sure" },
+      ],
+    },
+    {
+      id: "shares_video",
+      label: "Video sharing",
+      question: "Does the product share video with others?",
+      values: [
+        { id: "yes", label: "Yes" },
+        { id: "no", label: "No" },
         { id: "not_sure", label: "Not sure" },
       ],
     },

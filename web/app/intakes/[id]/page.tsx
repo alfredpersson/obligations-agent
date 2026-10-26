@@ -1,14 +1,13 @@
 import { Suspense } from "react";
-import RecordedAnswers from "./recorded-answers";
+import IntakeScreen from "./intake-screen";
 
 export default function IntakePage() {
   return (
     <main>
-      <h1>Recorded answers</h1>
       {/* The intake id is known only when the page is opened. Without Suspense, pnpm build fails
           under cacheComponents. */}
       <Suspense>
-        <RecordedAnswers />
+        <IntakeScreen />
       </Suspense>
     </main>
   );
