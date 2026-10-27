@@ -66,7 +66,7 @@ The prompts therefore implement only part of the specification. A prompt cannot 
 
 **FACT-3.** The form shows the slots that are always relevant. Every other slot is asked as a follow-up question when it becomes relevant.
 
-**FACT-4.** The description is the only input where the user writes free text. It has three fields, defined in `schema.yaml`: what the product does, who uses it, and what data it handles. Each can be at most 500 characters long.
+**FACT-4.** The description and the notes of "not sure" answers (INTAKE-6) are the only inputs where the user writes free text. The description has three fields, defined in `schema.yaml`: what the product does, who uses it, and what data it handles. Each can be at most 500 characters long.
 
 **FACT-5.** The form can be sent only when every slot on it has an answer and every field of the description is filled in. "Not sure" counts as an answer.
 
@@ -91,12 +91,13 @@ The prompts therefore implement only part of the specification. A prompt cannot 
 **INTAKE-1.** One step runs after the form is submitted and after every answer:
 
 1. Code records the answer, checks which slots are now relevant, removes the answers of slots that are no longer relevant, and puts the relevant slots that have no answer in a queue.
-2. The model receives the description, the answers so far and the queue as data, and ends the step by calling `ask` or `finish`.
-3. Code enforces the limits.
+2. Code ends the intake when the limit for the intake is reached or when no slot can be asked about (INTAKE-2).
+3. Otherwise, the model receives the description, the answers so far and the slots that it may ask about, with the user's notes, as data, and ends the step by calling `ask`.
+4. Code enforces the limits.
 
-If the model does not make a valid `ask` or `finish` call, code asks about the next slot in the queue with its default question text, or finishes the intake if the queue is empty.
+If the model does not make a valid `ask` call, code asks about the next slot in the queue with its default question text, or ends the intake if the queue is empty.
 
-**INTAKE-2.** The model may ask only about slots that are relevant and that are either not asked yet or open. It may ask about the same slot more than once, up to the limit per slot. It can call `finish` only when every relevant slot has an answer.
+**INTAKE-2.** The model may ask only about slots that are relevant and that are either not asked yet or answered "not sure" because the user does not understand the question (INTAKE-6). It may ask about such a slot again, up to the limit per slot. A slot answered "not sure" because the user does not know the fact is not asked again and stays open.
 
 **INTAKE-3.** The limits are two questions per slot, where the form's question is the first question about a slot on the form, and eight follow-up questions per intake. When the limit for the intake is reached, code finishes the intake. When an intake ends, relevant slots that still have no answer are treated as open.
 
@@ -104,14 +105,15 @@ If the model does not make a valid `ask` or `finish` call, code asks about the n
 
 **INTAKE-5.** The confirmation screen shows every recorded value with the labels from the schema, and lists the open slots. The user may change any value, and may answer an open slot by choosing one of its allowed values. After the user confirms, the answers can no longer be changed. The memo is built only from the confirmed answers and the description.
 
+**INTAKE-6.** When the user answers "not sure", on the form or to a follow-up question, the user may give a reason, "I don't understand the question" or "I don't know this about the product", and a note of at most 500 characters. A "not sure" answer without a reason counts as "I don't know this about the product". The reason and the note belong to the slot, and a later answer about the slot replaces them. When the model may ask about the slot again, it receives the note as data in the user message (INTAKE-4).
+
 ### Intake tools
 
-Both tools change only the intake state.
+The tool changes only the intake state.
 
 | ID | Tool | Inputs | On success | On failure |
 | --- | --- | --- | --- | --- |
-| TOOL-1 | `ask` | slot id, question text, options each linked to an allowed value | The question is recorded and shown to the user, and the step ends. | `invalid_slot` if the slot does not exist; `not_askable` if the slot is not relevant or has an answer other than "not sure"; `invalid_option` if the options do not link each allowed value of the slot exactly once; `limit_reached` if the limit for the slot or for the intake is reached. |
-| TOOL-2 | `finish` | none | The intake ends and moves to confirmation. | None. `finish` always succeeds. |
+| TOOL-1 | `ask` | slot id, question text, options each linked to an allowed value | The question is recorded and shown to the user, and the step ends. | `invalid_slot` if the slot does not exist; `not_askable` if the slot is not relevant, has an answer other than "not sure", or was answered "not sure" because the user does not know the fact; `invalid_option` if the options do not link each allowed value of the slot exactly once; `limit_reached` if the limit for the slot or for the intake is reached. |
 
 ## 5. Memo
 
@@ -164,4 +166,4 @@ Both tools change only the intake state.
 
 **RESP-3.** The memo and the questions use direct language without filler words. They use the regulation's own terms where the exact term matters, and plain words elsewhere.
 
-**RESP-4.** A question that the model writes asks about the same fact as its default question and keeps each of its conditions. It states nothing about the product that the description does not state, and it does not suggest which answer applies. It is easier for this user to answer than the default question: it names the product's own parties and data where the default question uses general terms, or it says what an answer means for this product.
+**RESP-4.** A question that the model writes asks about the same fact as its default question and keeps each of its conditions. It states nothing about the product that the description or the user's notes do not state, and it does not suggest which answer applies. It is easier for this user to answer than the default question: it names the product's own parties and data where the default question uses general terms, or it says what an answer means for this product.

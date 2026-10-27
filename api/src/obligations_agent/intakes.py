@@ -1,9 +1,10 @@
-"""Intakes: the form answers and the description, checked against the fact schema (FACT-2, FACT-4, FACT-5), and the follow-up questions with their limits (INTAKE-1 to INTAKE-3)."""
+"""Intakes: the form answers and the description, checked against the fact schema (FACT-2, FACT-4, FACT-5), the follow-up questions with their limits (INTAKE-1 to INTAKE-3), and the reason and the note of each "not sure" answer (INTAKE-6)."""
 
+import logging
 from collections.abc import Callable
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from obligations_agent.schema import NOT_SURE, Schema, Slot
 
@@ -16,12 +17,22 @@ Refusal = Literal["not_askable", "limit_reached"]
 QUESTION_LIMIT = 8
 SLOT_LIMIT = 2
 
+logger = logging.getLogger(__name__)
+
+
+class NotSure(BaseModel):
+    """Why the user answered "not sure": "unclear" when the question is unclear to the user, "unknown" when the user does not know the fact about the product, also when no reason is given. The note is optional, as long as a description field at most (INTAKE-6)."""
+
+    reason: Literal["unclear", "unknown"] = "unknown"
+    note: str = Field(default="", max_length=500)
+
 
 class Form(BaseModel):
-    """The form answers and the description: the body of POST /intakes."""
+    """The form answers, the description, and the reason and the note of form slots answered "not sure": the body of POST /intakes."""
 
     answers: dict[str, str]
     description: dict[str, str]
+    not_sure: dict[str, NotSure] = {}
 
 
 class Option(BaseModel):
@@ -40,7 +51,7 @@ class Question(BaseModel):
 
 
 class Intake(Form):
-    """A stored intake. The answers hold one current value for each slot, the follow-up answers included. questions holds each follow-up question, in the order asked, and replies the answer to each question that has one, in the same order."""
+    """A stored intake. The answers hold one current value for each slot, the follow-up answers included, and not_sure the reason and the note of each slot whose current value is "not sure". questions holds each follow-up question, in the order asked, and replies the answer to each question that has one, in the same order."""
 
     questions: list[Question] = []
     replies: list[str] = []
@@ -50,10 +61,11 @@ Writer = Callable[[Intake], Question | None]
 
 
 class Answer(BaseModel):
-    """The body of POST /intakes/{id}/answers: the number of a question, and the value of one of its options."""
+    """The body of POST /intakes/{id}/answers: the number of a question, the value of one of its options, and for "not sure" the reason and the note."""
 
     question: int
     value: str
+    not_sure: NotSure | None = None
 
 
 class IntakeError(Exception):
@@ -90,8 +102,9 @@ def asked_before(intake: Intake, slot: Slot) -> list[str]:
 
 
 def check_slot(intake: Intake, slot: Slot) -> Refusal | None:
-    """Why the model may not ask about the slot now, or None when it may: the slot is relevant, has no answer or the answer "not sure", and has had fewer than two questions (INTAKE-2, INTAKE-3)."""
-    if intake.answers.get(slot.id, NOT_SURE) != NOT_SURE or not is_relevant(
+    """Why the model may not ask about the slot now, or None when it may: the slot is relevant, has no answer or the answer "not sure" because the question is unclear, and has had fewer than two questions (INTAKE-2, INTAKE-3)."""
+    unclear = intake.not_sure.get(slot.id, NotSure()).reason == "unclear"
+    if (slot.id in intake.answers and not unclear) or not is_relevant(
         slot, intake.answers
     ):
         return "not_askable"
@@ -113,9 +126,10 @@ def create_intake(
     schema: Schema,
     answers: dict[str, str],
     description: dict[str, str],
+    not_sure: dict[str, NotSure],
     write: Writer,
 ) -> Intake:
-    """Checks the answers, then the description: first ids that are not slots on the form, then each entry in schema order. Then asks the first follow-up question."""
+    """Checks the answers, then the reasons and the notes, then the description: first ids that are not slots on the form, then each entry in schema order. Then asks the first follow-up question."""
     form_slots = [slot.id for slot in schema.slots]
     for slot_id in answers:
         if slot_id not in form_slots:
@@ -123,6 +137,9 @@ def create_intake(
     for slot in schema.slots:
         if answers.get(slot.id) not in [value.id for value in slot.values]:
             raise IntakeError("invalid_value", slot.id)
+    for slot_id in not_sure:
+        if answers.get(slot_id) != NOT_SURE:
+            raise IntakeError("invalid_value", slot_id)
     fields = [field.id for field in schema.description]
     for field_id in description:
         if field_id not in fields:
@@ -134,7 +151,16 @@ def create_intake(
     intake = Intake(
         answers={slot_id: answers[slot_id] for slot_id in form_slots},
         description={field_id: description[field_id] for field_id in fields},
+        not_sure={
+            slot_id: not_sure.get(slot_id, NotSure())
+            for slot_id in form_slots
+            if answers[slot_id] == NOT_SURE
+        },
     )
+    for slot_id, entry in intake.not_sure.items():
+        logger.info(
+            "not sure answer on the form slot=%s reason=%s", slot_id, entry.reason
+        )
     return ask_next(intake, write)
 
 
@@ -154,14 +180,21 @@ def waiting(intake: Intake) -> int | None:
 
 
 def record_answer(
-    schema: Schema, intake: Intake, question: int, value: str, write: Writer
+    schema: Schema,
+    intake: Intake,
+    question: int,
+    value: str,
+    not_sure: NotSure | None,
+    write: Writer,
 ) -> Intake:
-    """Records the answer to a question, removes the answers of slots that are no longer relevant (INTAKE-1), and asks the next question. The value is checked first. An answer to a question that already has an answer changes nothing, so a repeated request acts once."""
+    """Records the answer to a question with the reason and the note of a "not sure" answer, removes the answers of slots that are no longer relevant (INTAKE-1), and asks the next question. The answer is checked first. An answer to a question that already has an answer changes nothing, so a repeated request acts once."""
     if not 1 <= question <= len(intake.questions):
         raise IntakeError("invalid_value", "question")
     asked = intake.questions[question - 1]
     if value not in [option.value for option in asked.options]:
         raise IntakeError("invalid_value", "value")
+    if not_sure is not None and value != NOT_SURE:
+        raise IntakeError("invalid_value", "not_sure")
     if question <= len(intake.replies):
         return intake
     answers = {**intake.answers, asked.slot: value}
@@ -169,10 +202,27 @@ def record_answer(
     for slot in schema.follow_up_slots:
         if not is_relevant(slot, answers):
             answers.pop(slot.id, None)
-    replies = [*intake.replies, value]
-    return ask_next(
-        intake.model_copy(update={"answers": answers, "replies": replies}), write
-    )
+    entry = not_sure or NotSure()
+    if value == NOT_SURE:
+        logger.info(
+            "not sure answer to question %d slot=%s reason=%s",
+            question,
+            asked.slot,
+            entry.reason,
+        )
+    # A later answer about a slot replaces its reason and its note, and a removed answer takes
+    # them along.
+    entries = {**intake.not_sure, asked.slot: entry}
+    update = {
+        "answers": answers,
+        "not_sure": {
+            slot_id: entries[slot_id]
+            for slot_id in entries
+            if answers.get(slot_id) == NOT_SURE
+        },
+        "replies": [*intake.replies, value],
+    }
+    return ask_next(intake.model_copy(update=update), write)
 
 
 def open_slots(schema: Schema, intake: Intake) -> list[str]:

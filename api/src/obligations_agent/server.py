@@ -87,7 +87,9 @@ def create_app(
 
     @app.post("/intakes", status_code=201)
     def post_intake(body: Form) -> dict[str, Any]:
-        intake = create_intake(schema, body.answers, body.description, write)
+        intake = create_intake(
+            schema, body.answers, body.description, body.not_sure, write
+        )
         # 128 random bits, as 22 URL-safe characters.
         intake_id = secrets.token_urlsafe(16)
         intakes[intake_id] = intake
@@ -103,6 +105,7 @@ def create_app(
             "description": intake.description,
             "answers": intake.answers,
             "open_slots": open_slots(schema, intake),
+            "not_sure": intake.not_sure,
             "step": step(intake),
         }
 
@@ -113,7 +116,9 @@ def create_app(
             if intake is None:
                 raise IntakeError("not_found")
             # record_answer returns a new intake, so a reader sees the old one or the new one.
-            intake = record_answer(schema, intake, body.question, body.value, write)
+            intake = record_answer(
+                schema, intake, body.question, body.value, body.not_sure, write
+            )
             intakes[intake_id] = intake
         return {"step": step(intake)}
 
