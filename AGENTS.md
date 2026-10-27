@@ -63,7 +63,7 @@ pnpm e2e
 4. Write the tests from the acceptance criteria first, then the code.
 5. When the tests pass, check the changed code for types and helpers that repeat existing ones and for code that can be simpler, and fix the findings within the scope of the issue. In Claude Code, `/simplify` runs this check.
 6. Commit and push only when the author asks. Every commit message discloses AI assistance with a `Co-Authored-By` trailer.
-7. Open a small pull request with the template in `.github/pull_request_template.md`. Fill in the decision log: what was tried and what was ruled out.
+7. Open a small pull request with the template in `.github/pull_request_template.md`. Fill in the decision log: what was tried, what was ruled out, and each existing test that changed, with the reason.
 8. The author reviews and merges. Agents do not merge.
 
 ## Writing
