@@ -11,7 +11,7 @@ Two documents describe the product:
 - [docs/brief.md](docs/brief.md): who the product is for, what it must do for them, and which assumptions the design is based on.
 - [docs/spec.md](docs/spec.md): how the product must behave.
 
-`api/` holds the Python service and `web/` the Next.js web app. The service serves the fact schema, with three facts on the form and six follow-up facts. It records the form answers of an intake, then asks the follow-up questions one at a time with their default texts. The web app shows the form, then each follow-up question, then the recorded answers. Architecture decision records (ADRs) will go in `docs/`.
+`api/` holds the Python service and `web/` the Next.js web app. The service serves the fact schema, with three facts on the form and six follow-up facts. It records the form answers of an intake, then asks the follow-up questions one at a time. A model writes the text and the option labels of each question. Without a key for the model, or when a call fails, the service uses the default texts. The web app shows the form, then each follow-up question, then the recorded answers. Architecture decision records (ADRs) will go in `docs/`.
 
 ## Checks
 
@@ -41,7 +41,7 @@ pnpm build
 
 `pnpm install --frozen-lockfile` fails when `pnpm-lock.yaml` does not match `package.json`. The same 7-day rule applies (`minimumReleaseAge` in `web/pnpm-workspace.yaml`), and `pnpm lint` also fails on warnings.
 
-The browser test in `web/` starts the service and the web app by itself, fills in the form in Chromium, and checks the screen with the recorded answers. Install the browser once for each Playwright version, then run the test:
+The browser test in `web/` starts the service and the web app by itself, fills in the form in Chromium, and checks the screen with the recorded answers. It expects the default question texts. Outside CI it reuses a service that already runs on port 8000, so that service must run without the key. Install the browser once for each Playwright version, then run the test:
 
 ```sh
 pnpm exec playwright install --only-shell chromium
@@ -58,7 +58,15 @@ In `api/`:
 uv run uvicorn obligations_agent.server:app --reload
 ```
 
-The service then answers on http://127.0.0.1:8000. It keeps intakes in memory, so they are lost when the service stops.
+The service then answers on http://127.0.0.1:8000. It keeps intakes in memory, so they are lost when the service stops. Without a key, it asks the follow-up questions with their default texts.
+
+For questions written by a model (Claude Sonnet 5.5), put an Anthropic API key in `api/.env`, as one line `ANTHROPIC_API_KEY=...`, and start the service with that file. `.gitignore` keeps the file out of the repository.
+
+```sh
+uv run --env-file .env uvicorn obligations_agent.server:app --reload
+```
+
+The service writes one log line for each question. The line says whether the model wrote the question, or why the default text was used.
 
 In `web/`, while the service runs:
 

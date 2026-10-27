@@ -110,7 +110,7 @@ Both tools change only the intake state.
 
 | ID | Tool | Inputs | On success | On failure |
 | --- | --- | --- | --- | --- |
-| TOOL-1 | `ask` | slot id, question text, options each linked to an allowed value | The question is recorded and shown to the user, and the step ends. | `invalid_slot` if the slot does not exist; `not_askable` if the slot is not relevant or has an answer other than "not sure"; `invalid_option` if an option is not linked to an allowed value; `limit_reached` if the limit for the slot or for the intake is reached. |
+| TOOL-1 | `ask` | slot id, question text, options each linked to an allowed value | The question is recorded and shown to the user, and the step ends. | `invalid_slot` if the slot does not exist; `not_askable` if the slot is not relevant or has an answer other than "not sure"; `invalid_option` if the options do not link each allowed value of the slot exactly once; `limit_reached` if the limit for the slot or for the intake is reached. |
 | TOOL-2 | `finish` | none | The intake ends and moves to confirmation. | None. `finish` always succeeds. |
 
 ## 5. Memo
@@ -163,3 +163,5 @@ Both tools change only the intake state.
 **RESP-2.** When a question uses a term that the regulation defines, it shows the definition from the regulation.
 
 **RESP-3.** The memo and the questions use direct language without filler words. They use the regulation's own terms where the exact term matters, and plain words elsewhere.
+
+**RESP-4.** A question that the model writes asks about the same fact as its default question and keeps each of its conditions. It states nothing about the product that the description does not state, and it does not suggest which answer applies. It is easier for this user to answer than the default question: it names the product's own parties and data where the default question uses general terms, or it says what an answer means for this product.
