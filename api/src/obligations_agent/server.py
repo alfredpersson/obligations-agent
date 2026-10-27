@@ -11,7 +11,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from obligations_agent.intake_model import new_client, write_question
+from obligations_agent.intake_model import new_client, next_question
 from obligations_agent.intakes import (
     Answer,
     ErrorCode,
@@ -24,7 +24,7 @@ from obligations_agent.intakes import (
     record_answer,
     waiting,
 )
-from obligations_agent.schema import Schema, Slot, load_schema
+from obligations_agent.schema import Schema, load_schema
 
 READY_TO_CONFIRM = {"type": "ready_to_confirm"}
 
@@ -59,12 +59,12 @@ def create_app(
 ) -> FastAPI:
     app = FastAPI()
     # FastAPI runs these endpoints in several threads. Answers are recorded one at a time, so that
-    # the second of two copies of an answer sees the first and changes nothing. The model writes
-    # the next question under the same lock.
+    # the second of two copies of an answer sees the first and changes nothing. The model chooses
+    # and writes the next question under the same lock.
     answering = threading.Lock()
 
-    def write(slot: Slot, intake: Intake) -> Question:
-        return write_question(client, schema, slot, intake)
+    def write(intake: Intake) -> Question | None:
+        return next_question(client, schema, intake)
 
     @app.exception_handler(IntakeError)
     async def intake_error(request: Request, error: IntakeError) -> JSONResponse:
