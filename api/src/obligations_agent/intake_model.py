@@ -106,7 +106,8 @@ def ask_model(
         return "invalid_output"
     try:
         question = Question.model_validate({**call.input, "slot": slot.id})
-    except ValidationError:
+    # The SDK does not check responses, so the input can be something other than an object.
+    except TypeError, ValidationError:
         return "invalid_output"
     if not question.text.strip() or any(
         not option.label.strip() for option in question.options

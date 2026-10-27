@@ -225,6 +225,11 @@ def input_without_options(request: httpx2.Request) -> httpx2.Response:
     return ask({"text": TEXT})
 
 
+def input_not_an_object(request: httpx2.Request) -> httpx2.Response:
+    block = {"type": "tool_use", "id": "toolu_test", "name": "ask", "input": TEXT}
+    return message([block], "tool_use")
+
+
 def cut_off(request: httpx2.Request) -> httpx2.Response:
     return ask(
         {"text": "Does the shop decide", "options": WRITTEN}, stop_reason="max_tokens"
@@ -248,6 +253,7 @@ def empty_label(request: httpx2.Request) -> httpx2.Response:
         (refusal, "invalid_output"),
         (text_without_a_call, "invalid_output"),
         (input_without_options, "invalid_output"),
+        (input_not_an_object, "invalid_output"),
         (cut_off, "invalid_output"),
         (empty_text, "invalid_output"),
         (empty_label, "invalid_output"),
