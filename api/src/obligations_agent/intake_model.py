@@ -1,4 +1,4 @@
-"""The intake model: chooses the slot of each follow-up question among the askable ones and writes the text and the option labels, or finishes the intake (INTAKE-2, INTAKE-4, TOOL-1, TOOL-2). Without a key, or when the call gives no valid ask or finish, code asks about the next slot in the queue with its default text, or ends the intake (INTAKE-1)."""
+"""The intake model: chooses the slot of each follow-up question among the askable ones and writes the text and the option labels (INTAKE-2, INTAKE-4, TOOL-1). Code ends the intake. Without a key, or when the call gives no valid ask, code asks about the next slot in the queue with its default text, or ends the intake (INTAKE-1)."""
 
 import json
 import logging
@@ -13,6 +13,7 @@ from obligations_agent.intakes import (
     QUESTION_LIMIT,
     SLOT_LIMIT,
     Intake,
+    NotSure,
     Question,
     Refusal,
     askable,
@@ -58,17 +59,6 @@ ASK: ToolParam = {
         "additionalProperties": False,
     },
 }
-FINISH: ToolParam = {
-    "name": "finish",
-    "description": "Ends the follow-up questions, so that the user can check the answers.",
-    "strict": True,
-    "input_schema": {
-        "type": "object",
-        "properties": {},
-        "required": [],
-        "additionalProperties": False,
-    },
-}
 
 Reason = (
     Literal[
@@ -91,7 +81,7 @@ def new_client() -> anthropic.Anthropic:
 
 
 def user_message(schema: Schema, intake: Intake, slots: list[Slot]) -> str:
-    """The description, the answers so far with their labels, and the slots that may be asked about, as JSON data (INTAKE-1, INTAKE-4)."""
+    """The description, the answers so far with their labels, and the slots that may be asked about with the notes, as JSON data (INTAKE-1, INTAKE-4)."""
     data = {
         "description": {
             field.label: intake.description[field.id] for field in schema.description
@@ -109,7 +99,7 @@ def user_message(schema: Schema, intake: Intake, slots: list[Slot]) -> str:
 
 
 def fact(intake: Intake, slot: Slot) -> dict[str, object]:
-    """One slot that may be asked about, for the user message."""
+    """One slot that may be asked about, for the user message, with the user's note about the earlier questions."""
     earlier = asked_before(intake, slot)
     return {
         "id": slot.id,
@@ -117,6 +107,7 @@ def fact(intake: Intake, slot: Slot) -> dict[str, object]:
         "default_question": slot.question,
         "values": [{"value": value.id, "label": value.label} for value in slot.values],
         "earlier_questions": earlier,
+        "note": intake.not_sure.get(slot.id, NotSure()).note,
         "questions_left": SLOT_LIMIT - len(earlier),
     }
 
@@ -126,9 +117,8 @@ def ask_model(
     schema: Schema,
     intake: Intake,
     slots: list[Slot],
-    offer_finish: bool,
-) -> Question | Literal["finish"] | Reason:
-    """The question that the model asks, its call of finish, or the reason why it made no valid call (TOOL-1, TOOL-2)."""
+) -> Question | Reason:
+    """The question that the model asks, or the reason why it made no valid call (TOOL-1)."""
     if client is None:
         return "no_key"
     try:
@@ -136,7 +126,7 @@ def ask_model(
             model=MODEL,
             max_tokens=2048,
             system=PROMPT,
-            tools=[ASK, FINISH] if offer_finish else [ASK],
+            tools=[ASK],
             # The model refuses a forced tool choice, so the prompt asks for the call.
             tool_choice={"type": "auto", "disable_parallel_tool_use": True},
             messages=[{"role": "user", "content": user_message(schema, intake, slots)}],
@@ -146,11 +136,7 @@ def ask_model(
     except anthropic.APIError:
         return "call_failed"
     call = next((block for block in response.content if block.type == "tool_use"), None)
-    if response.stop_reason != "tool_use" or call is None:
-        return "invalid_output"
-    if call.name == "finish" and offer_finish:
-        return "finish"
-    if call.name != "ask":
+    if response.stop_reason != "tool_use" or call is None or call.name != "ask":
         return "invalid_output"
     try:
         question = Question.model_validate(call.input)
@@ -184,23 +170,20 @@ def ask_model(
 def next_question(
     client: anthropic.Anthropic | None, schema: Schema, intake: Intake
 ) -> Question | None:
-    """The next follow-up question, chosen and written by the model or by code, or None when the intake ends, and one log line that says which (INTAKE-1, INTAKE-3)."""
+    """The next follow-up question, chosen and written by the model or by code, or None when code ends the intake, and one log line that says which (INTAKE-1, INTAKE-3)."""
     if len(intake.questions) >= QUESTION_LIMIT:
-        return end(intake, "code reason=question_limit")
+        return end(intake, "question_limit")
     slots = askable(schema, intake)
     if not slots:
-        return end(intake, "code reason=no_askable_slot")
+        return end(intake, "no_askable_slot")
     # The queue's first slot: the first relevant slot without an answer, in schema order. Code
-    # asks about it when the model does not, and finish is offered only when there is none
-    # (INTAKE-1, INTAKE-2).
+    # asks about it when the model does not (INTAKE-1).
     queue = next((slot for slot in slots if slot.id not in intake.answers), None)
-    result = ask_model(client, schema, intake, slots, offer_finish=queue is None)
-    if result == "finish":
-        return end(intake, "model")
+    result = ask_model(client, schema, intake, slots)
     written_by = "model"
     if not isinstance(result, Question):
         if queue is None:
-            return end(intake, f"code reason={result}")
+            return end(intake, result)
         written_by = f"default reason={result}"
         result = default_question(queue)
     logger.info(
@@ -214,12 +197,12 @@ def next_question(
     return result
 
 
-def end(intake: Intake, ended_by: str) -> None:
-    """The log line for the end of the intake."""
+def end(intake: Intake, reason: str) -> None:
+    """The log line for the end of the intake, with the reason why code ends it."""
     logger.info(
-        "end after %d questions model=%s prompt=%s ended_by=%s",
+        "end after %d questions model=%s prompt=%s reason=%s",
         len(intake.questions),
         MODEL,
         PROMPT_VERSION,
-        ended_by,
+        reason,
     )

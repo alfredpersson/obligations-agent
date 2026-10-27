@@ -1,4 +1,4 @@
-"""Tests for GET /schema, POST /intakes, GET /intakes/{id} and POST /intakes/{id}/answers: acceptance criteria 2 to 7 of issue #7, the three description fields of issue #12, and acceptance criteria 2 to 7 of issue #16."""
+"""Tests for GET /schema, POST /intakes, GET /intakes/{id} and POST /intakes/{id}/answers: acceptance criteria 2 to 7 of issue #7, the three description fields of issue #12, acceptance criteria 2 to 7 of issue #16, and acceptance criteria 1 and 3 of issue #24."""
 
 import re
 from typing import Any
@@ -488,8 +488,86 @@ def test_get_intake_returns_the_answers_and_the_open_slots_in_schema_order(
         },
         # The follow-up slots after the first question are not asked yet, so they are not open.
         "open_slots": ["personal_data", "use_case_area"],
+        # Without a reason, a "not sure" answer counts as "I don't know this about the product".
+        "not_sure": {
+            "personal_data": {"reason": "unknown", "note": ""},
+            "use_case_area": {"reason": "unknown", "note": ""},
+        },
         "step": FIRST_QUESTION,
     }
+
+
+def test_post_intakes_stores_the_reason_and_the_note_of_each_form_slot_answered_not_sure(
+    client: TestClient,
+) -> None:
+    answers = {
+        "personal_data": "not_sure",
+        "under_own_name": "not_sure",
+        "use_case_area": "not_sure",
+    }
+    # é is one character and two bytes in UTF-8: the limit of 500 counts characters.
+    note = "é" * 500
+    not_sure = {
+        "under_own_name": {"note": "We have to ask the sales team."},
+        "use_case_area": {"reason": "unclear", "note": note},
+    }
+    created = client.post(
+        "/intakes",
+        json={"answers": answers, "description": DESCRIPTION, "not_sure": not_sure},
+    ).json()
+
+    response = client.get(f"/intakes/{created['id']}")
+
+    # Without a reason, a "not sure" answer counts as "I don't know this about the product".
+    assert response.json()["not_sure"] == {
+        "personal_data": {"reason": "unknown", "note": ""},
+        "under_own_name": {
+            "reason": "unknown",
+            "note": "We have to ask the sales team.",
+        },
+        "use_case_area": {"reason": "unclear", "note": note},
+    }
+
+
+@pytest.mark.parametrize(
+    ("not_sure", "field"),
+    [
+        pytest.param(
+            {"personal_data": {"reason": "unclear"}},
+            "personal_data",
+            id="a slot answered yes",
+        ),
+        pytest.param(
+            {"decides_purposes": {"reason": "unclear"}},
+            "decides_purposes",
+            id="a slot that is not on the form",
+        ),
+        pytest.param(
+            {"under_own_name": {"reason": "vague"}},
+            "reason",
+            id="a reason that is not one of the two",
+        ),
+        pytest.param(
+            {"under_own_name": {"note": "a" * 501}},
+            "note",
+            id="a note of 501 characters",
+        ),
+    ],
+)
+def test_post_intakes_refuses_a_reason_or_a_note_that_it_cannot_store_and_stores_nothing(
+    client: TestClient,
+    intakes: dict[str, Intake],
+    not_sure: dict[str, dict[str, str]],
+    field: str,
+) -> None:
+    response = client.post(
+        "/intakes",
+        json={"answers": ANSWERS, "description": DESCRIPTION, "not_sure": not_sure},
+    )
+
+    assert response.status_code == 422
+    assert response.json() == {"error": {"code": "invalid_value", "field": field}}
+    assert intakes == {}
 
 
 def test_get_intake_with_an_id_that_is_not_stored_returns_not_found(
@@ -645,6 +723,34 @@ def test_get_intake_returns_the_follow_up_answers_and_the_current_step(
     assert response.json()["step"] == answered["step"]
 
 
+def test_post_answer_stores_the_reason_and_the_note_of_a_not_sure_answer(
+    client: TestClient,
+) -> None:
+    intake_id = post_intake(client)
+    unclear = {"reason": "unclear", "note": "What does decide mean here?"}
+    client.post(
+        f"/intakes/{intake_id}/answers",
+        json={"question": 1, "value": "not_sure", "not_sure": unclear},
+    )
+    client.post(
+        f"/intakes/{intake_id}/answers", json={"question": 2, "value": "not_sure"}
+    )
+
+    response = client.get(f"/intakes/{intake_id}")
+
+    # Without a reason, a "not sure" answer counts as "I don't know this about the product".
+    assert response.json()["not_sure"] == {
+        "under_own_name": {"reason": "unknown", "note": ""},
+        "decides_purposes": unclear,
+        "processes_for_customer": {"reason": "unknown", "note": ""},
+    }
+    assert response.json()["open_slots"] == [
+        "under_own_name",
+        "decides_purposes",
+        "processes_for_customer",
+    ]
+
+
 @pytest.mark.parametrize(
     ("value_of_a", "asked"), [("yes", ["a", "b", "c"]), ("no", ["a", "c"])]
 )
@@ -710,6 +816,26 @@ def test_repeated_answers_do_not_count_toward_the_limit() -> None:
             {"question": 1, "value": "none"}, "value", id="value of another slot"
         ),
         pytest.param({"question": 1}, "value", id="value missing"),
+        pytest.param(
+            {"question": 1, "value": "no", "not_sure": {"reason": "unknown"}},
+            "not_sure",
+            id="a reason with another value",
+        ),
+        pytest.param(
+            {"question": 1, "value": "yes", "not_sure": {"note": "We checked."}},
+            "not_sure",
+            id="a note with another value",
+        ),
+        pytest.param(
+            {"question": 1, "value": "not_sure", "not_sure": {"reason": "vague"}},
+            "reason",
+            id="a reason that is not one of the two",
+        ),
+        pytest.param(
+            {"question": 1, "value": "not_sure", "not_sure": {"note": "a" * 501}},
+            "note",
+            id="a note of 501 characters",
+        ),
     ],
 )
 def test_post_answer_refuses_an_answer_and_records_nothing(
@@ -728,19 +854,33 @@ def test_post_answer_refuses_an_answer_and_records_nothing(
     assert intakes[intake_id] == stored
 
 
-def test_a_value_that_is_not_an_option_is_refused_for_an_answered_question_too(
-    client: TestClient, intakes: dict[str, Intake]
+@pytest.mark.parametrize(
+    ("body", "field"),
+    [
+        pytest.param(
+            {"question": 1, "value": "maybe"}, "value", id="value not an option"
+        ),
+        pytest.param(
+            {"question": 1, "value": "no", "not_sure": {"reason": "unclear"}},
+            "not_sure",
+            id="a reason with another value",
+        ),
+    ],
+)
+def test_a_refused_answer_is_refused_for_an_answered_question_too(
+    client: TestClient,
+    intakes: dict[str, Intake],
+    body: dict[str, Any],
+    field: str,
 ) -> None:
     intake_id = post_intake(client)
     client.post(f"/intakes/{intake_id}/answers", json={"question": 1, "value": "no"})
     stored = intakes[intake_id].model_copy(deep=True)
 
-    response = client.post(
-        f"/intakes/{intake_id}/answers", json={"question": 1, "value": "maybe"}
-    )
+    response = client.post(f"/intakes/{intake_id}/answers", json=body)
 
     assert response.status_code == 422
-    assert response.json() == {"error": {"code": "invalid_value", "field": "value"}}
+    assert response.json() == {"error": {"code": "invalid_value", "field": field}}
     assert intakes[intake_id] == stored
 
 
@@ -755,15 +895,44 @@ def test_post_answer_with_an_id_that_is_not_stored_returns_not_found(
     assert response.json() == {"error": {"code": "not_found"}}
 
 
-def test_the_same_answer_twice_is_recorded_once_and_gets_the_same_response(
-    client: TestClient, intakes: dict[str, Intake]
+@pytest.mark.parametrize(
+    ("body", "again"),
+    [
+        pytest.param(
+            {"question": 1, "value": "no"},
+            {"question": 1, "value": "no"},
+            id="the same answer",
+        ),
+        # A note cannot be changed after it is sent.
+        pytest.param(
+            {
+                "question": 1,
+                "value": "not_sure",
+                "not_sure": {
+                    "reason": "unknown",
+                    "note": "We have to ask the lawyers.",
+                },
+            },
+            {
+                "question": 1,
+                "value": "not_sure",
+                "not_sure": {"reason": "unclear", "note": "What does it mean?"},
+            },
+            id="another reason and note",
+        ),
+    ],
+)
+def test_a_repeated_answer_is_recorded_once_and_gets_the_same_response(
+    client: TestClient,
+    intakes: dict[str, Intake],
+    body: dict[str, Any],
+    again: dict[str, Any],
 ) -> None:
     intake_id = post_intake(client)
-    body = {"question": 1, "value": "no"}
     first = client.post(f"/intakes/{intake_id}/answers", json=body)
     stored = intakes[intake_id].model_copy(deep=True)
 
-    second = client.post(f"/intakes/{intake_id}/answers", json=body)
+    second = client.post(f"/intakes/{intake_id}/answers", json=again)
 
     assert first.status_code == second.status_code == 200
     assert second.json() == first.json()
