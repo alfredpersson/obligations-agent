@@ -90,15 +90,15 @@ The prompts therefore implement only part of the specification. A prompt cannot 
 
 **INTAKE-1.** One step runs after the form is submitted and after every answer:
 
-1. Code records the answer, checks which slots are now relevant, and puts the relevant slots that have no answer in a queue.
+1. Code records the answer, checks which slots are now relevant, removes the answers of slots that are no longer relevant, and puts the relevant slots that have no answer in a queue.
 2. The model receives the description, the answers so far and the queue as data, and ends the step by calling `ask` or `finish`.
 3. Code enforces the limits.
 
 If the model does not make a valid `ask` or `finish` call, code asks about the next slot in the queue with its default question text, or finishes the intake if the queue is empty.
 
-**INTAKE-2.** The model may ask only about slots that are relevant and that are either not asked yet or open. It may ask about the same slot more than once, up to the limit per slot.
+**INTAKE-2.** The model may ask only about slots that are relevant and that are either not asked yet or open. It may ask about the same slot more than once, up to the limit per slot. It can call `finish` only when every relevant slot has an answer.
 
-**INTAKE-3.** The limits are two questions per slot and eight follow-up questions per intake. When the limit for the intake is reached, code finishes the intake. When an intake ends, relevant slots that still have no answer are treated as open.
+**INTAKE-3.** The limits are two questions per slot, where the form's question is the first question about a slot on the form, and eight follow-up questions per intake. When the limit for the intake is reached, code finishes the intake. When an intake ends, relevant slots that still have no answer are treated as open.
 
 **INTAKE-4.** The model chooses which slot to ask about and writes the question. It cannot add a slot or an allowed value. The user's text is given to the model as data in the user message, never as part of the system prompt.
 

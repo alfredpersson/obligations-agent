@@ -11,7 +11,7 @@ Two documents describe the product:
 - [docs/brief.md](docs/brief.md): who the product is for, what it must do for them, and which assumptions the design is based on.
 - [docs/spec.md](docs/spec.md): how the product must behave.
 
-`api/` holds the Python service and `web/` the Next.js web app. The service serves the fact schema, with three facts on the form and six follow-up facts. It records the form answers of an intake, then asks the follow-up questions one at a time. A model writes the text and the option labels of each question. Without a key for the model, or when a call fails, the service uses the default texts. The web app shows the form, then each follow-up question, then the recorded answers. Architecture decision records (ADRs) will go in `docs/`.
+`api/` holds the Python service and `web/` the Next.js web app. The service serves the fact schema, with three facts on the form and six follow-up facts. It records the form answers of an intake, then asks the follow-up questions one at a time. A model chooses each follow-up question and writes its text and its option labels, asks again about a "not sure" answer within the limits, and finishes the intake. Without a key for the model, or when a call gives no valid question, the service asks about the next slot in schema order with its default text. Without a key, it asks about each slot once. The web app shows the form, then each follow-up question, then the recorded answers. Architecture decision records (ADRs) will go in `docs/`.
 
 ## Checks
 
