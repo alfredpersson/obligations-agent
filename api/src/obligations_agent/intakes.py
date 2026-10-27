@@ -1,5 +1,6 @@
 """Intakes: the form answers and the description, checked against the fact schema (FACT-2, FACT-4, FACT-5), and the follow-up questions that code asks (INTAKE-1, INTAKE-3)."""
 
+from collections.abc import Callable
 from typing import Literal
 
 from pydantic import BaseModel
@@ -19,10 +20,28 @@ class Form(BaseModel):
     description: dict[str, str]
 
 
-class Intake(Form):
-    """A stored intake. The answers include the follow-up answers, and questions holds the slot of each follow-up question, in the order asked."""
+class Option(BaseModel):
+    """A choice in a question: an allowed value of the slot, and the text that the user sees."""
 
-    questions: list[str] = []
+    value: str
+    label: str
+
+
+class Question(BaseModel):
+    """A follow-up question: the slot it asks about, its text and its options."""
+
+    slot: str
+    text: str
+    options: list[Option]
+
+
+class Intake(Form):
+    """A stored intake. The answers include the follow-up answers, and questions holds each follow-up question, in the order asked."""
+
+    questions: list[Question] = []
+
+
+Writer = Callable[[Slot, Intake], Question]
 
 
 class Answer(BaseModel):
@@ -48,8 +67,20 @@ def is_relevant(slot: Slot, answers: dict[str, str]) -> bool:
     )
 
 
+def default_question(slot: Slot) -> Question:
+    """The question with the default text of the slot, and the label of each value as its option."""
+    return Question(
+        slot=slot.id,
+        text=slot.question,
+        options=[Option(value=value.id, label=value.label) for value in slot.values],
+    )
+
+
 def create_intake(
-    schema: Schema, answers: dict[str, str], description: dict[str, str]
+    schema: Schema,
+    answers: dict[str, str],
+    description: dict[str, str],
+    write: Writer,
 ) -> Intake:
     """Checks the answers, then the description: first ids that are not slots on the form, then each entry in schema order. Then asks the first follow-up question."""
     form_slots = [slot.id for slot in schema.slots]
@@ -71,42 +102,39 @@ def create_intake(
         answers={slot_id: answers[slot_id] for slot_id in form_slots},
         description={field_id: description[field_id] for field_id in fields},
     )
-    return ask_next(schema, intake)
+    return ask_next(schema, intake, write)
 
 
-def ask_next(schema: Schema, intake: Intake) -> Intake:
+def ask_next(schema: Schema, intake: Intake, write: Writer) -> Intake:
     """Asks about the first relevant follow-up slot without an answer, in schema order, unless the limit is reached (INTAKE-1, INTAKE-3). When no question is asked, the intake has ended."""
     if len(intake.questions) < QUESTION_LIMIT:
         for slot in schema.follow_up_slots:
             if slot.id not in intake.answers and is_relevant(slot, intake.answers):
-                return intake.model_copy(
-                    update={"questions": [*intake.questions, slot.id]}
-                )
+                questions = [*intake.questions, write(slot, intake)]
+                return intake.model_copy(update={"questions": questions})
     return intake
 
 
 def waiting(intake: Intake) -> int | None:
     """The number of the question that waits for an answer, or None when the intake has ended."""
-    if intake.questions and intake.questions[-1] not in intake.answers:
+    if intake.questions and intake.questions[-1].slot not in intake.answers:
         return len(intake.questions)
     return None
 
 
-def record_answer(schema: Schema, intake: Intake, question: int, value: str) -> Intake:
+def record_answer(
+    schema: Schema, intake: Intake, question: int, value: str, write: Writer
+) -> Intake:
     """Records the answer to a question and asks the next one. The value is checked first. An answer to a question that already has an answer changes nothing, so a repeated request acts once."""
     if not 1 <= question <= len(intake.questions):
         raise IntakeError("invalid_value", "question")
-    slot = next(
-        slot
-        for slot in schema.follow_up_slots
-        if slot.id == intake.questions[question - 1]
-    )
-    if value not in [option.id for option in slot.values]:
+    asked = intake.questions[question - 1]
+    if value not in [option.value for option in asked.options]:
         raise IntakeError("invalid_value", "value")
-    if slot.id in intake.answers:
+    if asked.slot in intake.answers:
         return intake
-    answers = {**intake.answers, slot.id: value}
-    return ask_next(schema, intake.model_copy(update={"answers": answers}))
+    answers = {**intake.answers, asked.slot: value}
+    return ask_next(schema, intake.model_copy(update={"answers": answers}), write)
 
 
 def open_slots(schema: Schema, intake: Intake) -> list[str]:

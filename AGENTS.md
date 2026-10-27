@@ -26,7 +26,7 @@ uv run pyright
 uv run pytest
 ```
 
-`uv run ruff format` fixes the formatting. `uv run uvicorn obligations_agent.server:app --reload` starts the service on http://127.0.0.1:8000.
+`uv run ruff format` fixes the formatting. `uv run uvicorn obligations_agent.server:app --reload` starts the service on http://127.0.0.1:8000. Without a key, the service asks the follow-up questions with their default texts. `uv run --env-file .env uvicorn obligations_agent.server:app --reload` starts it with the author's key in `api/.env`, so that a model writes the questions.
 
 In `web/`:
 
@@ -38,7 +38,7 @@ pnpm test
 pnpm build
 ```
 
-`pnpm dev` starts the web app, which forwards calls under `/api` to the service. The browser test starts the service and the web app by itself. Install its browser once for each Playwright version:
+`pnpm dev` starts the web app, which forwards calls under `/api` to the service. The browser test starts the service and the web app by itself. It reuses a service that already runs on port 8000, and it expects the default question texts, so that service must run without the key. Install its browser once for each Playwright version:
 
 ```sh
 pnpm exec playwright install --only-shell chromium
@@ -53,6 +53,7 @@ pnpm e2e
 - Do not add a dependency without the author's approval. Add an approved one with `uv add` in `api/` or `pnpm add` in `web/`, so that the package list and the lockfile change together.
 - When a change alters behavior that `docs/spec.md` describes, change the specification in the same pull request. Requirement ids stay in sequence without gaps.
 - Secrets stay out of the repository and out of prompts.
+- Do not read `api/.env`. Start the service without it, unless the author asks.
 
 ## Workflow
 
