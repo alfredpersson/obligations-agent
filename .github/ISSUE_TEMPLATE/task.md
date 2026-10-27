@@ -14,7 +14,7 @@ One change per issue. If the acceptance criteria grow past seven lines, split th
 
 ## Why
 
-<!-- Why it matters now. The reason limits the scope. -->
+<!-- Why this issue matters now. The reason limits the scope. A reason that would fit every issue, such as the order of the work, limits nothing. -->
 
 ## Acceptance criteria
 
@@ -28,7 +28,7 @@ One change per issue. If the acceptance criteria grow past seven lines, split th
 
 ## Non-goals
 
-<!-- What is out of scope, and what must not change. -->
+<!-- What is out of scope, and what must not change. When out-of-scope work moves to another issue, name that issue by its number. Otherwise, say only that the work is out of scope. -->
 
 ## Done means
 
