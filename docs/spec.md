@@ -19,6 +19,7 @@ It covers what a user does when the web app and the Python service run on the us
 | Part of the specification | Where it is implemented | Reason |
 | --- | --- | --- |
 | Which facts can be asked about and recorded (FACT) | `schema.yaml` | The list of facts that can be recorded is fixed in a data file. A model cannot add to it. |
+| Examples from official guidance (FACT-6) | `guidance.yaml` and the stored copies in `docs/guidance/` | Each quote must be word for word and checked against its copy. A model cannot add or change one. |
 | Which regulations, roles and risk tiers apply (GATE) | `gates.yaml` and the gate code | The same facts must always give the same result, and the text of the description must not be able to change it. |
 | Follow-up questions (INTAKE, TOOL) | intake system prompt and the intake tool code | The model chooses the questions and writes them. Code enforces the limits and the allowed values. |
 | Whether a clause applies (MEMO) | judge prompt | Deciding whether a clause applies to the given facts needs a model's judgment. |
@@ -69,6 +70,8 @@ The prompts therefore implement only part of the specification. A prompt cannot 
 **FACT-4.** The description and the notes of "not sure" answers (INTAKE-6) are the only inputs where the user writes free text. The description has three fields, defined in `schema.yaml`: what the product does, who uses it, and what data it handles. Each can be at most 500 characters long.
 
 **FACT-5.** The form can be sent only when every slot on it has an answer and every field of the description is filled in. "Not sure" counts as an answer.
+
+**FACT-6.** Examples from official guidance are one file, `guidance.yaml`, next to `schema.yaml`. Each entry belongs to one slot and one source, and holds one or more quotes from that source, word for word, each with the heading, or the sentence that introduces a list, under which the source gives it. An entry is two-sided when its quotes show a case that the source counts under the slot's term and a case that it does not, or a party that decides and a party that does not. Every other entry is marked one-sided. The file holds one entry for each kind of data or situation: where sources give the same one, the entry that shows both sides, or else the one that states its condition. Each source has its title, the body that published it, a link, the date of the document where it has one, the date its quotes were last checked, its terms of reuse, and a text copy stored in the repository. Only sources whose terms allow such a copy are used.
 
 **GATE-1.** Each gate is a decision table in `gates.yaml` and names the unit that defines it.
 

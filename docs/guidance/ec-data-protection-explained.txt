@@ -1,0 +1,147 @@
+Title: Data protection explained
+Body: European Commission
+Link: https://commission.europa.eu/law/law-topic/data-protection/reform/what-personal-data_en
+Taken: 2026-10-28, the main part of the page, as Chromium shows it
+Terms of reuse: CC BY 4.0, https://commission.europa.eu/legal-notice_en; this copy keeps the text only, without the layout and the links
+
+---
+
+Page contents
+What is personal data?
+What is data processing?
+When and to whom does EU data protection law apply?
+How is personal data protected?
+What is personal data?
+
+Personal data is any information that relates to an identified or identifiable living individual (data subject). Different pieces of information, which together can lead to the identification of a particular person, may also be considered personal data.
+
+Personal data that has been de-identified, encrypted or pseudonymised but can be used to re-identify a person remains personal data and falls within the scope of the General Data Protection Regulation (GDPR), the EU's main data protection law.
+
+Examples of personal data
+
+a name and surname
+a home address
+an email address such as 'name.surname@company.com'
+an Internet Protocol (IP) address
+an identification card number
+a cookie ID
+the advertising identifier of your phone
+data held by a hospital or doctor, which could be a symbol that uniquely identifies a person
+
+Personal data that has been rendered anonymous in such a way that the individual is no longer identifiable is not considered personal data. For data to be truly anonymised, the anonymisation must be irreversible.
+
+Examples of data that is not considered personal data
+
+a company registration number
+an email address such as 'info@company.com'
+anonymised data, if anonymisation is irreversible
+
+References
+
+Article 4(1) and (5) and Recitals (14), (26) to (30) of the GDPR
+Article 29 Working Party Opinion 4/2007 on the concept of personal data
+Article 29 Working Party Opinion 05/2014 on Anonymisation Techniques
+What is data processing?
+What constitutes personal data processing?
+
+Data processing is any operation performed on personal data. It includes the collection, recording, organisation, structuring, storage, adaptation or alteration, retrieval, consultation, use, disclosure by transmission, dissemination or otherwise making available, alignment or combination, restriction, erasure or destruction of personal data.
+
+The GDPR protects personal data regardless of the technology used for processing that data. It is technology neutral and applies to both automated and manual processing, provided the data is organised in accordance with pre-defined criteria (for example in an alphabetical order). It also does not matter how the data is stored – in an IT system, through video surveillance, or on paper; in all cases, personal data is subject to the protection requirements set out in the GDPR.
+
+Examples of data processing
+
+staff management and payroll administration
+accessing or consulting a contacts database containing personal data
+shredding documents containing personal data
+posting a photo of a person on a website
+storing IP addresses or MAC addresses
+video recording (CCTV)
+
+References
+
+Articles 2, 4(2) and (6) and Recital (15) of the GDPR
+Who processes personal data?
+
+Personal data processing can be carried out by individuals, or by private or public organisations, such as companies or public authorities. Their responsibilities and liability for specific data processing depend on the role that they play in the processing in question.
+
+Data controller
+
+The data controller determines the purposes for which and the means by which personal data is processed.
+
+Data processor
+
+The data processor processes personal data on behalf of the controller, on that controller’s documented instructions. 
+
+Example: Data controller and processor
+
+A brewery has many employees. It signs a contract with a payroll company to pay the wages. The brewery tells the payroll company when the wages should be paid, when an employee leaves or has a pay rise, and provides all other details for the salary slip and payment. The payroll company provides the IT system and stores the employees’ data. 
+
+In this case, the brewery is the data controller and the payroll company is the data processor.
+
+Read more about the role of the data controller and processor
+
+References
+
+Articles 4(7) and (8) and 24, 26 and 28 of the GDPR
+EDPB Guidelines 7/2020 on the concepts of controller and processor in the GDPR
+When and to whom does EU data protection law apply?
+
+The GDPR applies to:
+
+A controller or a processor, such as an individual or a private or public organisation, established in the EU which processes personal data as part of its activities, regardless of whether the data is processed in the EU; and
+A controller or a processor, such as an individual or a private or public organisation, established outside the EU when it is offering goods/services (paid or for free) to individuals in the EU or monitoring the behaviour of individuals in the EU.
+
+Example of when the GDPR applies
+
+A small, tertiary education company, operating online with an establishment based outside the EU targets mainly students in Spanish and Portuguese language universities in the EU. 
+
+A company with an establishment in the EU provides travel services to customers based in the Baltic countries and in that context processes personal data of natural persons.
+
+Example of when the GDPR does not apply
+
+A company, which is a service provider based outside the EU, provides services to customers outside the EU. Its clients can use its services when they travel to other countries, including within the EU. Provided that the company does not specifically target its services at individuals in the EU, it is not subject to the rules of the GDPR. 
+
+If a company is a small and medium-sized enterprise (SME) processing personal data, it must comply with the GDPR. However, some obligations of the GDPR do not apply if the processing is not a core part of the SME’s business, or if its activity is not likely to create risks for individuals. 
+
+Read more about specific rules for SMEs.
+
+The GDPR does not apply to data processed by an individual for purely personal reasons or for activities carried out in one's home, if there is no connection to a professional or commercial activity. When an individual uses personal data outside the personal sphere, for socio-cultural or financial activities, for example, then the data protection law has to be respected.
+
+The GDPR does not apply to the processing of personal data of deceased persons.
+
+References
+
+Articles 2 and 3 and Recitals (13), (18), (22) to (25) and (27) of the GDPR
+How is personal data protected?
+Principles of personal data processing
+
+To ensure the protection of your personal data when it is collected or used, the GDPR sets out 7 key principles that individuals and private or public organisations must comply with when they process personal data.
+
+The principles of personal data processing under the GDPR
+
+Lawfulness, fairness and transparency
+Purpose limitation
+Data minimisation
+Storage limitation
+Accuracy
+Integrity and confidentiality
+Accountability
+
+Read more about the principles of the GDPR
+
+Data protection rights
+
+Under the GDPR, individuals have several rights over their personal data. 
+
+The rights of individuals
+
+Right to be informed
+Right of access
+Right to rectification
+Right to erasure
+Right to restriction of processing
+Right to data portability
+Right to object
+Rights in relation to automated decision-making and profiling
+
+Read more about the rights of individuals under the GDPR

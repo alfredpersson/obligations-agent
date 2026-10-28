@@ -1,0 +1,169 @@
+Title: Commission Guidelines on prohibited artificial intelligence practices established by Regulation (EU) 2024/1689 (AI Act), C(2025) 5052 final
+Body: European Commission
+Link: https://ai-act-service-desk.ec.europa.eu/sites/default/files/2025-08/guidelines_on_prohibited_artificial_intelligence_practices_established_by_regulation_eu_20241689_ai_act_english_ied3r5nwo50xggpcfmwckm3nuc_112367-1.PDF
+Taken: 2026-10-28, sections 2.3 and 2.4, PDF pages 9 to 11, as the text layer reads with pdftotext -layout (poppler 26.04.0)
+Terms of reuse: the Commission's reuse policy, https://commission.europa.eu/legal-notice_en; this copy keeps the text only, without the layout and the links
+
+---
+
+2.3.          Material scope: practices related to the ‘placing on the market’, ‘putting
+              into service’ or ‘use’ of an AI system
+(11)      The practices prohibited by Article 5 AI Act relate to the placing on the market, the
+          putting into service, or the use of specific AI systems.5 As regards real-time remote
+          biometric identification (‘RBI’) systems, the prohibition in Article 5(1)(h) AI Act only
+          applies to their use. Article 3(1) AI Act defines what constitutes an AI system. The
+          Guidelines on the Definition of an AI system provide the Commission’s interpretation
+          of that definition.
+(12)      According to Article 3(9) AI Act, the placing on the market of an AI system is ‘the
+          first making available of an AI system […] on the Union market’. ‘Making available’
+          is defined as the supply of the system ‘for distribution or use on the Union market in
+          the course of a commercial activity, whether in return for payment or free of charge.’ 6
+          The making available of an AI system is covered regardless of the means of supply,
+          such as access to the system and its service through an application programming
+          interface (‘API’), via cloud, direct downloads, as physical copies, or embedded in
+          physical products.
+          For example, a RBI system developed outside the Union by a third-country provider is
+          placed on the Union market for the first time when it is offered in return for payment or
+          free of charge in one or more Member States. Such placing on the market may occur by
+          providing access to the system online through an API or other user interface.
+(13)      Article 3(11) AI Act defines putting into service as ‘the supply of an AI system for
+          first use to the deployer or for own use in the Union for its intended purpose’, therefore
+          covering both supply for first use to third parties, as well as in-house development and
+          deployment. The intended purpose of the system is the ‘use for which an AI system is
+          intended by the provider, including the specific context and conditions of use, as
+          specified in the information supplied by the provider in the instructions of use,
+          promotional or sales materials and statements, as well as in the technical
+          documentation.’7
+          For example, a provider builds a RBI system outside the Union and supplies that system
+          to a law enforcement authority or to a private company established in a Member State
+          to be used for the first time, thereby putting it into service.
+          For example, a public authority develops a scoring system in-house and deploys it to
+          predict the risk of fraud of household allowance beneficiaries, thereby putting it into
+          service.
+
+
+
+        security and justice (AFSJ) annexed to the TEU and TFEU, Ireland may decide not to apply the rules concerning the prohibition of
+        real-time use of RBIs in public spaces for a law enforcement purpose as well as the procedural rules linked to that article (Article
+        5(2) to (6) AI Act) (see Recital 40). Denmark benefits from opt-out agreements when applying Protocol No. 22 to the TEU and TFEU
+        and may decide not to fully apply the prohibitions based on Article 16 of the TFEU (see Recital 41).
+5
+        See for definitions of these terms also the Commission Notice – The ‘Blue Guide’ on the implementation of EU product rules 2022,
+        2022/C 247/01, Section 2.
+6
+        Article 3(10) AI Act.
+7
+        Article 3(12) AI Act.
+
+
+
+                                                                                                                                          4
+
+(14)      While the ‘use’ of an AI system is not explicitly defined in the AI Act, it should be
+          understood in a broad manner to cover the use or deployment of the system at any
+          moment of its lifecycle after having been placed on the market or put into service. This
+          may also cover the integration of the AI system in the services and processes of the
+          person(s) making use of the AI system, including as part of more complex systems,
+          processes or infrastructure. While providers of AI systems must consider the conditions
+          of use which may be reasonably foreseen prior to placing their AI systems on the market
+          (intended use and reasonably foreseeable misuse8), deployers remain responsible for
+          taking the lawful conditions for the use of the system into account.9 For the purposes of
+          Article 5 AI Act, the reference to ‘use’ should be understood to include any misuse of
+          an AI system (‘reasonably foreseeable’ or not) that may amount to a prohibited
+          practice.10
+          For example, an AI system used by an employer to infer emotions at the workspace is
+          prohibited, except when used for medical or safety purposes (Article 5(1)(f) AI Act).
+          The prohibition applies to deployers regardless of whether the provider (the supplier of
+          the system) has excluded such use in its contractual relationships with the deployer (the
+          employer), i.e. in the terms of use.
+       2.4.          Personal scope: responsible actors
+(15)      The AI Act distinguishes between different categories of operators in relation to AI
+          systems: providers, deployers, importers, distributors, and product manufacturers. The
+          present Guidelines will focus only on providers and deployers given the scope of the
+          prohibited practices in Article 5 AI Act.
+(16)      According to Article 3(3) AI Act, providers are natural or legal persons, public
+          authorities, agencies or other bodies, that develop AI systems or have them developed
+          and place them on the Union market, or put them into service under their own name or
+          trademark11 (see section 2.3 above). Providers established or located outside the Union
+          are subject to the provisions of the AI Act if they place those systems on the market or
+          put them into service in the Union,12 or if the output of the AI system is used in the
+          Union.13 Providers must ensure their AI systems meet all relevant requirements before
+          placing them on the market or putting them into service.
+          For example, a provider of a RBI system is the manufacturer of the system that markets
+          the system in the Union under its trademark. The provider of such a system could also
+
+8
+        See Article 3(12) and (13) AI Act.
+9
+        See for definitions of these terms also the Commission Notice – The ‘Blue Guide’ on the implementation of EU product rules 2022,
+        2022/C 247/01, Section 2.8.
+10
+        Recital 28 AI Act.
+11
+        Article 3(3), (9) and (11) AI Act. In relation to high-risk AI systems, Article 25 AI Act envisages that 1. Any distributor, importer,
+        deployer or other third-party shall be considered to be a provider of a high-risk AI system for the purposes of this Regulation and
+        shall be subject to the obligations of the provider under Article 16, in any of the following circumstances: (a) they put their name or
+        trademark on a high-risk AI system already placed on the market or put into service, without prejudice to contractual arrangements
+        stipulating that the obligations are otherwise allocated; (b) they make a substantial modification to a high-risk AI system that has
+        already been placed on the market or has already been put into service in such a way that it remains a high-risk AI system pursuant
+        to Article 6; (c) they modify the intended purpose of an AI system, including a general-purpose AI system, which has not been
+        classified as high-risk and has already been placed on the market or put into service in such a way that the AI system concerned
+        becomes a high-risk AI system in accordance with Article 6.
+12
+        Article 2(1)(a) AI Act.
+13
+        Article 2(1)(c) AI Act.
+
+
+
+                                                                                                                                             5
+
+          be a public authority that develops the system in-house and puts it into service for its
+          own use.
+(17)      Deployers are natural or legal persons, public authorities, agencies or other bodies
+          using AI systems under their authority, unless the use is for a personal non-professional
+          activity.14 ‘Authority’ over an AI system should be understood as assuming
+          responsibility over the decision to deploy the system and over the manner of its actual
+          use. Deployers fall within the scope of the AI Act, if their place of establishment or
+          location is within the Union15 or, if they are located in a third country, the output of the
+          AI system is used in the Union.16
+(18)      Where the deployer of an AI system is a legal person under whose authority the system
+          is used, i.e. a law enforcement authority or a private security company, the individual
+          employees that act within the procedures and under the control of that person should
+          not be considered to be the deployer. A legal person also remains a deployer if it
+          involves third parties (e.g. contractors, external staff) in the operation of the system on
+          its behalf and under its responsibility and control.
+(19)      Operators may fulfil more than one role concurrently in relation to an AI system. For
+          example, if an operator develops its own AI system that it uses afterwards, it will be
+          considered both the provider and the deployer of that system, even if that system is also
+          used by other deployers to whom the system has been provided in return for payment
+          or free of charge.
+(20)      Continuous compliance with the AI Act is required during all phases of the AI lifecycle.
+          This necessitates ongoing monitoring of and updates to AI systems placed on the market
+          or put into service in the Union to ensure that an AI system remains compliant with the
+          AI Act throughout its lifecycle and that it does not result in a practice prohibited under
+          Article 5 AI Act. Providers and deployers of AI systems have different responsibilities
+          depending on their roles and control over the design, the development and the actual
+          use of the system to avoid a prohibited practice. For each of the prohibitions, these roles
+          and responsibilities should be interpreted in a proportionate manner, taking into account
+          who in the value chain is best placed to adopt specific preventive and mitigating
+          measures and ensure compliant development and use of AI systems in line with the
+          objectives and the approach of the AI Act.
+       2.5.            Exclusion from the scope of the AI Act
+(21)      Article 2 AI Act provides for a number of general exclusions from scope which are
+          relevant for a complete understanding of the practical application of the prohibitions
+          listed in Article 5 AI Act.
+              2.5.1.     National security, defence and military purposes
+(22)      According to Article 2(3) AI Act, the AI Act does not apply to areas outside the scope
+          of Union law, and should not, in any event, affect the competences of the Member States
+
+14
+        Article 3(4) AI Act.
+15
+        Article 2(1)(b) AI Act.
+16
+        Article 2(1)(c) AI Act.
+
+
+
+                                                                                                    6

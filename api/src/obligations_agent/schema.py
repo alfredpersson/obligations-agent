@@ -14,7 +14,7 @@ class SchemaError(Exception):
     """A problem in schema.yaml: a key used twice, a slot without the form that FACT-1 and FACT-2 require, an id used twice, or a relevance condition that does not name earlier slots and their values."""
 
 
-class _UniqueKeyLoader(yaml.SafeLoader):
+class UniqueKeyLoader(yaml.SafeLoader):
     """The safe loader, but a key used twice in one mapping is an error. PyYAML would keep only the last value."""
 
     def construct_mapping(
@@ -64,7 +64,7 @@ class Schema(BaseModel):
 
 def parse_schema(text: str) -> Schema:
     """Reads a schema from YAML text, and puts the slots that are always relevant on the form. The error for a broken slot names it by id, or by position when the id is missing; a description field whose id is already used is named by its id; a key used twice is named with its line."""
-    data: Any = yaml.load(text, Loader=_UniqueKeyLoader)
+    data: Any = yaml.load(text, Loader=UniqueKeyLoader)
     slots: list[Slot] = []
     for position, raw in enumerate(data["slots"], start=1):
         name = raw.get("id", position)
