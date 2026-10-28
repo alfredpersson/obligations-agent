@@ -1,0 +1,141 @@
+Title: Data protection basics (data protection guide for small business)
+Body: European Data Protection Board
+Link: https://www.edpb.europa.eu/sme-data-protection-guide/data-protection-basics_en
+Taken: 2026-10-28, the main part of the page, as Chromium shows it
+Terms of reuse: reuse authorised when the source is acknowledged and the meaning is not distorted, https://www.edpb.europa.eu/copyright_en; this copy keeps the text only, without the layout and the links
+
+---
+
+Breadcrumb
+Home Learn the basics 
+On this page
+What is personal data?
+What does processing personal data mean?
+Does the GDPR apply to your organisation?
+The key principles of the GDPR
+Data protection basics
+What is personal data?
+
+Personal data means any information relating to an identified or identifiable individual.
+
+Examples of the type of information that may allow the direct or indirect identification of an individual, and therefore qualify as personal data, are:
+
+name, surname, phone numbers of clients, stakeholders, employees, providers;
+identification numbers, such as an individual’s client number, an individual’s employee number,
+a booking reference;
+email addresses, location data;
+an individual’s browsing history;
+an individual’s purchase history and receipts;
+photos, videos and audio recordings containing images or sounds of individuals.
+
+With this personal data, an individual may be identified directly or indirectly:
+
+if your organisation is processing an individual’s name or surname for example, this personal data allows the direct identification of this individual;
+if your organisation is processing an individual’s client number or booking reference for example, this personal data may allow the indirect identification of that individual.
+any type of information processed in relation to the individual directly or indirectly identified (i.e. preferences, habits) will be considered as personal data as well.
+Read more
+Special categories of personal data
+
+Some types of personal data, usually called sensitive data, belong to special categories which deserve more protection. According to Art. 9 GDPR, sensitive data includes data that reveals information about:
+
+an individual’s health;
+an individual’s sex life or sexual orientation;
+an individual’s racial or ethnic origin;
+an individual’s political opinions, religious or philosophical beliefs;
+an individual’s biometric and genetic data;
+trade union membership.
+
+The processing of an individual’s sensitive data is generally prohibited, except under specific circumstances that justify its processing (such as explicit consent).
+
+For more details on the circumstances under which sensitive data can be processed check Process personal data lawfully.
+
+ 
+
+Personal data concerning criminal convictions and offences
+
+The processing of personal data relating to criminal convictions and offences is subject to strict legal conditions. This personal data can only be processed by an official authority, such as the police, under the control of an official authority, or when authorised by domestic law.
+
+Read more
+GDPR good practices checklist
+Ask yourself if the purpose for which personal data may be collected is justified.
+Only collect personal data that is necessary for the specific purpose(s) envisaged.
+Inform individuals about how and for what purposes their personal data may be processed.
+Check if you have an appropriate legal basis for the processing of personal data. In case you intend to rely on the consent of individuals, ask for their consent before processing their personal data.
+Make sure that individuals’ personal data is handled in a secure way.
+Keep individuals’ personal data accurate and up to date.
+Delete individuals’ personal data when no longer necessary. Please bear in mind that national legislation may oblige you to keep certain data (i.e. for tax reasons).
+
+ 
+
+What does processing personal data mean?
+
+The processing of individuals’ personal data includes any type of activity (processing operation) performed whether or not by automated means on or with individuals’ personal data.
+
+Examples of processing operations include collecting, recording, organising, using, modifying, storing, disclosing individuals’ personal data.
+
+Even if the GDPR mainly relates to automated processing of personal data, processing operations carried out manually will also be subject to the GDPR from the moment the paper files are organised in a systematic manner, e.g. ordered alphabetically in a filing cabinet.
+
+Read more
+Does the GDPR apply to your organisation?
+
+The GDPR may apply to all private and public organisations if:
+
+the organisation in question is established in the EU or in the European Economic Area (EEA - EU countries + Iceland, Liechtenstein and Norway); or
+the organisation is not established in the EEA but its products or services are offered to individuals who are in the EEA, or the organisation is monitoring the behaviour of individuals who are in the EEA.
+
+The GDPR also applies in the same way to any sub-contractor that may be processing individuals’ personal data on behalf of a private or public organisation.
+
+Read more
+In practice, GDPR applies to you if one of the following conditions apply
+You are a company based in an EEA country;
+You are an organisation, based in a non-EEA country, selling goods or offering services, even for free, targeting individuals in an EEA country;
+You are an IT company based in a non-EEA country that has been subcontracted by a private organisation based in the EEA to manage their IT databases, such as a client’s database;
+You are a service provider based in the EEA and processing personal data on behalf of another company.
+
+ 
+
+The key principles of the GDPR
+
+When processing individuals’ personal data, your organisation must comply with the following 6 key principles of the GDPR. In addition, your organisation must be able to demonstrate its compliance with these principles.
+
+ 
+Lawfulness, Fairness and Transparency
+
+ 
+
+Any processing of personal data must be lawful, fair and transparent.
+
+Your organisation can only process an individual’s personal data if the processing operation envisaged is lawful; thus based on the individual’s consent, necessary for the performance of a contract, or based on one of the other legal bases for processing data mentioned in Art. 6 GDPR.
+
+If the processing is based on consent, your organisation must ensure that this consent is freely given, informed, specific and unambiguous. In other words, there must be no doubt that individuals are aware of what they agree to, for what purposes the processing is being done, and that this consent was actively given before the processing started. Furthermore, individuals should be able to freely withdraw their consent. If you realise that the processing of their data will nevertheless be necessary (i.e. in the context of a contract), it means that consent is not the appropriate legal basis.
+
+Read more
+Purpose limitation
+
+Your organisation can only collect personal data for specified, explicit and legitimate purposes. The processing of an individual’s data must be strictly limited to the purpose(s) initially established, and therefore not processed for subsequent or other purpose(s) that are incompatible with the initial purposes.
+
+ 
+
+Data minimisation
+
+Your organisation can only process personal data that is necessary and proportionate in light of the purpose envisaged.
+
+ 
+
+Accuracy
+
+The personal data of individuals that your organisation processes must be accurate and kept up to date. Inaccurate personal data must be rectified or erased.
+
+ 
+
+Storage limitation
+
+The storage of individuals’ personal data must be limited in time, in light of the purpose for which this data was collected and processed. As such, individuals’ personal data must be deleted or anonymised once this data is no longer necessary. In practice, this means that your organisation should have an internal policy in place regarding data retention periods per different purpose, as well as a procedure for deleting data.
+
+ 
+
+Security
+
+The processing of individuals’ data must be done in a secure way. In this sense, robust data protection safeguards, such as appropriate cybersecurity measures, must be put in place to ensure that individuals’ data is adequately protected. These measures must prevent accidental, unauthorised, or unlawful disclosure, loss, destruction or damage of individuals’ personal data.
+
+Read more

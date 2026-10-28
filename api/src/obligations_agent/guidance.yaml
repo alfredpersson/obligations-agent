@@ -1,0 +1,289 @@
+# Examples from official guidance (FACT-6 in docs/spec.md). Each entry belongs to one slot and one
+# source, and quotes the source word for word, each quote with the heading, or the sentence that
+# introduces a list, under which the source gives it. Quotes with the same heading are parts of one
+# passage, in the order of the source. A stored copy of each source is in docs/guidance/, and the
+# tests find every quote in it.
+
+sources:
+  - id: ec_data_protection_explained
+    title: Data protection explained
+    body: European Commission
+    link: https://commission.europa.eu/law/law-topic/data-protection/reform/what-personal-data_en
+    checked: 2026-10-28
+    terms: CC BY 4.0, https://commission.europa.eu/legal-notice_en
+    stored_copy: ec-data-protection-explained.txt
+
+  - id: edpb_data_protection_basics
+    title: Data protection basics (data protection guide for small business)
+    body: European Data Protection Board
+    link: https://www.edpb.europa.eu/sme-data-protection-guide/data-protection-basics_en
+    checked: 2026-10-28
+    terms: reuse authorised when the source is acknowledged and the meaning is not distorted, https://www.edpb.europa.eu/copyright_en
+    stored_copy: edpb-data-protection-basics.txt
+
+  - id: ec_prohibited_practices
+    title: Commission Guidelines on prohibited artificial intelligence practices established by Regulation (EU) 2024/1689 (AI Act), C(2025) 5052 final
+    body: European Commission
+    link: https://ai-act-service-desk.ec.europa.eu/sites/default/files/2025-08/guidelines_on_prohibited_artificial_intelligence_practices_established_by_regulation_eu_20241689_ai_act_english_ied3r5nwo50xggpcfmwckm3nuc_112367-1.PDF
+    published: 2025-07-29
+    checked: 2026-10-28
+    terms: the Commission's reuse policy, https://commission.europa.eu/legal-notice_en
+    stored_copy: ec-prohibited-practices-guidelines.txt
+
+  - id: ec_blue_guide_2022
+    title: The 'Blue Guide' on the implementation of EU product rules 2022 (2022/C 247/01)
+    body: European Commission
+    link: https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:52022XC0629(04)
+    published: 2022-06-29
+    checked: 2026-10-28
+    terms: the Commission's reuse policy, https://commission.europa.eu/legal-notice_en
+    stored_copy: ec-blue-guide-2022.txt
+    note: EU product rules, written for goods. The Commission's guidelines on the AI Act refer to it for these terms.
+
+entries:
+  # personal_data, European Commission, "Data protection explained"
+
+  - id: pieces_of_information
+    slot: personal_data
+    source: ec_data_protection_explained
+    two_sided: false
+    quotes:
+      - heading: What is personal data?
+        text: >-
+          Different pieces of information, which together can lead to the identification of a
+          particular person, may also be considered personal data.
+
+  - id: pseudonymised_data
+    slot: personal_data
+    source: ec_data_protection_explained
+    two_sided: true
+    quotes:
+      - heading: What is personal data?
+        text: >-
+          Personal data that has been de-identified, encrypted or pseudonymised but can be used to
+          re-identify a person remains personal data and falls within the scope of the General Data
+          Protection Regulation (GDPR), the EU's main data protection law.
+      - heading: Examples of data that is not considered personal data
+        text: anonymised data, if anonymisation is irreversible
+
+  - id: home_address
+    slot: personal_data
+    source: ec_data_protection_explained
+    two_sided: false
+    quotes:
+      - heading: Examples of personal data
+        text: a home address
+
+  - id: email_address
+    slot: personal_data
+    source: ec_data_protection_explained
+    two_sided: true
+    quotes:
+      - heading: Examples of personal data
+        text: "an email address such as 'name.surname@company.com'"
+      - heading: Examples of data that is not considered personal data
+        text: "an email address such as 'info@company.com'"
+
+  - id: ip_address
+    slot: personal_data
+    source: ec_data_protection_explained
+    two_sided: false
+    quotes:
+      - heading: Examples of personal data
+        text: an Internet Protocol (IP) address
+
+  - id: identification_card_number
+    slot: personal_data
+    source: ec_data_protection_explained
+    two_sided: false
+    quotes:
+      - heading: Examples of personal data
+        text: an identification card number
+
+  - id: cookie_id
+    slot: personal_data
+    source: ec_data_protection_explained
+    two_sided: false
+    quotes:
+      - heading: Examples of personal data
+        text: a cookie ID
+
+  - id: advertising_identifier
+    slot: personal_data
+    source: ec_data_protection_explained
+    two_sided: false
+    quotes:
+      - heading: Examples of personal data
+        text: the advertising identifier of your phone
+
+  - id: hospital_data
+    slot: personal_data
+    source: ec_data_protection_explained
+    two_sided: false
+    quotes:
+      - heading: Examples of personal data
+        text: >-
+          data held by a hospital or doctor, which could be a symbol that uniquely identifies a
+          person
+
+  - id: company_registration_number
+    slot: personal_data
+    source: ec_data_protection_explained
+    two_sided: false
+    quotes:
+      - heading: Examples of data that is not considered personal data
+        text: a company registration number
+
+  # personal_data, EDPB, "Data protection basics"
+
+  - id: names_and_phone_numbers
+    slot: personal_data
+    source: edpb_data_protection_basics
+    two_sided: false
+    quotes:
+      - heading: "Examples of the type of information that may allow the direct or indirect identification of an individual, and therefore qualify as personal data, are:"
+        text: name, surname, phone numbers of clients, stakeholders, employees, providers
+      - heading: "With this personal data, an individual may be identified directly or indirectly:"
+        text: >-
+          if your organisation is processing an individual’s name or surname for example, this
+          personal data allows the direct identification of this individual
+
+  - id: identification_numbers
+    slot: personal_data
+    source: edpb_data_protection_basics
+    two_sided: false
+    quotes:
+      - heading: "Examples of the type of information that may allow the direct or indirect identification of an individual, and therefore qualify as personal data, are:"
+        text: >-
+          identification numbers, such as an individual’s client number, an individual’s employee
+          number
+      - heading: "Examples of the type of information that may allow the direct or indirect identification of an individual, and therefore qualify as personal data, are:"
+        text: a booking reference
+      - heading: "With this personal data, an individual may be identified directly or indirectly:"
+        text: >-
+          if your organisation is processing an individual’s client number or booking reference for
+          example, this personal data may allow the indirect identification of that individual.
+
+  - id: location_data
+    slot: personal_data
+    source: edpb_data_protection_basics
+    two_sided: false
+    quotes:
+      - heading: "Examples of the type of information that may allow the direct or indirect identification of an individual, and therefore qualify as personal data, are:"
+        text: location data
+
+  - id: browsing_history
+    slot: personal_data
+    source: edpb_data_protection_basics
+    two_sided: false
+    quotes:
+      - heading: "Examples of the type of information that may allow the direct or indirect identification of an individual, and therefore qualify as personal data, are:"
+        text: an individual’s browsing history
+
+  - id: purchase_history
+    slot: personal_data
+    source: edpb_data_protection_basics
+    two_sided: false
+    quotes:
+      - heading: "Examples of the type of information that may allow the direct or indirect identification of an individual, and therefore qualify as personal data, are:"
+        text: an individual’s purchase history and receipts
+
+  - id: photos_videos_and_recordings
+    slot: personal_data
+    source: edpb_data_protection_basics
+    two_sided: false
+    quotes:
+      - heading: "Examples of the type of information that may allow the direct or indirect identification of an individual, and therefore qualify as personal data, are:"
+        text: photos, videos and audio recordings containing images or sounds of individuals
+
+  - id: information_about_an_individual
+    slot: personal_data
+    source: edpb_data_protection_basics
+    two_sided: false
+    quotes:
+      - heading: "With this personal data, an individual may be identified directly or indirectly:"
+        text: >-
+          any type of information processed in relation to the individual directly or indirectly
+          identified (i.e. preferences, habits) will be considered as personal data as well.
+
+  # decides_purposes, European Commission, "Data protection explained"
+
+  - id: brewery_and_payroll_company
+    slot: decides_purposes
+    source: ec_data_protection_explained
+    two_sided: true
+    quotes:
+      - heading: "Example: Data controller and processor"
+        text: >-
+          The brewery tells the payroll company when the wages should be paid, when an employee
+          leaves or has a pay rise, and provides all other details for the salary slip and payment.
+          The payroll company provides the IT system and stores the employees’ data.
+      - heading: "Example: Data controller and processor"
+        text: >-
+          In this case, the brewery is the data controller and the payroll company is the data
+          processor.
+
+  # under_own_name, European Commission, guidelines on prohibited practices, sections 2.3 and 2.4
+
+  - id: making_available
+    slot: under_own_name
+    source: ec_prohibited_practices
+    two_sided: false
+    quotes:
+      - heading: "Material scope: practices related to the ‘placing on the market’, ‘putting into service’ or ‘use’ of an AI system"
+        text: >-
+          The making available of an AI system is covered regardless of the means of supply, such
+          as access to the system and its service through an application programming interface
+          (‘API’), via cloud, direct downloads, as physical copies, or embedded in physical products.
+
+  - id: supply_for_first_use
+    slot: under_own_name
+    source: ec_prohibited_practices
+    two_sided: false
+    quotes:
+      - heading: "Material scope: practices related to the ‘placing on the market’, ‘putting into service’ or ‘use’ of an AI system"
+        text: >-
+          For example, a provider builds a RBI system outside the Union and supplies that system to a
+          law enforcement authority or to a private company established in a Member State to be used
+          for the first time, thereby putting it into service.
+
+  - id: own_development_and_use
+    slot: under_own_name
+    source: ec_prohibited_practices
+    two_sided: false
+    quotes:
+      - heading: "Material scope: practices related to the ‘placing on the market’, ‘putting into service’ or ‘use’ of an AI system"
+        text: >-
+          For example, a public authority develops a scoring system in-house and deploys it to
+          predict the risk of fraud of household allowance beneficiaries, thereby putting it into
+          service.
+      - heading: "Personal scope: responsible actors"
+        text: >-
+          For example, if an operator develops its own AI system that it uses afterwards, it will be
+          considered both the provider and the deployer of that system, even if that system is also
+          used by other deployers to whom the system has been provided in return for payment or free
+          of charge.
+
+  - id: provider_under_trademark
+    slot: under_own_name
+    source: ec_prohibited_practices
+    two_sided: false
+    quotes:
+      - heading: "Personal scope: responsible actors"
+        text: >-
+          For example, a provider of a RBI system is the manufacturer of the system that markets the
+          system in the Union under its trademark.
+
+  # under_own_name, European Commission, the Blue Guide, section 3.1
+
+  - id: own_name_or_trademark
+    slot: under_own_name
+    source: ec_blue_guide_2022
+    two_sided: true
+    quotes:
+      - heading: 3.1. Manufacturer
+        text: >-
+          The definition contains two cumulative conditions: the person has to manufacture (or have a
+          product manufactured) and to market the product under his own name or trademark. So, if the
+          product is marketed under another person’s name or trademark, this person will be
+          considered as the manufacturer.
