@@ -103,9 +103,9 @@ If the model does not make a valid `ask` call, code asks about the next slot in 
 
 **INTAKE-4.** The model chooses which slot to ask about and writes the question. It cannot add a slot or an allowed value. The user's text is given to the model as data in the user message, never as part of the system prompt.
 
-**INTAKE-5.** The confirmation screen shows every recorded value with the labels from the schema, and lists the open slots. The user may change any value, and may answer an open slot by choosing one of its allowed values. After the user confirms, the answers can no longer be changed. The memo is built only from the confirmed answers and the description.
+**INTAKE-5.** The confirmation screen shows every recorded value with the labels from the schema, and lists the open slots, each slot answered "not sure" with its reason and its note (INTAKE-6). The user may change any value, and may answer an open slot by choosing one of its allowed values. After the user confirms, the answers can no longer be changed. The memo is built only from the confirmed answers and the description.
 
-**INTAKE-6.** When the user answers "not sure", on the form or to a follow-up question, the user may give a reason, "I don't understand the question" or "I don't know this about the product", and a note of at most 500 characters. A "not sure" answer without a reason counts as "I don't know this about the product". The reason and the note belong to the slot, and a later answer about the slot replaces them. When the model may ask about the slot again, it receives the note as data in the user message (INTAKE-4).
+**INTAKE-6.** When the user answers "not sure", on the form or to a follow-up question, the user chooses a reason, "I don't understand the question" or "I don't know this about the product", and may add a note of at most 500 characters. The web app sends the answer only with a reason. A "not sure" answer that reaches the service without a reason counts as "I don't know this about the product". The reason and the note belong to the slot, and a later answer about the slot replaces them. When the model may ask about the slot again, it receives the note as data in the user message (INTAKE-4).
 
 ### Intake tools
 

@@ -30,6 +30,7 @@ const waiting = {
   description: { purpose: "A door camera.", people: "Building staff." },
   answers: { uses_camera: "yes", audience: "staff", stores_video: "yes" },
   open_slots: [],
+  not_sure: {},
   step: SECOND,
 } satisfies Intake;
 const ended = {

@@ -1,7 +1,8 @@
 "use client";
 
 import { type SubmitEvent, useState, useTransition } from "react";
-import type { Question, Step } from "../../service";
+import NotSureReason from "../../not-sure-reason";
+import { NOT_SURE, type NotSure, type Question, type Step } from "../../service";
 
 // One follow-up question with the options of its step, and the button that sends the answer
 // (INTAKE-1).
@@ -15,6 +16,7 @@ export default function FollowUpQuestion({
   onStep: (step: Step) => void;
 }) {
   const [value, setValue] = useState<string | null>(null);
+  const [notSure, setNotSure] = useState<Partial<NotSure>>({});
   const [message, setMessage] = useState<string | null>(null);
   const [sending, startTransition] = useTransition();
 
@@ -29,7 +31,13 @@ export default function FollowUpQuestion({
           method: "POST",
           // The service refuses a JSON body without this header.
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ question: question.number, value }),
+          // JSON.stringify leaves out a key whose value is undefined, so another answer is sent
+          // without not_sure, which the service refuses with any value but not_sure.
+          body: JSON.stringify({
+            question: question.number,
+            value,
+            not_sure: value === NOT_SURE ? notSure : undefined,
+          }),
         });
         if (!response.ok) throw new Error();
         const { step } = (await response.json()) as { step: Step };
@@ -56,9 +64,13 @@ export default function FollowUpQuestion({
             {option.label}
           </label>
         ))}
+        {value === NOT_SURE && <NotSureReason value={notSure} onChange={setNotSure} />}
       </fieldset>
       {message && <p role="alert">{message}</p>}
-      <button type="submit" disabled={value === null || sending}>
+      <button
+        type="submit"
+        disabled={value === null || (value === NOT_SURE && !notSure.reason) || sending}
+      >
         Next
       </button>
     </form>
