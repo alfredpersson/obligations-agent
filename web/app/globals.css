@@ -12,6 +12,20 @@ fieldset {
   margin: 0 0 1rem;
 }
 
+/* A floating legend stays inside the border of its group, so that a question text over several
+   lines does not cross the border. Each paragraph of a question text starts on a new line. */
+legend {
+  float: left;
+  width: 100%;
+  padding: 0;
+  margin-bottom: 0.5rem;
+  white-space: pre-line;
+}
+
+legend + * {
+  clear: left;
+}
+
 fieldset label {
   display: block;
 }

@@ -1,4 +1,5 @@
 import { Fragment } from "react";
+import { REASONS } from "../../not-sure-reason";
 import type { Intake, Schema } from "../../service";
 
 // The recorded answers of one intake, with the labels from the schema (INTAKE-5).
@@ -30,9 +31,18 @@ export default function RecordedAnswers({ intake, schema }: { intake: Intake; sc
         <p>No open questions.</p>
       ) : (
         <ul>
-          {open.map((slot) => (
-            <li key={slot.id}>{slot.label}</li>
-          ))}
+          {open.map((slot) => {
+            // An open slot that was answered "not sure" has a reason and a note (INTAKE-6); a
+            // relevant slot that was never asked has none.
+            const entry = intake.not_sure[slot.id];
+            return (
+              <li key={slot.id}>
+                {slot.label}
+                {entry && <div>{REASONS.find((reason) => reason.reason === entry.reason)?.label}</div>}
+                {entry?.note && <div>Note: {entry.note}</div>}
+              </li>
+            );
+          })}
         </ul>
       )}
     </>

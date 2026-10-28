@@ -17,6 +17,10 @@ const FOLLOW_UPS = [
   ["Do people interact with the product directly,", "Not sure"],
 ];
 
+// The notes of the two "Not sure" answers: on the form, and to the last follow-up question.
+const FORM_NOTE = "We have not decided whose brand goes on the product.";
+const FOLLOW_UP_NOTE = "Does a chat window on the shop's website count?";
+
 // After a navigation, Next.js keeps the previous page in the document, hidden. The test finds
 // elements by role, because role queries skip hidden elements.
 test("a filled-in form and the answered follow-up questions lead to the screen with the recorded answers", async ({
@@ -27,12 +31,12 @@ test("a filled-in form and the answered follow-up questions lead to the screen w
     .getByRole("group", { name: "Does the product process personal data?" })
     .getByRole("radio", { name: "Yes" })
     .check();
-  await page
-    .getByRole("group", {
-      name: "Do you place the product on the market or put it into service under your own name or trademark?",
-    })
-    .getByRole("radio", { name: "Not sure" })
-    .check();
+  const ownName = page.getByRole("group", {
+    name: "Do you place the product on the market or put it into service under your own name or trademark?",
+  });
+  await ownName.getByRole("radio", { name: "Not sure" }).check();
+  await ownName.getByRole("radio", { name: "I don't know this about the product" }).check();
+  await ownName.getByRole("textbox", { name: "What do you need to check? (optional)" }).fill(FORM_NOTE);
   await page
     .getByRole("group", { name: "Which of these areas is the product intended to be used in?" })
     .getByRole("radio", { name: "None of these" })
@@ -45,8 +49,15 @@ test("a filled-in form and the answered follow-up questions lead to the screen w
   await expect(page).toHaveURL(/\/intakes\/[A-Za-z0-9_-]{22}$/);
   for (const [index, [question, answer]] of FOLLOW_UPS.entries()) {
     await expect(page.getByRole("heading", { level: 1, name: `Question ${index + 1}` })).toBeVisible();
+    const group = page.getByRole("group", { name: question });
     // Exact names, because "No" is also part of "Not sure".
-    await page.getByRole("group", { name: question }).getByRole("radio", { name: answer, exact: true }).check();
+    await group.getByRole("radio", { name: answer, exact: true }).check();
+    if (answer === "Not sure") {
+      await group.getByRole("radio", { name: "I don't understand the question" }).check();
+      await group
+        .getByRole("textbox", { name: "What is unclear about the question? (optional)" })
+        .fill(FOLLOW_UP_NOTE);
+    }
     await page.getByRole("button", { name: "Next" }).click();
   }
 
@@ -74,5 +85,12 @@ test("a filled-in form and the answered follow-up questions lead to the screen w
     "No",
     "Not sure",
   ]);
-  await expect(page.getByRole("listitem")).toHaveText(["Under own name or trademark", "Interacts with people"]);
+  // The label, the reason and the note are lines of their own, so the rendered text separates them.
+  await expect(page.getByRole("listitem")).toHaveText(
+    [
+      `Under own name or trademark I don't know this about the product Note: ${FORM_NOTE}`,
+      `Interacts with people I don't understand the question Note: ${FOLLOW_UP_NOTE}`,
+    ],
+    { useInnerText: true },
+  );
 });
