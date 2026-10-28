@@ -274,16 +274,6 @@ entries:
           For example, a provider of a RBI system is the manufacturer of the system that markets the
           system in the Union under its trademark.
 
-  - id: deployer_authority
-    slot: under_own_name
-    source: ec_prohibited_practices
-    two_sided: false
-    quotes:
-      - heading: "Personal scope: responsible actors"
-        text: >-
-          ‘Authority’ over an AI system should be understood as assuming responsibility over the
-          decision to deploy the system and over the manner of its actual use.
-
   # under_own_name, European Commission, the Blue Guide, section 3.1
 
   - id: own_name_or_trademark
