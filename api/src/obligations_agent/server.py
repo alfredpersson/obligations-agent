@@ -1,22 +1,31 @@
-"""The HTTP API that the web app calls: GET /schema, POST /intakes and GET /intakes/{id}."""
+"""The HTTP API that the web app calls: GET /schema, POST /intakes, GET /intakes/{id} and POST /intakes/{id}/answers."""
 
+import logging
+import os
 import secrets
+import threading
 from typing import Any
 
+import anthropic
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from obligations_agent.intake_model import new_client, next_question
 from obligations_agent.intakes import (
+    Answer,
     ErrorCode,
+    Form,
     Intake,
     IntakeError,
+    Question,
     create_intake,
     open_slots,
+    record_answer,
+    waiting,
 )
 from obligations_agent.schema import Schema, load_schema
 
-# No follow-up facts exist yet, so the intake finishes right after the form (INTAKE-1).
 READY_TO_CONFIRM = {"type": "ready_to_confirm"}
 
 STATUS: dict[ErrorCode, int] = {
@@ -31,8 +40,31 @@ def error_response(code: ErrorCode, field: str | None = None) -> JSONResponse:
     return JSONResponse({"error": error}, status_code=STATUS[code])
 
 
-def create_app(schema: Schema, intakes: dict[str, Intake]) -> FastAPI:
+def step(intake: Intake) -> dict[str, Any]:
+    """The current step: the question that waits for an answer, or "ready to confirm"."""
+    number = waiting(intake)
+    if number is None:
+        return READY_TO_CONFIRM
+    return {
+        "type": "question",
+        "number": number,
+        **intake.questions[number - 1].model_dump(),
+    }
+
+
+def create_app(
+    schema: Schema,
+    intakes: dict[str, Intake],
+    client: anthropic.Anthropic | None = None,
+) -> FastAPI:
     app = FastAPI()
+    # FastAPI runs these endpoints in several threads. Answers are recorded one at a time, so that
+    # the second of two copies of an answer sees the first and changes nothing. The model chooses
+    # and writes the next question under the same lock.
+    answering = threading.Lock()
+
+    def write(intake: Intake) -> Question | None:
+        return next_question(client, schema, intake)
 
     @app.exception_handler(IntakeError)
     async def intake_error(request: Request, error: IntakeError) -> JSONResponse:
@@ -49,16 +81,19 @@ def create_app(schema: Schema, intakes: dict[str, Intake]) -> FastAPI:
 
     @app.get("/schema")
     def get_schema() -> dict[str, Any]:
-        # The form does not use the relevance condition or the defining unit.
-        return schema.model_dump(exclude={"slots": {"__all__": {"relevant", "unit"}}})
+        # The web app does not use the relevance condition or the defining unit.
+        hidden = {"__all__": {"relevant", "unit"}}
+        return schema.model_dump(exclude={"slots": hidden, "follow_up_slots": hidden})
 
     @app.post("/intakes", status_code=201)
-    def post_intake(body: Intake) -> dict[str, Any]:
-        intake = create_intake(schema, body.answers, body.description)
+    def post_intake(body: Form) -> dict[str, Any]:
+        intake = create_intake(
+            schema, body.answers, body.description, body.not_sure, write
+        )
         # 128 random bits, as 22 URL-safe characters.
         intake_id = secrets.token_urlsafe(16)
         intakes[intake_id] = intake
-        return {"id": intake_id, "step": READY_TO_CONFIRM}
+        return {"id": intake_id, "step": step(intake)}
 
     @app.get("/intakes/{intake_id}")
     def get_intake(intake_id: str) -> dict[str, Any]:
@@ -69,11 +104,32 @@ def create_app(schema: Schema, intakes: dict[str, Intake]) -> FastAPI:
             "id": intake_id,
             "description": intake.description,
             "answers": intake.answers,
-            "open_slots": open_slots(intake),
-            "step": READY_TO_CONFIRM,
+            "open_slots": open_slots(schema, intake),
+            "not_sure": intake.not_sure,
+            "step": step(intake),
         }
+
+    @app.post("/intakes/{intake_id}/answers")
+    def post_answer(intake_id: str, body: Answer) -> dict[str, Any]:
+        with answering:
+            intake = intakes.get(intake_id)
+            if intake is None:
+                raise IntakeError("not_found")
+            # record_answer returns a new intake, so a reader sees the old one or the new one.
+            intake = record_answer(
+                schema, intake, body.question, body.value, body.not_sure, write
+            )
+            intakes[intake_id] = intake
+        return {"step": step(intake)}
 
     return app
 
 
-app = create_app(load_schema(), {})
+# The log lines of this package show next to the lines of uvicorn. Other packages, such as the
+# HTTP client of the SDK, keep the default level and log only warnings.
+logging.basicConfig()
+logging.getLogger("obligations_agent").setLevel(logging.INFO)
+# The model is called only when the key is set (INTAKE-1).
+app = create_app(
+    load_schema(), {}, new_client() if os.environ.get("ANTHROPIC_API_KEY") else None
+)

@@ -8,7 +8,7 @@
 
 ## AI involvement
 
-<!-- The tools that were used. For work written by an agent, add the decision log: what it was trying to do and what it ruled out. -->
+<!-- The tools that were used. For work written by an agent, add the decision log that the workflow in `AGENTS.md` describes. -->
 
 ## Risk tier
 

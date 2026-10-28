@@ -2,7 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { type SubmitEvent, useEffect, useState, useTransition } from "react";
-import type { Schema } from "./service";
+import NotSureReason from "./not-sure-reason";
+import { NOT_SURE, type NotSure, type Schema } from "./service";
 
 // The form: the description fields, then one group of choices for each slot in the schema
 // (FACT-3 to FACT-5).
@@ -10,6 +11,7 @@ export default function IntakeForm() {
   const router = useRouter();
   const [schema, setSchema] = useState<Schema | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [notSure, setNotSure] = useState<Record<string, Partial<NotSure>>>({});
   const [description, setDescription] = useState<Record<string, string>>({});
   const [message, setMessage] = useState<string | null>(null);
   const [sending, startTransition] = useTransition();
@@ -28,10 +30,11 @@ export default function IntakeForm() {
     return message ? <p role="alert">{message}</p> : <p>Loading the form.</p>;
   }
 
-  // "Not sure" counts as an answer.
+  // "Not sure" counts as an answer once it has a reason (INTAKE-6).
   const complete =
-    schema.slots.every((slot) => slot.id in answers) &&
-    schema.description.every((field) => (description[field.id] ?? "").trim() !== "");
+    schema.slots.every(
+      (slot) => slot.id in answers && (answers[slot.id] !== NOT_SURE || notSure[slot.id]?.reason),
+    ) && schema.description.every((field) => (description[field.id] ?? "").trim() !== "");
 
   function send(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -44,7 +47,14 @@ export default function IntakeForm() {
           method: "POST",
           // The service refuses a JSON body without this header.
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ answers, description }),
+          body: JSON.stringify({
+            answers,
+            description,
+            // A reason and a note entered for a slot whose answer changed afterwards are not sent.
+            not_sure: Object.fromEntries(
+              Object.entries(notSure).filter(([id]) => answers[id] === NOT_SURE),
+            ),
+          }),
         });
         if (!response.ok) throw new Error();
         const { id } = (await response.json()) as { id: string };
@@ -81,6 +91,12 @@ export default function IntakeForm() {
               {value.label}
             </label>
           ))}
+          {answers[slot.id] === NOT_SURE && (
+            <NotSureReason
+              value={notSure[slot.id] ?? {}}
+              onChange={(entry) => setNotSure({ ...notSure, [slot.id]: entry })}
+            />
+          )}
         </fieldset>
       ))}
       {message && <p role="alert">{message}</p>}
