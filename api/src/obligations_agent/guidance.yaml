@@ -21,6 +21,15 @@ sources:
     terms: reuse authorised when the source is acknowledged and the meaning is not distorted, https://www.edpb.europa.eu/copyright_en
     stored_copy: edpb-data-protection-basics.txt
 
+  - id: edpb_guidelines_07_2020
+    title: Guidelines 07/2020 on the concepts of controller and processor in the GDPR, version 2.1
+    body: European Data Protection Board
+    link: https://www.edpb.europa.eu/system/files/2023-10/EDPB_guidelines_202007_controllerprocessor_final_en.pdf
+    published: 2022-09-20
+    checked: 2026-10-28
+    terms: reuse authorised when the source is acknowledged and the meaning is not distorted, https://www.edpb.europa.eu/copyright_en
+    stored_copy: edpb-guidelines-07-2020.txt
+
   - id: ec_prohibited_practices
     title: Commission Guidelines on prohibited artificial intelligence practices established by Regulation (EU) 2024/1689 (AI Act), C(2025) 5052 final
     body: European Commission
@@ -206,22 +215,354 @@ entries:
           any type of information processed in relation to the individual directly or indirectly
           identified (i.e. preferences, habits) will be considered as personal data as well.
 
-  # decides_purposes, European Commission, "Data protection explained"
+  # decides_purposes, EDPB, Guidelines 07/2020, Part I, sections 2 to 5
 
-  - id: brewery_and_payroll_company
+  - id: marketing_department
     slot: decides_purposes
-    source: ec_data_protection_explained
+    source: edpb_guidelines_07_2020
     two_sided: true
     quotes:
-      - heading: "Example: Data controller and processor"
+      - heading: "2.1.1 “Natural or legal person, public authority, agency or other body”"
         text: >-
-          The brewery tells the payroll company when the wages should be paid, when an employee
-          leaves or has a pay rise, and provides all other details for the salary slip and payment.
-          The payroll company provides the IT system and stores the employees’ data.
-      - heading: "Example: Data controller and processor"
+          The marketing department of Company ABC launches an advertising campaign to promote ABC’s
+          products.
+      - heading: "2.1.1 “Natural or legal person, public authority, agency or other body”"
         text: >-
-          In this case, the brewery is the data controller and the payroll company is the data
+          Even if the marketing department acted with considerable independence, Company ABC will in
+          principle be considered as the controller seeing as the advertising campaign is launched
+          by the company and takes place within the realm of its business activities and for its
+          purposes.
+
+  - id: own_employees_customers_members
+    slot: decides_purposes
+    source: edpb_guidelines_07_2020
+    two_sided: false
+    quotes:
+      - heading: "2) Control stemming from factual influence"
+        text: >-
+          When an entity engages in processing of personal data as part of its interactions with its
+          own employees, customers or members, it will generally be the one who determines the
+          purpose and means around the processing and is therefore acting as a controller within the
+          meaning of the GDPR.
+
+  - id: law_firm
+    slot: decides_purposes
+    source: edpb_guidelines_07_2020
+    two_sided: false
+    quotes:
+      - heading: "Example: Law firms"
+        text: >-
+          The law firm acts with a significant degree of independence, for example in deciding what
+          information to use and how to use it, and there are no instructions from the client
+          company regarding the personal data processing. The processing that the law firm carries
+          out in order to fulfil the task as legal representative for the company is therefore
+          linked to the functional role of the law firm so that it is to be regarded as controller
+          for this processing.
+
+  - id: telecom_operator
+    slot: decides_purposes
+    source: edpb_guidelines_07_2020
+    two_sided: true
+    quotes:
+      - heading: "Example: Telecom operators"
+        text: >-
+          Providing an electronic communications service such as an electronic mail service involves
+          processing of personal data. The provider of such services will normally be considered a
+          controller in respect of the processing of personal data that is necessary for the
+          operation of the service as such (e.g., traffic and billing data). If the sole purpose and
+          role of the provider is to enable the transmission of email messages, the provider will
+          not be considered as the controller in respect of the personal data contained in the
+          message itself.
+
+  - id: standardised_cloud_storage
+    slot: decides_purposes
+    source: edpb_guidelines_07_2020
+    two_sided: true
+    quotes:
+      - heading: "Example: standardised cloud storage service"
+        text: >-
+          Company X will still be considered a controller, given its decision to make use of this
+          particular cloud service provider in order to process personal data for its purposes.
+          Insofar as the cloud service provider does not process the personal data for its own
+          purposes and stores the data solely on behalf of its customers and in accordance with
+          instructions, the service provider will be considered as a processor.
+
+  - id: essential_means
+    slot: decides_purposes
+    source: edpb_guidelines_07_2020
+    two_sided: true
+    quotes:
+      - heading: "Essential vs. non-essential means"
+        text: >-
+          While non-essential means can also be determined by the processor, essential means are to
+          be determined by the controller. “Essential means” are means that are closely linked to
+          the purpose and the scope of the processing, such as the type of personal data which are
+          processed (“which data shall be processed?”), the duration of the processing (“for how
+          long shall they be processed?”), the categories of recipients (“who shall have access to
+          them?”) and the categories of data subjects (“whose personal data are being processed?”).
+      - heading: "Essential vs. non-essential means"
+        text: >-
+          “Non-essential means” concern more practical aspects of implementation, such as the choice
+          for a particular type of hard- or software or the detailed security measures which may be
+          left to the processor to decide on.
+
+  - id: payroll_administration
+    slot: decides_purposes
+    source: edpb_guidelines_07_2020
+    two_sided: true
+    quotes:
+      - heading: "Example: Payroll administration"
+        text: >-
+          Employer A gives clear instructions on who to pay, what amounts, by what date, by which
+          bank, how long the data shall be stored, what data should be disclosed to the tax
+          authority etc. In this case, the processing of data is carried out for Company A’s purpose
+          to pay salaries to its employees and the payroll administrator may not use the data for
+          any purpose of its own.
+      - heading: "Example: Payroll administration"
+        text: >-
+          Nevertheless, the payroll administrator may decide on certain detailed matters around the
+          processing such as which software to use, how to distribute access within its own
+          organisation etc. This does not alter its role as processor as long as the administrator
+          does not go against or beyond the instructions given by Company A.
+
+  - id: bank_payments
+    slot: decides_purposes
+    source: edpb_guidelines_07_2020
+    two_sided: false
+    quotes:
+      - heading: "Example: Bank payments"
+        text: >-
+          Employer A cannot have any influence on the purpose and means of Bank B’s processing of
+          data. Bank B is therefore to be seen as a controller for this processing and the
+          transmission of personal data from the payroll administration is to be regarded as a
+          disclosure of information between two controllers, from Employer A to Bank B.
+
+  - id: accounting_firm
+    slot: decides_purposes
+    source: edpb_guidelines_07_2020
+    two_sided: true
+    quotes:
+      - heading: "Example: Accountants"
+        text: >-
+          Employer A also hires Accounting firm C to carry out audits of their bookkeeping and
+          therefore transfers data about financial transactions (including personal data) to C.
+          Accounting firm C processes these data without detailed instructions from A.
+      - heading: "Example: Accountants"
+        text: >-
+          Under these circumstances, Accounting firm C is to be regarded as a controller of its own
+          when performing its auditing services for A. However, this assessment may be different
+          depending on the level of instructions from A. In a situation where the law does not lay
+          down specific obligations for the accounting firm and the client company provides very
+          detailed instructions on the processing, the accounting firm would indeed be acting as a
           processor.
+
+  - id: call_centre
+    slot: decides_purposes
+    source: edpb_guidelines_07_2020
+    two_sided: true
+    quotes:
+      - heading: "Example: Call centre"
+        text: >-
+          The call centre uses its own software and IT infrastructure to manage the personal data
+          concerning Company X’s customers.
+      - heading: "Example: Call centre"
+        text: >-
+          In this example, Company X remains a controller, despite the fact that the call centre has
+          determined certain non-essential means of the processing.
+
+  - id: market_research
+    slot: decides_purposes
+    source: edpb_guidelines_07_2020
+    two_sided: true
+    quotes:
+      - heading: "Example: Market research 1"
+        text: >-
+          XYZ may only process the data for the purpose given by Company ABC and according to its
+          detailed instructions and is therefore to be regarded as processor.
+      - heading: "Example: Market research 2"
+        text: >-
+          Service provider XYZ has collected and analysed this data independently, according to its
+          own methodology without receiving any instructions from Company ABC.
+      - heading: "Example: Market research 2"
+        text: >-
+          In this example, service provider XYZ acts as the sole controller, processing personal
+          data for market research purposes, autonomously determining the means for doing so.
+
+  - id: travel_agency
+    slot: decides_purposes
+    source: edpb_guidelines_07_2020
+    two_sided: false
+    quotes:
+      - heading: "Example: Travel agency"
+        text: >-
+          A travel agency sends personal data of its customers to the airline and a chain of hotels,
+          with a view to making reservations for a travel package.
+      - heading: "Example: Travel agency"
+        text: >-
+          Each of the actors processes the data for carrying out their own activities and using
+          their own means. In this case, the travel agency, the airline and the hotel are three
+          different data controllers processing the data for their own and separate purposes and
+          there is no joint controllership.
+
+  - id: research_project
+    slot: decides_purposes
+    source: edpb_guidelines_07_2020
+    two_sided: false
+    quotes:
+      - heading: "Example: Research project by institutes"
+        text: >-
+          Several research institutes decide to participate in a specific joint research project and
+          to use to that end the existing platform of one of the institutes involved in the project.
+      - heading: "Example: Research project by institutes"
+        text: >-
+          In this case, all institutes qualify as joint controllers for the personal data processing
+          that is done by storing and disclosing information from this platform since they have
+          decided together the purpose of the processing and the means to be used (the existing
+          platform).
+
+  - id: marketing_operation
+    slot: decides_purposes
+    source: edpb_guidelines_07_2020
+    two_sided: false
+    quotes:
+      - heading: "Example: Marketing operation"
+        text: >-
+          Companies A and B have launched a co-branded product C and wish to organise an event to
+          promote this product.
+      - heading: "Example: Marketing operation"
+        text: >-
+          Companies A and B can be considered as joint controllers for the processing of personal
+          data related to the organisation of the promotional event as they decide together on the
+          jointly defined purpose and essential means of the data processing in this context.
+
+  - id: headhunters
+    slot: decides_purposes
+    source: edpb_guidelines_07_2020
+    two_sided: false
+    quotes:
+      - heading: "Example: Headhunters"
+        text: >-
+          Even though they have not formally taken a decision together, Companies X and Y jointly
+          participate to the processing with the purpose of finding suitable candidates based on
+          converging decisions: the decision to create and manage the service “global matchz” for
+          Company X and the decision of Company Y to enrich the database with the CVs it directly
+          receives. Such decisions complement each other, are inseparable and necessary for the
+          processing of finding suitable candidates to take place. Therefore, in this particular
+          case they should be considered as joint controllers of such processing. However, Company X
+          is the sole controller of the processing necessary to manage its database and Company Y is
+          the sole controller of the subsequent hiring processing for its own purpose (organisation
+          of interviews, conclusion of the contract and management of HR data).
+
+  - id: health_data_analysis
+    slot: decides_purposes
+    source: edpb_guidelines_07_2020
+    two_sided: true
+    quotes:
+      - heading: "Example: Analysis of health data"
+        text: >-
+          Company ABC, the developer of a blood pressure monitoring app and Company XYZ, a provider
+          of apps for medical professionals, both wish to examine how blood pressure changes can
+          help predict certain diseases.
+      - heading: "Example: Analysis of health data"
+        text: >-
+          Company ABC, Hospital DEF and Company XYZ have jointly determined the purposes of
+          processing. Company XYZ takes the initiative to propose the essential means of processing.
+          Both Company ABC and the Hospital DEF accept these essential means after they as well were
+          involved in developing some of the features of the app so that the results can be
+          sufficiently used by them.
+      - heading: "Example: Analysis of health data"
+        text: >-
+          For all these reasons, they qualify as joint controllers for this specific joint
+          processing. If Company XYZ had been simply asked by the others to perform this assessment
+          without having any purpose of their own and merely been processing data on behalf of the
+          others, Company XYZ would qualify as a processor even if it was entrusted with the
+          determination of the non-essential means.
+
+  - id: shared_group_database
+    slot: decides_purposes
+    source: edpb_guidelines_07_2020
+    two_sided: true
+    quotes:
+      - heading: "Example: Marketing operations in a group of companies using a shared database:"
+        text: >-
+          A group of companies uses the same database for the management of clients and prospects.
+          Such database is hosted on the servers of the mother company who is therefore a processor
+          of the companies with respect to the storage of the data. Each entity of the group enters
+          the data of its own clients and prospects and processes such data for its own purposes
+          only. Also, each entity decides independently on the access, the retention periods, the
+          correction or deletion of their clients and prospects’ data.
+      - heading: "Example: Marketing operations in a group of companies using a shared database:"
+        text: Under these circumstances, each company is thus a separate controller.
+
+  - id: processor_acting_as_controller
+    slot: decides_purposes
+    source: edpb_guidelines_07_2020
+    two_sided: false
+    quotes:
+      - heading: "Example: Service provider referred to as data processor but acting as controller"
+        text: >-
+          However, MarketinZ decides to use GoodProducts customer database also for other purposes
+          than advertising for GoodProducts, such as developing their own business activity. The
+          decision to add an additional purpose to the one for which the personal data were
+          transferred converts MarketinZ into a data controller for this set of processing
+          operations and their processing for this purpose would constitute an infringement of the
+          GDPR.
+
+  - id: taxi_service
+    slot: decides_purposes
+    source: edpb_guidelines_07_2020
+    two_sided: false
+    quotes:
+      - heading: "Example: Taxi service"
+        text: >-
+          The taxi service has designed the online booking platform as part of developing its own
+          business activity to provide transportation services, without any instructions from
+          Company ABC. The taxi service also independently determines the categories of data it
+          collects and how long it retains. The taxi service therefore acts as a controller in its
+          own right, notwithstanding the fact that the processing takes place following a request
+          for service from Company ABC.
+
+  - id: it_support
+    slot: decides_purposes
+    source: edpb_guidelines_07_2020
+    two_sided: false
+    quotes:
+      - heading: "Example: General IT support"
+        text: >-
+          Company Z hires an IT service provider to perform general support on its IT systems which
+          include a vast amount of personal data.
+      - heading: "Example: General IT support"
+        text: >-
+          Company Z therefore concludes that the IT service provider - being a separate company and
+          inevitably being required to process personal data even though this is not the main
+          objective of the service – is to be regarded as a processor.
+
+  - id: it_consultant
+    slot: decides_purposes
+    source: edpb_guidelines_07_2020
+    two_sided: false
+    quotes:
+      - heading: "Example: IT-consultant fixing a software bug"
+        text: >-
+          The IT-consultant is not hired to process personal data, and Company ABC determines that
+          any access to personal data will be purely incidental and therefore very limited in
+          practice. ABC therefore concludes that the IT-specialist is not a processor (nor a
+          controller in its own right) and that Company ABC will take appropriate measures according
+          to Article 32 of the GDPR in order to prevent the IT-consultant from processing personal
+          data in an unauthorised manner.
+
+  - id: group_parent_company
+    slot: decides_purposes
+    source: edpb_guidelines_07_2020
+    two_sided: false
+    quotes:
+      - heading: "Example: Company groups – parent company and subsidiaries"
+        text: >-
+          At one point, the parent company ZZ decides to request employee data from all subsidiaries
+          in order to produce group wide statistics. When transferring data from companies X and Y
+          to ZZ, the latter is to be regarded as a third party regardless of the fact that all
+          companies are part of the same group. Company ZZ will be regarded as controller for its
+          processing of the data for statistical purposes.
 
   # under_own_name, European Commission, guidelines on prohibited practices, sections 2.3 and 2.4
 
