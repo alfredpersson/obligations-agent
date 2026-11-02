@@ -1,4 +1,4 @@
-"""The intake model: chooses the slot of each follow-up question among the askable ones and writes the text and the option labels (INTAKE-2, INTAKE-4, TOOL-1). Code ends the intake. Without a key, or when the call gives no valid ask, code asks about the next slot in the queue with its default text, or ends the intake (INTAKE-1)."""
+"""The intake model: chooses the slot of each follow-up question among the askable ones, writes the text and the option labels, and names the examples from guidance that are about the user's text (INTAKE-2, INTAKE-4, TOOL-1, RESP-5). Code ends the intake. Without a key, or when the call gives no valid ask, code asks about the next slot in the queue with its default text, or ends the intake (INTAKE-1)."""
 
 import json
 import logging
@@ -7,13 +7,16 @@ from typing import Literal
 
 import anthropic
 from anthropic.types import ToolParam
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
+from obligations_agent.guidance import Guidance
 from obligations_agent.intakes import (
     QUESTION_LIMIT,
     SLOT_LIMIT,
+    Example,
     Intake,
     NotSure,
+    Option,
     Question,
     Refusal,
     askable,
@@ -26,7 +29,7 @@ from obligations_agent.schema import Schema, Slot
 MODEL = "claude-sonnet-5-5"
 # Seconds for each phase of a request (connecting, sending, each wait for the answer), not
 # for the whole call.
-TIMEOUT = 10.0
+TIMEOUT = 20.0
 PROMPT = (
     files("obligations_agent").joinpath("intake_prompt.md").read_text(encoding="utf-8")
 )
@@ -35,7 +38,7 @@ PROMPT_VERSION = PROMPT.split("\n", 1)[0].removeprefix("Version: ")
 
 ASK: ToolParam = {
     "name": "ask",
-    "description": "Asks the user one question about one of the facts: the id of the fact, the question text, and one option for each allowed value of the fact.",
+    "description": "Asks the user one question about one of the facts: the id of the fact, the question text, one option for each allowed value of the fact, the entries of the fact's guidance that are about the user's text, each with a line, and a check line.",
     "strict": True,
     "input_schema": {
         "type": "object",
@@ -54,8 +57,21 @@ ASK: ToolParam = {
                     "additionalProperties": False,
                 },
             },
+            "examples": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "entry": {"type": "string"},
+                        "line": {"type": "string"},
+                    },
+                    "required": ["entry", "line"],
+                    "additionalProperties": False,
+                },
+            },
+            "check": {"type": "string"},
         },
-        "required": ["slot", "text", "options"],
+        "required": ["slot", "text", "options", "examples", "check"],
         "additionalProperties": False,
     },
 }
@@ -75,13 +91,32 @@ Reason = (
 logger = logging.getLogger(__name__)
 
 
+class Named(BaseModel):
+    """An entry that the model names for its question, with its line about the user's text."""
+
+    entry: str
+    line: str
+
+
+class Asked(BaseModel):
+    """The input of the tool ask (TOOL-1)."""
+
+    slot: str
+    text: str
+    options: list[Option]
+    examples: list[Named] = []
+    check: str = ""
+
+
 def new_client() -> anthropic.Anthropic:
     """The client for the model. It makes no retries, because the user waits for the step."""
     return anthropic.Anthropic(timeout=TIMEOUT, max_retries=0)
 
 
-def user_message(schema: Schema, intake: Intake, slots: list[Slot]) -> str:
-    """The description, the answers so far with their labels, and the slots that may be asked about with the notes, as JSON data (INTAKE-1, INTAKE-4)."""
+def user_message(
+    schema: Schema, guidance: Guidance, intake: Intake, slots: list[Slot]
+) -> str:
+    """The description, the answers so far with their labels, and the slots that may be asked about with the notes and the entries from guidance, as JSON data (INTAKE-1, INTAKE-4)."""
     data = {
         "description": {
             field.label: intake.description[field.id] for field in schema.description
@@ -93,13 +128,13 @@ def user_message(schema: Schema, intake: Intake, slots: list[Slot]) -> str:
             if intake.answers.get(other.id) == value.id
         ],
         "questions_left": QUESTION_LIMIT - len(intake.questions),
-        "facts": [fact(intake, slot) for slot in slots],
+        "facts": [fact(guidance, intake, slot) for slot in slots],
     }
     return json.dumps(data, ensure_ascii=False, indent=2)
 
 
-def fact(intake: Intake, slot: Slot) -> dict[str, object]:
-    """One slot that may be asked about, for the user message, with the user's note about the earlier questions."""
+def fact(guidance: Guidance, intake: Intake, slot: Slot) -> dict[str, object]:
+    """One slot that may be asked about, for the user message, with the user's note about the earlier questions and the slot's entries from guidance (FACT-6)."""
     earlier = asked_before(intake, slot)
     return {
         "id": slot.id,
@@ -109,16 +144,47 @@ def fact(intake: Intake, slot: Slot) -> dict[str, object]:
         "earlier_questions": earlier,
         "note": intake.not_sure.get(slot.id, NotSure()).note,
         "questions_left": SLOT_LIMIT - len(earlier),
+        "guidance": [
+            entry.model_dump(include={"id", "two_sided", "quotes"})
+            for entry in guidance.entries
+            if entry.slot == slot.id
+        ],
     }
+
+
+def matched(guidance: Guidance, slot: Slot, named: list[Named]) -> list[Example]:
+    """The entries of the slot that the model names, in its order, with their quotes and sources. An id that is not an entry of the slot, an entry named again and an entry without a line are left out (TOOL-1, RESP-5)."""
+    entries = {entry.id: entry for entry in guidance.entries if entry.slot == slot.id}
+    sources = {source.id: source for source in guidance.sources}
+    examples: list[Example] = []
+    for item in named:
+        entry = entries.get(item.entry)
+        if (
+            entry is None
+            or not item.line.strip()
+            or entry.id in [example.id for example in examples]
+        ):
+            continue
+        examples.append(
+            Example(
+                id=entry.id,
+                line=item.line,
+                two_sided=entry.two_sided,
+                quotes=entry.quotes,
+                source=sources[entry.source],
+            )
+        )
+    return examples
 
 
 def ask_model(
     client: anthropic.Anthropic | None,
     schema: Schema,
+    guidance: Guidance,
     intake: Intake,
     slots: list[Slot],
-) -> Question | Reason:
-    """The question that the model asks, or the reason why it made no valid call (TOOL-1)."""
+) -> tuple[Question, int] | Reason:
+    """The question that the model asks with the number of entry ids that code left out, or the reason why it made no valid call (TOOL-1)."""
     if client is None:
         return "no_key"
     try:
@@ -129,7 +195,15 @@ def ask_model(
             tools=[ASK],
             # The model refuses a forced tool choice, so the prompt asks for the call.
             tool_choice={"type": "auto", "disable_parallel_tool_use": True},
-            messages=[{"role": "user", "content": user_message(schema, intake, slots)}],
+            # A question with examples takes about 11 seconds at the default effort, and about 8
+            # at medium.
+            output_config={"effort": "medium"},
+            messages=[
+                {
+                    "role": "user",
+                    "content": user_message(schema, guidance, intake, slots),
+                }
+            ],
         )
     except anthropic.APITimeoutError:
         return "timeout"
@@ -139,18 +213,18 @@ def ask_model(
     if response.stop_reason != "tool_use" or call is None or call.name != "ask":
         return "invalid_output"
     try:
-        question = Question.model_validate(call.input)
+        asked = Asked.model_validate(call.input)
     except ValidationError:
         return "invalid_output"
-    if not question.text.strip() or any(
-        not option.label.strip() for option in question.options
+    if not asked.text.strip() or any(
+        not option.label.strip() for option in asked.options
     ):
         return "invalid_output"
     slot = next(
         (
             slot
             for slot in [*schema.slots, *schema.follow_up_slots]
-            if slot.id == question.slot
+            if slot.id == asked.slot
         ),
         None,
     )
@@ -161,14 +235,27 @@ def ask_model(
         return refused
     # Each allowed value exactly once (TOOL-1), shown in schema order.
     values = [value.id for value in slot.values]
-    if sorted(option.value for option in question.options) != sorted(values):
+    if sorted(option.value for option in asked.options) != sorted(values):
         return "invalid_option"
-    question.options.sort(key=lambda option: values.index(option.value))
-    return question
+    asked.options.sort(key=lambda option: values.index(option.value))
+    examples = matched(guidance, slot, asked.examples)
+    # The check line only for a slot whose entries the model received (RESP-5).
+    has_entries = any(entry.slot == slot.id for entry in guidance.entries)
+    question = Question(
+        slot=slot.id,
+        text=asked.text,
+        options=asked.options,
+        examples=examples,
+        check=asked.check.strip() if has_entries else "",
+    )
+    return question, len(asked.examples) - len(examples)
 
 
 def next_question(
-    client: anthropic.Anthropic | None, schema: Schema, intake: Intake
+    client: anthropic.Anthropic | None,
+    schema: Schema,
+    guidance: Guidance,
+    intake: Intake,
 ) -> Question | None:
     """The next follow-up question, chosen and written by the model or by code, or None when code ends the intake, and one log line that says which (INTAKE-1, INTAKE-3)."""
     if len(intake.questions) >= QUESTION_LIMIT:
@@ -179,22 +266,28 @@ def next_question(
     # The queue's first slot: the first relevant slot without an answer, in schema order. Code
     # asks about it when the model does not (INTAKE-1).
     queue = next((slot for slot in slots if slot.id not in intake.answers), None)
-    result = ask_model(client, schema, intake, slots)
+    result = ask_model(client, schema, guidance, intake, slots)
     written_by = "model"
-    if not isinstance(result, Question):
-        if queue is None:
-            return end(intake, result)
+    left_out = 0
+    if isinstance(result, tuple):
+        question, left_out = result
+    elif queue is None:
+        return end(intake, result)
+    else:
         written_by = f"default reason={result}"
-        result = default_question(queue)
+        question = default_question(queue)
     logger.info(
-        "question %d slot=%s model=%s prompt=%s written_by=%s",
+        "question %d slot=%s model=%s prompt=%s written_by=%s examples=%d left_out=%d check=%s",
         len(intake.questions) + 1,
-        result.slot,
+        question.slot,
         MODEL,
         PROMPT_VERSION,
         written_by,
+        len(question.examples),
+        left_out,
+        "yes" if question.check else "no",
     )
-    return result
+    return question
 
 
 def end(intake: Intake, reason: str) -> None:

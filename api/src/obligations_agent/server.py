@@ -11,6 +11,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from obligations_agent.guidance import Guidance, load_guidance
 from obligations_agent.intake_model import new_client, next_question
 from obligations_agent.intakes import (
     Answer,
@@ -54,6 +55,7 @@ def step(intake: Intake) -> dict[str, Any]:
 
 def create_app(
     schema: Schema,
+    guidance: Guidance,
     intakes: dict[str, Intake],
     client: anthropic.Anthropic | None = None,
 ) -> FastAPI:
@@ -64,7 +66,7 @@ def create_app(
     answering = threading.Lock()
 
     def write(intake: Intake) -> Question | None:
-        return next_question(client, schema, intake)
+        return next_question(client, schema, guidance, intake)
 
     @app.exception_handler(IntakeError)
     async def intake_error(request: Request, error: IntakeError) -> JSONResponse:
@@ -129,7 +131,12 @@ def create_app(
 # HTTP client of the SDK, keep the default level and log only warnings.
 logging.basicConfig()
 logging.getLogger("obligations_agent").setLevel(logging.INFO)
-# The model is called only when the key is set (INTAKE-1).
+# The schema and the examples from guidance are loaded once, when the service starts. The model is
+# called only when the key is set (INTAKE-1).
+SCHEMA = load_schema()
 app = create_app(
-    load_schema(), {}, new_client() if os.environ.get("ANTHROPIC_API_KEY") else None
+    SCHEMA,
+    load_guidance(SCHEMA),
+    {},
+    new_client() if os.environ.get("ANTHROPIC_API_KEY") else None,
 )
