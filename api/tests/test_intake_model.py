@@ -1,4 +1,4 @@
-"""Tests for the follow-up questions that the model chooses and writes: acceptance criteria 1 to 6 of issues #20 and #22, acceptance criteria 2 and 4 to 6 of issue #24, and failure cases from their plans. The model client sends each request to a fake transport, so no test calls the provider."""
+"""Tests for the follow-up questions that the model chooses and writes: acceptance criteria 1 to 6 of issues #20 and #22, acceptance criteria 2 and 4 to 6 of issue #24, the acceptance criteria of issue #32, and failure cases from their plans. The model client sends each request to a fake transport, so no test calls the provider."""
 
 import importlib
 import json
@@ -15,6 +15,7 @@ import yaml
 from fastapi.testclient import TestClient
 
 from obligations_agent import server
+from obligations_agent.guidance import load_guidance
 from obligations_agent.intake_model import new_client
 from obligations_agent.schema import Schema, load_schema, parse_schema
 from obligations_agent.server import create_app
@@ -63,6 +64,9 @@ WRITTEN = [
 SHOWN = [WRITTEN[2], WRITTEN[1], WRITTEN[0]]
 
 SCHEMA = load_schema()
+GUIDANCE = load_guidance(SCHEMA)
+# A question without examples from guidance (RESP-5).
+NO_EXAMPLES: dict[str, Any] = {"examples": [], "check": ""}
 YES_NO_NOT_SURE = [
     {"value": "yes", "label": "Yes"},
     {"value": "no", "label": "No"},
@@ -75,6 +79,7 @@ DEFAULT_STEP = {
     "slot": "decides_purposes",
     "text": "Do you decide, alone or together with others, what the personal data is used for and how it is processed?",
     "options": YES_NO_NOT_SURE,
+    **NO_EXAMPLES,
 }
 READY_TO_CONFIRM = {"type": "ready_to_confirm"}
 
@@ -152,7 +157,8 @@ def service(handler: Handler, schema: Schema = SCHEMA) -> TestClient:
     model = new_client().with_options(
         http_client=anthropic.DefaultHttpxClient(transport=transport)
     )
-    return TestClient(create_app(schema, {}, model))
+    # The test schemas have no slot with entries, so they get the guidance of the repository too.
+    return TestClient(create_app(schema, GUIDANCE, {}, model))
 
 
 def recording(requests: list[httpx2.Request]) -> Handler:
@@ -227,6 +233,74 @@ def camera_form(value: str) -> dict[str, Any]:
     }
 
 
+# personal_data and under_own_name answered "not sure" because the question is unclear, so the
+# model may ask about both again.
+PERSONAL_DATA_UNCLEAR = {
+    **FORM,
+    "answers": {
+        "personal_data": "not_sure",
+        "under_own_name": "not_sure",
+        "use_case_area": "none",
+    },
+    "not_sure": {
+        "personal_data": {"reason": "unclear", "note": "Do email addresses count?"},
+        "under_own_name": {"reason": "unclear", "note": FORM_NOTE},
+    },
+}
+# An entry that the model names with its line, and that the step can show.
+KEPT = ("names_and_phone_numbers", "Your description mentions the names of customers.")
+# Markers in a line and in the check line that the model writes. They must not reach a log line.
+LINE_MARKER = "Okapi-2718"
+CHECK_MARKER = "Tapir-3141"
+
+
+def guidance_of(slot: str) -> list[dict[str, Any]]:
+    """The entries of the slot in guidance.yaml, as the user message gives them."""
+    return [
+        {
+            "id": entry.id,
+            "two_sided": entry.two_sided,
+            "quotes": [
+                {"heading": quote.heading, "text": quote.text} for quote in entry.quotes
+            ],
+        }
+        for entry in GUIDANCE.entries
+        if entry.slot == slot
+    ]
+
+
+def from_file(entry_id: str, line: str) -> dict[str, Any]:
+    """An entry of guidance.yaml as the step shows it, with the model's line and the entry's source."""
+    [entry] = [entry for entry in GUIDANCE.entries if entry.id == entry_id]
+    [source] = [source for source in GUIDANCE.sources if source.id == entry.source]
+    return {
+        "id": entry.id,
+        "line": line,
+        "two_sided": entry.two_sided,
+        "quotes": [
+            {"heading": quote.heading, "text": quote.text} for quote in entry.quotes
+        ],
+        "source": source.model_dump(mode="json"),
+    }
+
+
+def naming(slot: str, examples: list[tuple[str, str]], check: str = "") -> Handler:
+    """A model that asks about the given slot and names the given entries, each with its line, and the check line."""
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        named = [{"entry": entry, "line": line} for entry, line in examples]
+        tool_input = {
+            "slot": slot,
+            "text": TEXT,
+            "options": WRITTEN,
+            "examples": named,
+            "check": check,
+        }
+        return ask(tool_input)
+
+    return handler
+
+
 def test_the_step_shows_the_slot_the_text_and_the_labels_that_the_model_chooses_in_schema_order() -> (
     None
 ):
@@ -249,6 +323,7 @@ def test_the_step_shows_the_slot_the_text_and_the_labels_that_the_model_chooses_
         "slot": "special_categories",
         "text": special,
         "options": SHOWN,
+        **NO_EXAMPLES,
     }
     assert created["step"] == first
     # The question is stored with its slot and its text, so a reload shows the same question.
@@ -262,6 +337,7 @@ def test_the_step_shows_the_slot_the_text_and_the_labels_that_the_model_chooses_
         "slot": "processes_for_customer",
         "text": "Does the shop process the order data for a customer?",
         "options": SHOWN,
+        **NO_EXAMPLES,
     }
 
 
@@ -278,7 +354,7 @@ def test_a_slot_on_the_form_answered_not_sure_can_be_asked_once_more(
 
     assert step == {**DEFAULT_STEP, "number": 2}
     assert (
-        "question 2 slot=decides_purposes model=claude-sonnet-5-5 prompt=3 written_by=default reason=limit_reached"
+        "question 2 slot=decides_purposes model=claude-sonnet-5-5 prompt=4 written_by=default reason=limit_reached"
         in caplog.text
     )
 
@@ -306,6 +382,7 @@ def test_a_follow_up_slot_answered_not_sure_can_be_asked_a_second_time(
         "slot": "decides_purposes",
         "text": second,
         "options": SHOWN,
+        **NO_EXAMPLES,
     }
     assert client.get(f"/intakes/{created['id']}").json()["step"] == step
     assert (
@@ -322,6 +399,7 @@ def test_a_follow_up_slot_answered_not_sure_can_be_asked_a_second_time(
         "slot": "processes_for_customer",
         "text": "Do you process personal data on behalf of a customer, following the customer's instructions?",
         "options": YES_NO_NOT_SURE,
+        **NO_EXAMPLES,
     }
     assert "question 3 slot=processes_for_customer" in caplog.text
     assert "written_by=default reason=limit_reached" in caplog.text
@@ -437,7 +515,9 @@ def test_without_a_model_client_each_question_has_its_default_text(
 ) -> None:
     caplog.set_level(logging.INFO)
 
-    created = TestClient(create_app(SCHEMA, {})).post("/intakes", json=FORM).json()
+    created = (
+        TestClient(create_app(SCHEMA, GUIDANCE, {})).post("/intakes", json=FORM).json()
+    )
 
     assert created["step"] == DEFAULT_STEP
     assert "written_by=default reason=no_key" in caplog.text
@@ -461,7 +541,7 @@ def test_without_a_model_client_no_slot_is_asked_a_second_time(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     caplog.set_level(logging.INFO)
-    client = TestClient(create_app(SCHEMA, {}))
+    client = TestClient(create_app(SCHEMA, GUIDANCE, {}))
     created = client.post("/intakes", json=FORM).json()
 
     steps = [
@@ -473,7 +553,7 @@ def test_without_a_model_client_no_slot_is_asked_a_second_time(
     open_slots = client.get(f"/intakes/{created['id']}").json()["open_slots"]
     assert open_slots == ["under_own_name", *FOLLOW_UPS]
     assert (
-        "end after 5 questions model=claude-sonnet-5-5 prompt=3 reason=no_key"
+        "end after 5 questions model=claude-sonnet-5-5 prompt=4 reason=no_key"
         in caplog.text
     )
 
@@ -581,12 +661,12 @@ def test_when_no_slot_is_queued_a_refused_or_failed_call_ends_the_intake(
         "under_own_name"
     ]
     assert (
-        f"end after 5 questions model=claude-sonnet-5-5 prompt=3 reason={reason}"
+        f"end after 5 questions model=claude-sonnet-5-5 prompt=4 reason={reason}"
         in caplog.text
     )
 
 
-def test_a_timeout_gives_the_default_question_after_one_request_with_a_timeout_of_ten_seconds(
+def test_a_timeout_gives_the_default_question_after_one_request_with_a_timeout_of_twenty_seconds(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     caplog.set_level(logging.INFO)
@@ -601,7 +681,7 @@ def test_a_timeout_gives_the_default_question_after_one_request_with_a_timeout_o
     assert created["step"] == DEFAULT_STEP
     assert "written_by=default reason=timeout" in caplog.text
     # One request and no retries, because the user waits for the step.
-    assert timeouts == [{"connect": 10.0, "read": 10.0, "write": 10.0, "pool": 10.0}]
+    assert timeouts == [{"connect": 20.0, "read": 20.0, "write": 20.0, "pool": 20.0}]
 
 
 def test_an_answer_that_makes_slots_no_longer_relevant_removes_their_answers() -> None:
@@ -758,7 +838,7 @@ def test_code_ends_the_intake_without_a_request_when_the_slots_left_are_answered
         "decides_purposes",
     ]
     assert (
-        "end after 5 questions model=claude-sonnet-5-5 prompt=3 reason=no_askable_slot"
+        "end after 5 questions model=claude-sonnet-5-5 prompt=4 reason=no_askable_slot"
         in caplog.text
     )
 
@@ -791,6 +871,7 @@ def test_the_request_has_the_prompt_file_the_strict_tool_ask_and_the_description
     first, second = [json.loads(request.content) for request in requests]
     assert first["model"] == "claude-sonnet-5-5"
     assert first["max_tokens"] == 2048
+    assert first["output_config"] == {"effort": "medium"}
     prompt = (
         files("obligations_agent")
         .joinpath("intake_prompt.md")
@@ -801,6 +882,13 @@ def test_the_request_has_the_prompt_file_the_strict_tool_ask_and_the_description
     [tool] = first["tools"]
     assert tool["name"] == "ask"
     assert tool["strict"] is True
+    assert tool["input_schema"]["required"] == [
+        "slot",
+        "text",
+        "options",
+        "examples",
+        "check",
+    ]
     outside = json.dumps(
         {name: part for name, part in first.items() if name != "messages"}
     )
@@ -847,6 +935,7 @@ def test_the_user_message_lists_each_askable_slot_with_its_earlier_questions_and
         "earlier_questions": [form_question],
         "note": FORM_NOTE,
         "questions_left": 1,
+        "guidance": guidance_of("under_own_name"),
     }
     assert first["facts"][1]["earlier_questions"] == []
     assert first["facts"][1]["note"] == ""
@@ -937,14 +1026,14 @@ def test_each_question_and_the_end_get_one_log_line_without_the_description_or_t
     ]
     assert lines == [
         "not sure answer on the form slot=under_own_name reason=unclear",
-        "question 1 slot=decides_purposes model=claude-sonnet-5-5 prompt=3 written_by=model",
-        "question 2 slot=processes_for_customer model=claude-sonnet-5-5 prompt=3 written_by=default reason=invalid_output",
-        "question 3 slot=special_categories model=claude-sonnet-5-5 prompt=3 written_by=model",
-        "question 4 slot=automated_decisions model=claude-sonnet-5-5 prompt=3 written_by=model",
-        "question 5 slot=interacts_with_people model=claude-sonnet-5-5 prompt=3 written_by=model",
+        "question 1 slot=decides_purposes model=claude-sonnet-5-5 prompt=4 written_by=model examples=0 left_out=0 check=no",
+        "question 2 slot=processes_for_customer model=claude-sonnet-5-5 prompt=4 written_by=default reason=invalid_output examples=0 left_out=0 check=no",
+        "question 3 slot=special_categories model=claude-sonnet-5-5 prompt=4 written_by=model examples=0 left_out=0 check=no",
+        "question 4 slot=automated_decisions model=claude-sonnet-5-5 prompt=4 written_by=model examples=0 left_out=0 check=no",
+        "question 5 slot=interacts_with_people model=claude-sonnet-5-5 prompt=4 written_by=model examples=0 left_out=0 check=no",
         "not sure answer to question 5 slot=interacts_with_people reason=unknown",
-        "question 6 slot=under_own_name model=claude-sonnet-5-5 prompt=3 written_by=model",
-        "end after 6 questions model=claude-sonnet-5-5 prompt=3 reason=no_askable_slot",
+        "question 6 slot=under_own_name model=claude-sonnet-5-5 prompt=4 written_by=model examples=0 left_out=0 check=no",
+        "end after 6 questions model=claude-sonnet-5-5 prompt=4 reason=no_askable_slot",
     ]
     assert MARKER not in caplog.text
     assert NOTE_MARKER not in caplog.text
@@ -988,3 +1077,217 @@ def test_no_request_goes_to_the_model_when_the_step_is_ready_to_confirm_or_an_an
     ]
     assert steps[-1] == {"type": "ready_to_confirm"}
     assert len(requests) == 6
+
+
+def test_the_user_message_gives_each_fact_the_entries_of_its_slot_in_guidance() -> None:
+    requests: list[httpx2.Request] = []
+    service(recording(requests)).post("/intakes", json=PERSONAL_DATA_UNCLEAR)
+
+    facts = user_data(requests[0])["facts"]
+    assert [fact["id"] for fact in facts] == [
+        "personal_data",
+        "under_own_name",
+        "decides_purposes",
+        "processes_for_customer",
+        "special_categories",
+        "automated_decisions",
+        "interacts_with_people",
+    ]
+    for fact in facts:
+        assert fact["guidance"] == guidance_of(fact["id"])
+    # A fact without entries gets an empty list.
+    assert facts[3]["guidance"] == []
+    [email] = [
+        entry for entry in facts[0]["guidance"] if entry["id"] == "email_address"
+    ]
+    assert email == {
+        "id": "email_address",
+        "two_sided": True,
+        "quotes": [
+            {
+                "heading": "Examples of personal data",
+                "text": "an email address such as 'name.surname@company.com'",
+            },
+            {
+                "heading": "Examples of data that is not considered personal data",
+                "text": "an email address such as 'info@company.com'",
+            },
+        ],
+    }
+
+
+def test_the_step_shows_the_named_entries_in_the_models_order_with_their_quotes_and_sources() -> (
+    None
+):
+    email = "Your description mentions email addresses."
+    client = service(naming("personal_data", [KEPT, ("email_address", email)]))
+    created = client.post("/intakes", json=PERSONAL_DATA_UNCLEAR).json()
+
+    examples = created["step"]["examples"]
+    # The model's order, not the order of the ids or of the file.
+    assert examples == [from_file(*KEPT), from_file("email_address", email)]
+    assert (
+        examples[1]["quotes"][1]["text"]
+        == "an email address such as 'info@company.com'"
+    )
+    assert examples[1]["source"]["body"] == "European Commission"
+    # The question is stored with its examples, so a reload shows the same step.
+    assert client.get(f"/intakes/{created['id']}").json()["step"] == created["step"]
+
+
+@pytest.mark.parametrize(
+    "named",
+    [
+        pytest.param(
+            [("phone_book", "Your description mentions a phone book."), KEPT],
+            id="an_id_not_in_the_file",
+        ),
+        pytest.param(
+            [("call_centre", "Your description mentions customers."), KEPT],
+            id="an_entry_of_another_slot",
+        ),
+        pytest.param([KEPT, KEPT], id="an_entry_named_twice"),
+        pytest.param([("email_address", " "), KEPT], id="an_entry_with_an_empty_line"),
+    ],
+)
+def test_code_leaves_out_an_entry_that_it_cannot_show_and_keeps_the_question(
+    named: list[tuple[str, str]],
+) -> None:
+    created = (
+        service(naming("personal_data", named))
+        .post("/intakes", json=PERSONAL_DATA_UNCLEAR)
+        .json()
+    )
+
+    assert created["step"]["text"] == TEXT
+    assert created["step"]["examples"] == [from_file(*KEPT)]
+
+
+@pytest.mark.parametrize(
+    ("slot", "check", "shown"),
+    [
+        pytest.param(
+            "personal_data",
+            "Check whether the order numbers can be linked to a customer.",
+            "Check whether the order numbers can be linked to a customer.",
+            id="a_slot_with_entries",
+        ),
+        pytest.param(
+            "processes_for_customer",
+            "Check who gives the instructions.",
+            "",
+            id="a_slot_without_entries",
+        ),
+        pytest.param("personal_data", "   ", "", id="spaces_only"),
+    ],
+)
+def test_the_check_line_is_kept_only_for_a_slot_with_entries(
+    slot: str, check: str, shown: str
+) -> None:
+    created = (
+        service(naming(slot, [], check))
+        .post("/intakes", json=PERSONAL_DATA_UNCLEAR)
+        .json()
+    )
+
+    assert created["step"]["slot"] == slot
+    assert created["step"]["check"] == shown
+
+
+def test_a_question_without_examples_has_an_empty_list_and_an_empty_check_line() -> (
+    None
+):
+    # The input of ask without examples and check, as the tool had it before.
+    created = (
+        service(asking("processes_for_customer")).post("/intakes", json=FORM).json()
+    )
+
+    assert created["step"] == {
+        "type": "question",
+        "number": 1,
+        "slot": "processes_for_customer",
+        "text": TEXT,
+        "options": SHOWN,
+        **NO_EXAMPLES,
+    }
+
+
+def test_the_log_line_of_a_question_counts_its_examples_the_ids_left_out_and_the_check_line(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.INFO)
+    named = [
+        ("email_address", "Your description mentions email addresses."),
+        ("phone_book", "Your description mentions a phone book."),
+        KEPT,
+    ]
+
+    service(naming("personal_data", named, "Check the order numbers.")).post(
+        "/intakes", json=PERSONAL_DATA_UNCLEAR
+    )
+
+    assert (
+        "question 1 slot=personal_data model=claude-sonnet-5-5 prompt=4 written_by=model examples=2 left_out=1 check=yes"
+        in caplog.text
+    )
+
+
+def test_no_log_line_holds_a_line_or_the_check_line_that_the_model_wrote(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.INFO)
+    line = f"Your description mentions email addresses. {LINE_MARKER}"
+    check = f"Check the booking details. {CHECK_MARKER}"
+
+    created = (
+        service(naming("personal_data", [("email_address", line)], check))
+        .post("/intakes", json=PERSONAL_DATA_UNCLEAR)
+        .json()
+    )
+
+    assert created["step"]["examples"][0]["line"] == line
+    assert created["step"]["check"] == check
+    assert LINE_MARKER not in caplog.text
+    assert CHECK_MARKER not in caplog.text
+
+
+def test_a_call_with_examples_that_fails_another_check_gives_the_default_question_without_examples(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.INFO)
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        tool_input = {
+            "slot": "personal_data",
+            "text": TEXT,
+            # The value not_sure is left out.
+            "options": WRITTEN[1:],
+            "examples": [{"entry": KEPT[0], "line": KEPT[1]}],
+            "check": "Check the order numbers.",
+        }
+        return ask(tool_input)
+
+    created = service(handler).post("/intakes", json=PERSONAL_DATA_UNCLEAR).json()
+
+    assert created["step"] == DEFAULT_STEP
+    assert "written_by=default reason=invalid_option" in caplog.text
+
+
+def test_the_service_loads_guidance_yaml_when_it_starts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    requests: list[httpx2.Request] = []
+    transport = httpx2.MockTransport(recording(requests))
+    model = new_client().with_options(
+        http_client=anthropic.DefaultHttpxClient(transport=transport)
+    )
+    monkeypatch.setattr("obligations_agent.intake_model.new_client", lambda: model)
+    # The service creates its app when the module loads, so the module is loaded again with the fake
+    # model.
+    importlib.reload(server)
+
+    TestClient(server.app).post("/intakes", json=PERSONAL_DATA_UNCLEAR)
+
+    assert user_data(requests[0])["facts"][0]["guidance"] == guidance_of(
+        "personal_data"
+    )

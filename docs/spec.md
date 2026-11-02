@@ -55,7 +55,7 @@ The prompts therefore implement only part of the specification. A prompt cannot 
 **SCOPE-3.** The system does not cover:
 
 - Legal advice, and questions where the meaning of the law is disputed.
-- Anything outside the two regulations: national law, other EU acts, the terms of platforms, and rules for specific sectors.
+- Anything outside the two regulations: national law, other EU acts, the terms of platforms, and rules for specific sectors. Examples from official guidance appear only in questions (RESP-5), as guidance and not as law.
 - Answering questions about the memo or the regulations.
 - Obligations of companies that provide a general-purpose AI model (AI Act Chapter V). The memo uses the fact that a product is built on such a model. It does not cover placing such a model on the market.
 
@@ -95,7 +95,7 @@ The prompts therefore implement only part of the specification. A prompt cannot 
 
 1. Code records the answer, checks which slots are now relevant, removes the answers of slots that are no longer relevant, and puts the relevant slots that have no answer in a queue.
 2. Code ends the intake when the limit for the intake is reached or when no slot can be asked about (INTAKE-2).
-3. Otherwise, the model receives the description, the answers so far and the slots that it may ask about, with the user's notes, as data, and ends the step by calling `ask`.
+3. Otherwise, the model receives the description, the answers so far and the slots that it may ask about, with the user's notes and the entries of `guidance.yaml` for those slots (FACT-6), as data, and ends the step by calling `ask`.
 4. Code enforces the limits.
 
 If the model does not make a valid `ask` call, code asks about the next slot in the queue with its default question text, or ends the intake if the queue is empty.
@@ -116,7 +116,9 @@ The tool changes only the intake state.
 
 | ID | Tool | Inputs | On success | On failure |
 | --- | --- | --- | --- | --- |
-| TOOL-1 | `ask` | slot id, question text, options each linked to an allowed value | The question is recorded and shown to the user, and the step ends. | `invalid_slot` if the slot does not exist; `not_askable` if the slot is not relevant, has an answer other than "not sure", or was answered "not sure" because the user does not know the fact; `invalid_option` if the options do not link each allowed value of the slot exactly once; `limit_reached` if the limit for the slot or for the intake is reached. |
+| TOOL-1 | `ask` | slot id, question text, options each linked to an allowed value, the entries of the slot's guidance that are about the user's text, each with a line, and a check line (RESP-5) | The question is recorded with the entries, their quotes and their sources, and shown to the user, and the step ends. | `invalid_slot` if the slot does not exist; `not_askable` if the slot is not relevant, has an answer other than "not sure", or was answered "not sure" because the user does not know the fact; `invalid_option` if the options do not link each allowed value of the slot exactly once; `limit_reached` if the limit for the slot or for the intake is reached. |
+
+Code leaves out an entry id that is not an entry of the slot, an entry named a second time and an entry without a line, and records the question with the other entries. It keeps the check line only for a slot with entries.
 
 ## 5. Memo
 
@@ -170,3 +172,5 @@ The tool changes only the intake state.
 **RESP-3.** The memo and the questions use direct language without filler words. They use the regulation's own terms where the exact term matters, and plain words elsewhere.
 
 **RESP-4.** A question that the model writes asks about the same fact as its default question and keeps each of its conditions. It states nothing about the product that the description or the user's notes do not state, and it does not suggest which answer applies. It is easier for this user to answer than the default question: it names the product's own parties and data where the default question uses general terms, or it says what an answer means for this product.
+
+**RESP-5.** A question that the model writes about a fact with entries in `guidance.yaml` (FACT-6) shows each of those entries that is about data or a situation that the description or the user's notes name, and no other entry. For each entry, the model writes one line that names the part of the user's text that the entry is about. The model may add one check line: it names data or a situation in the user's text that no shown entry covers, or a detail that decides and that the user's text does not give, and says what to check. Code adds the quotes and the source of each entry, so the model writes no quote. RESP-4 applies to the question and to these lines, not to the quotes: a line presents an entry as a case from the guidance, never as the user's case or as the answer. The quotes are shown as guidance, not as law, and the user chooses the answer.

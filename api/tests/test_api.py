@@ -7,6 +7,7 @@ import pytest
 import yaml
 from fastapi.testclient import TestClient
 
+from obligations_agent.guidance import load_guidance
 from obligations_agent.intakes import Intake
 from obligations_agent.schema import load_schema, parse_schema
 from obligations_agent.server import create_app
@@ -85,11 +86,14 @@ FIRST_QUESTION = {
     "slot": "decides_purposes",
     "text": "Do you decide, alone or together with others, what the personal data is used for and how it is processed?",
     "options": OPTIONS,
+    "examples": [],
+    "check": "",
 }
 READY_TO_CONFIRM = {"type": "ready_to_confirm"}
 
 # Read once: the tests do not change the schema.
 SCHEMA = load_schema()
+GUIDANCE = load_guidance(SCHEMA)
 
 
 @pytest.fixture
@@ -99,7 +103,7 @@ def intakes() -> dict[str, Intake]:
 
 @pytest.fixture
 def client(intakes: dict[str, Intake]) -> TestClient:
-    return TestClient(create_app(SCHEMA, intakes))
+    return TestClient(create_app(SCHEMA, GUIDANCE, intakes))
 
 
 def follow_up(slot_id: str, relevant: dict[str, list[str]]) -> dict[str, Any]:
@@ -135,7 +139,8 @@ def start_test_intake(
     text = yaml.safe_dump(
         {"description": [description], "slots": [camera, *follow_ups]}
     )
-    client = TestClient(create_app(parse_schema(text), {}))
+    # The test schema has no slot with entries, so it gets the guidance of the repository too.
+    client = TestClient(create_app(parse_schema(text), GUIDANCE, {}))
     created = client.post(
         "/intakes",
         json={
@@ -705,6 +710,8 @@ def test_post_answer_records_the_value_and_returns_the_next_question(
             "slot": "processes_for_customer",
             "text": "Do you process personal data on behalf of a customer, following the customer's instructions?",
             "options": OPTIONS,
+            "examples": [],
+            "check": "",
         }
     }
 

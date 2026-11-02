@@ -6,6 +6,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from obligations_agent.guidance import Quote, Source
 from obligations_agent.schema import NOT_SURE, Schema, Slot
 
 ErrorCode = Literal["invalid_slot", "invalid_value", "not_found"]
@@ -42,12 +43,24 @@ class Option(BaseModel):
     label: str
 
 
+class Example(BaseModel):
+    """An entry of guidance.yaml that the model matched to the user's text, with the model's line about that text, and the entry's quotes and source from the file (RESP-5)."""
+
+    id: str
+    line: str
+    two_sided: bool
+    quotes: list[Quote]
+    source: Source
+
+
 class Question(BaseModel):
-    """A follow-up question: the slot it asks about, its text and its options."""
+    """A follow-up question: the slot it asks about, its text, its options, and the examples from guidance with the check line (RESP-5)."""
 
     slot: str
     text: str
     options: list[Option]
+    examples: list[Example] = []
+    check: str = ""
 
 
 class Intake(Form):
