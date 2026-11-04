@@ -2,6 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { type SubmitEvent, useEffect, useState, useTransition } from "react";
+import styles from "./actions.module.css";
+import LoadingStatus, { WRITING } from "./loading-status";
 import NotSureReason from "./not-sure-reason";
 import { NOT_SURE, type NotSure, type Schema } from "./service";
 
@@ -27,7 +29,7 @@ export default function IntakeForm() {
   }, []);
 
   if (schema === null) {
-    return message ? <p role="alert">{message}</p> : <p>Loading the form.</p>;
+    return message ? <p role="alert">{message}</p> : <LoadingStatus message="Loading the form." />;
   }
 
   // "Not sure" counts as an answer once it has a reason (INTAKE-6).
@@ -100,9 +102,12 @@ export default function IntakeForm() {
         </fieldset>
       ))}
       {message && <p role="alert">{message}</p>}
-      <button type="submit" disabled={!complete || sending}>
-        Send
-      </button>
+      <div className={styles.actions}>
+        <button type="submit" disabled={!complete || sending}>
+          Send
+        </button>
+        <LoadingStatus message={sending ? WRITING : null} />
+      </div>
     </form>
   );
 }

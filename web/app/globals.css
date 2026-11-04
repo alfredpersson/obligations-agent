@@ -1,15 +1,157 @@
-/* Width, spacing and readable text. The browser's defaults do the rest. */
+/* The design, the theme of the author's personal site: warm paper, near-black text and one
+   terracotta accent, a serif for the text and a monospace font for labels, and flat rows between
+   thin rules. The colors, type sizes, spaces and the radius are defined here once, with the rules for
+   the elements that every screen uses. Each component keeps its own rules in a CSS Module next to
+   it, and only this file names a color (design.test.ts checks the contrast of each pair). */
 
-body {
-  max-width: 40rem;
-  margin: 2rem auto;
-  padding: 0 1rem;
-  font-family: system-ui, sans-serif;
-  line-height: 1.5;
+:root {
+  --color-page: #faf7f2;
+  /* Text fields and groups of options. */
+  --color-surface: #fffdf9;
+  --color-text: #1a1714;
+  --color-muted: #6b6259;
+  /* The borders of controls. */
+  --color-border: #8a7e72;
+  /* Lines that only separate parts of a screen. */
+  --color-rule: #e6dfd6;
+  /* Links, the focus outline, the button's fill and the chosen option. */
+  --color-accent: #a34a2a;
+  --color-accent-text: #faf7f2;
+  --color-accent-soft: #f4e7df;
+  /* Marks only: the square before the product name and the bar above a section label. */
+  --color-mark: #bd684f;
+  --color-quote: #f3eee6;
+  --color-error: #b42318;
+  --color-disabled: #e6dfd6;
+  --color-disabled-text: #574f47;
+  /* The result of a gate: its status label, and the square before its title. The words of the
+     label carry the meaning, and the color only repeats it. */
+  --color-applies: #e6f4ea;
+  --color-applies-text: #14532d;
+  --color-applies-mark: #16a34a;
+  --color-does-not-apply: #eef0f2;
+  --color-does-not-apply-text: #3d4650;
+  --color-does-not-apply-mark: #9ca3af;
+  --color-conditional: #fff4d6;
+  --color-conditional-text: #713f00;
+  --color-conditional-mark: #d97706;
+  /* The page behind a dialog. */
+  --color-backdrop: rgb(26 23 20 / 0.45);
+
+  /* The fonts that layout.tsx loads, then fonts of the system. */
+  --font-text: var(--font-serif), Georgia, "Times New Roman", serif;
+  --font-label: var(--font-mono), ui-monospace, Menlo, monospace;
+  --size-text: 1.0625rem;
+  --size-h1: 2.25rem;
+  --size-h2: 1.5rem;
+  --size-legend: 1.1875rem;
+  --size-section: 0.9375rem;
+  --size-button: 0.875rem;
+  --size-note: 0.8125rem;
+  --size-label: 0.75rem;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-7: 1.75rem;
+  --space-8: 2rem;
+  --gutter: 1.5rem;
+  --column: 42.5rem;
+  /* The space inside a card: a group of options, or a group of examples. */
+  --card-padding: var(--space-4) var(--space-6);
+
+  --radius: 0;
 }
 
+/* On a phone, less space inside a card, so that its text keeps its width. */
+@media (max-width: 30rem) {
+  :root {
+    --card-padding: var(--space-3) var(--space-4);
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--color-page);
+  color: var(--color-text);
+  font-family: var(--font-text);
+  font-size: var(--size-text);
+  line-height: 1.6;
+  /* A long word or link in the user's text wraps, so that nothing scrolls sideways. */
+  overflow-wrap: anywhere;
+}
+
+h1 {
+  margin: 0 0 var(--space-6);
+  font-size: var(--size-h1);
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+/* A section heading is a label: monospace and upper case, with a short bar above it. */
+h2 {
+  position: relative;
+  margin: var(--space-8) 0 var(--space-3);
+  padding-top: var(--space-4);
+  font-family: var(--font-label);
+  font-size: var(--size-section);
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+h2::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 30px;
+  height: 3px;
+  background: var(--color-mark);
+}
+
+/* A heading inside a section is a smaller label in the muted color. */
+h3 {
+  margin: var(--space-6) 0 var(--space-2);
+  color: var(--color-muted);
+  font-family: var(--font-label);
+  font-size: var(--size-label);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+p {
+  margin: 0 0 var(--space-4);
+}
+
+a {
+  color: var(--color-accent);
+  text-underline-offset: 0.15em;
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* A group of options is a card, with the options as rows between thin rules. A group is at most as
+   wide as the column, also with a long word in it. */
 fieldset {
-  margin: 0 0 1rem;
+  min-width: 0;
+  margin: 0 0 var(--space-6);
+  padding: var(--card-padding);
+  background: var(--color-surface);
+  border: 1px solid var(--color-rule);
 }
 
 /* A floating legend stays inside the border of its group, so that a question text over several
@@ -18,64 +160,123 @@ legend {
   float: left;
   width: 100%;
   padding: 0;
-  margin-bottom: 0.5rem;
+  margin-bottom: var(--space-3);
+  font-size: var(--size-legend);
+  font-weight: 700;
 }
 
 legend + * {
   clear: left;
 }
 
-fieldset label {
+/* The group of reasons inside a "not sure" answer. */
+fieldset fieldset {
+  margin: var(--space-3) 0 0;
+  padding: var(--space-3) var(--space-4);
+}
+
+fieldset fieldset legend {
+  font-size: var(--size-text);
+}
+
+/* An option is a row under a thin rule, tinted when it is chosen. */
+label:has(> input[type="radio"]) {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  padding: var(--space-3) var(--space-2);
+  border-top: 1px solid var(--color-rule);
+  cursor: pointer;
+}
+
+label:has(> input[type="radio"]:checked) {
+  background: var(--color-accent-soft);
+}
+
+input[type="radio"] {
+  flex: none;
+  width: 1.125rem;
+  height: 1.125rem;
+  margin: 0.15em 0 0;
+  accent-color: var(--color-accent);
+}
+
+label:has(> textarea) {
   display: block;
+  font-weight: 600;
 }
 
 textarea {
   display: block;
-  box-sizing: border-box;
   width: 100%;
   min-height: 6rem;
-  margin: 0.25rem 0 1rem;
+  margin: var(--space-2) 0 var(--space-6);
+  padding: var(--space-2) var(--space-3);
   font: inherit;
+  font-weight: 400;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
 }
 
 button {
-  font: inherit;
+  padding: var(--space-3) var(--space-6);
+  font-family: var(--font-label);
+  font-size: var(--size-button);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--color-accent-text);
+  background: var(--color-accent);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius);
+  cursor: pointer;
 }
 
-dt {
-  font-weight: bold;
-}
-
-dd {
-  margin: 0 0 0.5rem;
+button:disabled {
+  color: var(--color-disabled-text);
+  background: var(--color-disabled);
+  border-color: var(--color-disabled);
+  cursor: not-allowed;
 }
 
 [role="alert"] {
-  color: #b00020;
+  color: var(--color-error);
 }
 
-/* The examples from guidance: a line on the left marks the block, and its headings keep the size of
-   the text. */
-.examples {
-  border-left: 3px solid #999;
-  padding-left: 0.75rem;
-}
-
-.examples h2,
-.examples h3 {
-  font-size: 1rem;
-}
-
+/* A quote from the law or from guidance. */
 blockquote {
-  margin: 0 0 0.5rem 1rem;
+  margin: 0 0 var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-quote);
+  border-left: 3px solid var(--color-rule);
 }
 
-/* The dialog before a link to EUR-Lex is as wide as the text of the page at most. */
-dialog {
-  max-width: 36rem;
+ul {
+  padding-left: var(--space-6);
 }
 
-/* A quote from a regulation keeps the line of each paragraph and point. */
-blockquote.unit {
-  white-space: pre-line;
+li {
+  margin-bottom: var(--space-2);
+}
+
+/* A list of answers shows the fact and its answer in two columns. */
+dl {
+  margin: 0 0 var(--space-4);
+}
+
+dl > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-4);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--color-rule);
+}
+
+dt {
+  font-weight: 600;
+}
+
+dd {
+  margin: 0;
 }

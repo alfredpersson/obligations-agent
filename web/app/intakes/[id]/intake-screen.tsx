@@ -2,6 +2,7 @@
 
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import LoadingStatus from "../../loading-status";
 import type { Intake, Schema, Step } from "../../service";
 import FollowUpQuestion from "./follow-up-question";
 import IntakeResult from "./intake-result";
@@ -12,6 +13,7 @@ export default function IntakeScreen() {
   const { id } = useParams<{ id: string }>();
   const [data, setData] = useState<{ intake: Intake; schema: Schema } | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [loading, setLoading] = useState("Loading the answers.");
 
   const load = useCallback(() => {
     Promise.all([fetch(`/api/intakes/${id}`), fetch("/api/schema")])
@@ -30,8 +32,17 @@ export default function IntakeScreen() {
 
   useEffect(load, [load]);
 
+  // One status for the screen, first in each of its views, so that React keeps its element and
+  // screen readers announce the message after the last answer.
+  const status = <LoadingStatus message={data === null && message === null ? loading : null} />;
+
   if (data === null) {
-    return message ? <p role="alert">{message}</p> : <p>Loading the answers.</p>;
+    return (
+      <>
+        {status}
+        {message && <p role="alert">{message}</p>}
+      </>
+    );
   }
 
   const { intake, schema } = data;
@@ -41,6 +52,7 @@ export default function IntakeScreen() {
       setData({ schema, intake: { ...intake, step } });
     } else {
       // The recorded answers need the new answers, so the intake is loaded again.
+      setLoading("Loading the result.");
       setData(null);
       load();
     }
@@ -52,6 +64,7 @@ export default function IntakeScreen() {
     const slot = [...schema.slots, ...schema.follow_up_slots].find((slot) => slot.id === step.slot);
     return (
       <>
+        {status}
         <h1>{slot?.label}</h1>
         {/* A key for each question, so that no choice of the previous question stays selected. */}
         <FollowUpQuestion key={step.number} id={id} question={step} onStep={show} />
@@ -61,6 +74,7 @@ export default function IntakeScreen() {
   // The result first, then the recorded answers (GATE-4).
   return (
     <>
+      {status}
       {intake.result && <IntakeResult result={intake.result} notSure={intake.not_sure} schema={schema} />}
       <RecordedAnswers intake={intake} schema={schema} />
     </>

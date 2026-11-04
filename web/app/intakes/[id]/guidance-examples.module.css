@@ -1,0 +1,52 @@
+/* The examples from guidance under their section label, one card for each group: the line about the
+   user's text is the card's title above a rule, the quotes stand indented under their heading, and
+   the source line is the card's footer below a rule. The line and the quote headings are in the font
+   of the text, and the source lines are labels. */
+.examples {
+  margin: 0 0 var(--space-6);
+}
+
+.examples h2 {
+  margin-top: 0;
+}
+
+.group {
+  margin: 0 0 var(--space-4);
+  padding: var(--card-padding);
+  background: var(--color-surface);
+  border: 1px solid var(--color-rule);
+}
+
+.group h3 {
+  margin: 0 0 var(--space-4);
+  padding-bottom: var(--space-3);
+  color: var(--color-text);
+  font-family: var(--font-text);
+  font-size: var(--size-text);
+  letter-spacing: normal;
+  text-transform: none;
+  border-bottom: 1px solid var(--color-rule);
+}
+
+/* A quote heading is the source's heading or the sentence that leads into the quote, and many are
+   long, so it is not a label. */
+.heading {
+  margin: var(--space-4) 0 var(--space-2);
+  color: var(--color-muted);
+}
+
+.group blockquote {
+  margin-left: var(--space-4);
+}
+
+.source {
+  margin: var(--space-4) 0 0;
+  padding-top: var(--space-3);
+  color: var(--color-muted);
+  font-family: var(--font-label);
+  border-top: 1px solid var(--color-rule);
+}
+
+.source small {
+  font-size: var(--size-note);
+}

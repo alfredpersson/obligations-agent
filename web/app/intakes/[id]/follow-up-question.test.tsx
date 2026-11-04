@@ -196,6 +196,25 @@ test("Next is disabled while the answer is sent, so that a second click sends no
   await waitFor(() => expect(nextButton().disabled).toBe(false));
 });
 
+test("while the answer is sent, the status after Next says that the next question is being written, and it is empty again after an error", async () => {
+  const sent = Promise.withResolvers<Response>();
+  vi.stubGlobal("fetch", vi.fn<typeof fetch>(() => sent.promise));
+  render(<FollowUpQuestion id={ID} question={question} onStep={vi.fn()} />);
+  // The status is in the page, empty, before the wait, so that screen readers announce its message.
+  const status = screen.getByRole("status");
+  expect(status.textContent).toBe("");
+  expect(status.previousElementSibling).toBe(nextButton());
+
+  fireEvent.click(choice("Yes, it is kept"));
+  fireEvent.click(nextButton());
+  await waitFor(() => expect(status.textContent).toBe("Writing the next question. This can take several seconds."));
+
+  sent.reject(new TypeError("fetch failed"));
+  await screen.findByRole("alert");
+  await waitFor(() => expect(status.textContent).toBe(""));
+  expect(screen.getByRole("status")).toBe(status);
+});
+
 test.each([
   ["a 500 response", new Response(null, { status: 500 })],
   [
@@ -321,12 +340,14 @@ test("the explanation, the examples and the check line come first, then the ques
     "SECTION",
     "P",
     "FIELDSET",
-    "BUTTON",
+    "DIV",
   ]);
   expect(form.children[0].textContent).toBe(full.explanation);
   expect(form.children[1]).toBe(screen.getByRole("region", { name: EXAMPLES }));
   expect(form.children[2].textContent).toBe(full.check);
   expect(form.children[3]).toBe(group);
+  // Next and its status in one row.
+  expect([...form.children[4].children]).toEqual([nextButton(), screen.getByRole("status")]);
   const meaning = group.querySelector("legend")?.nextElementSibling;
   expect(meaning?.textContent).toBe(full.meaning);
   expect(meaning?.nextElementSibling?.querySelector("input[type=radio]")).toBeTruthy();
@@ -336,7 +357,8 @@ test("a question without an explanation, examples, a check line and a meaning sh
   const { container } = render(<FollowUpQuestion id={ID} question={question} onStep={vi.fn()} />);
 
   const form = container.querySelector("form") as HTMLFormElement;
-  expect([...form.children].map((child) => child.tagName)).toEqual(["FIELDSET", "BUTTON"]);
+  expect([...form.children].map((child) => child.tagName)).toEqual(["FIELDSET", "DIV"]);
+  expect([...form.children[1].children]).toEqual([nextButton(), screen.getByRole("status")]);
   expect(form.querySelector("legend")?.nextElementSibling?.querySelector("input[type=radio]")).toBeTruthy();
 });
 
@@ -358,6 +380,25 @@ test("the examples show the line of each group once, as a heading above the quot
     "a recording that a shop camera keeps for a week",
   ]);
   expect(region.textContent).not.toMatch(/sided/i);
+});
+
+test("each group of examples is one element, from its line to its last source line, so that the screen can show it as a card", () => {
+  render(<FollowUpQuestion id={ID} question={full} onStep={vi.fn()} />);
+
+  const region = screen.getByRole("region", { name: EXAMPLES });
+  const groups = within(region)
+    .getAllByRole("heading", { level: 3 })
+    .map((line) => line.parentElement as HTMLElement);
+  expect(groups.map((group) => group.parentElement)).toEqual([region, region]);
+  expect(groups.map((group) => group.firstElementChild?.textContent)).toEqual([
+    "Your description mentions a shop, a door camera and backups.",
+    "Your note mentions a phone and a shop camera.",
+  ]);
+  expect(groups.map((group) => within(group).getAllByRole("blockquote").length)).toEqual([5, 2]);
+  expect(groups.map((group) => group.lastElementChild?.querySelector("a")?.textContent)).toEqual([
+    "Camera guidance",
+    "Product rules guide",
+  ]);
 });
 
 test("inside a group a heading shows once for quotes in a row that share it, also across entries, and again after the source line of another source and in the next group", () => {
