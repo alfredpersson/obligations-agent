@@ -55,6 +55,9 @@ export const testSchema = {
   ],
 } satisfies Schema;
 
+// The fields of a question without an explanation, a meaning, examples and a check line (RESP-6).
+export const PLAIN = { explanation: "", meaning: "", examples: [], check: "" };
+
 // Replaces fetch in a test. Each URL gets a response, or an error for fetch to throw.
 export function stubFetch(results: Record<string, Response | Error>) {
   const fetchMock = vi.fn<typeof fetch>(async (input) => {

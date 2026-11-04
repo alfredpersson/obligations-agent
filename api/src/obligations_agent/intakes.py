@@ -54,10 +54,12 @@ class Example(BaseModel):
 
 
 class Question(BaseModel):
-    """A follow-up question: the slot it asks about, its text, its options, and the examples from guidance with the check line (RESP-5)."""
+    """A follow-up question: the slot it asks about, its three texts (the explanation, the question and what each answer means, RESP-6), its options, and the examples from guidance with the check line (RESP-5)."""
 
     slot: str
     text: str
+    explanation: str = ""
+    meaning: str = ""
     options: list[Option]
     examples: list[Example] = []
     check: str = ""
@@ -106,11 +108,11 @@ def default_question(slot: Slot) -> Question:
     )
 
 
-def asked_before(intake: Intake, slot: Slot) -> list[str]:
-    """The texts of the questions about the slot so far: the form's question for a slot on the form, then each follow-up question about it."""
-    form = [slot.question] if slot.relevant == "always" else []
+def asked_before(intake: Intake, slot: Slot) -> list[Question]:
+    """The questions about the slot so far: the form's question for a slot on the form, then each follow-up question about it."""
+    form = [default_question(slot)] if slot.relevant == "always" else []
     return form + [
-        question.text for question in intake.questions if question.slot == slot.id
+        question for question in intake.questions if question.slot == slot.id
     ]
 
 

@@ -13,13 +13,12 @@ fieldset {
 }
 
 /* A floating legend stays inside the border of its group, so that a question text over several
-   lines does not cross the border. Each paragraph of a question text starts on a new line. */
+   lines does not cross the border. */
 legend {
   float: left;
   width: 100%;
   padding: 0;
   margin-bottom: 0.5rem;
-  white-space: pre-line;
 }
 
 legend + * {
@@ -53,4 +52,20 @@ dd {
 
 [role="alert"] {
   color: #b00020;
+}
+
+/* The examples from guidance: a line on the left marks the block, and its headings keep the size of
+   the text. */
+section {
+  border-left: 3px solid #999;
+  padding-left: 0.75rem;
+}
+
+section h2,
+section h3 {
+  font-size: 1rem;
+}
+
+blockquote {
+  margin: 0 0 0.5rem 1rem;
 }

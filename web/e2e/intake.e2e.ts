@@ -7,14 +7,23 @@ const DESCRIPTION = [
   ["What data does the product handle?", "Order numbers, and the names and email addresses of customers."],
 ];
 
-// The start of each follow-up question that schema.yaml asks after the form answers below, in
-// order, and the answer to choose.
+// For each follow-up question that schema.yaml asks after the form answers below, in order: the
+// label of its fact, which is the heading of its screen, the start of the question, and the answer
+// to choose.
 const FOLLOW_UPS = [
-  ["Do you decide, alone or together with others,", "Yes"],
-  ["Do you process personal data on behalf of a customer,", "No"],
-  ["Does the product process data that shows a person's racial or ethnic origin,", "No"],
-  ["Does the product make decisions about people without a person taking part,", "No"],
-  ["Do people interact with the product directly,", "Not sure"],
+  ["Decides why and how personal data is processed", "Do you decide, alone or together with others,", "Yes"],
+  ["Processes personal data for a customer", "Do you process personal data on behalf of a customer,", "No"],
+  [
+    "Special categories of personal data",
+    "Does the product process data that shows a person's racial or ethnic origin,",
+    "No",
+  ],
+  [
+    "Automated decisions about people",
+    "Does the product make decisions about people without a person taking part,",
+    "No",
+  ],
+  ["Interacts with people", "Do people interact with the product directly,", "Not sure"],
 ];
 
 // The notes of the two "Not sure" answers: on the form, and to the last follow-up question.
@@ -47,8 +56,8 @@ test("a filled-in form and the answered follow-up questions lead to the screen w
   await page.getByRole("button", { name: "Send" }).click();
 
   await expect(page).toHaveURL(/\/intakes\/[A-Za-z0-9_-]{22}$/);
-  for (const [index, [question, answer]] of FOLLOW_UPS.entries()) {
-    await expect(page.getByRole("heading", { level: 1, name: `Question ${index + 1}` })).toBeVisible();
+  for (const [label, question, answer] of FOLLOW_UPS) {
+    await expect(page.getByRole("heading", { level: 1, name: label })).toBeVisible();
     const group = page.getByRole("group", { name: question });
     // Exact names, because "No" is also part of "Not sure".
     await group.getByRole("radio", { name: answer, exact: true }).check();

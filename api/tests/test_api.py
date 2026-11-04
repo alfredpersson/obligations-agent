@@ -86,6 +86,8 @@ FIRST_QUESTION = {
     "slot": "decides_purposes",
     "text": "Do you decide, alone or together with others, what the personal data is used for and how it is processed?",
     "options": OPTIONS,
+    "explanation": "",
+    "meaning": "",
     "examples": [],
     "check": "",
 }
@@ -710,6 +712,8 @@ def test_post_answer_records_the_value_and_returns_the_next_question(
             "slot": "processes_for_customer",
             "text": "Do you process personal data on behalf of a customer, following the customer's instructions?",
             "options": OPTIONS,
+            "explanation": "",
+            "meaning": "",
             "examples": [],
             "check": "",
         }
