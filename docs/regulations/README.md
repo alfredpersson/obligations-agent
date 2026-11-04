@@ -1,0 +1,14 @@
+# Stored copies of the regulations
+
+These files are copies of the Official Journal text of the two regulations, from which `api/src/obligations_agent/gates.yaml` quotes the units that the result of an intake cites (MEMO-8 in [docs/spec.md](../spec.md)). The tests in `api/tests/test_gates.py` find every quote of `gates.yaml` word for word in the copy of its document, after the header that ends with the line `---`, and check in the copy that the text directive of each link marks exactly that text. That a browser does the same on EUR-Lex was checked by opening each kind of link in Chromium. A quote can be checked after the web page changes.
+
+The repository's MIT license does not cover these files. They are the text of the European Union, used under its terms of reuse:
+
+| File | Document | Terms of reuse |
+| --- | --- | --- |
+| `ai-act.txt` | Regulation (EU) 2024/1689 (Artificial Intelligence Act), CELEX 32024R1689, as published in the Official Journal | © European Union; reuse authorised under Commission Decision 2011/833/EU, [EUR-Lex legal notice](https://eur-lex.europa.eu/content/legal-notice/legal-notice.html) |
+| `gdpr.txt` | Regulation (EU) 2016/679 (General Data Protection Regulation), CELEX 32016R0679, as published in the Official Journal | © European Union; reuse authorised under Commission Decision 2011/833/EU, [EUR-Lex legal notice](https://eur-lex.europa.eu/content/legal-notice/legal-notice.html) |
+
+Each copy is the XHTML of the Publications Office (Cellar), taken with `curl -sS -L -H "Accept: application/xhtml+xml" -H "Accept-Language: eng" https://publications.europa.eu/resource/celex/<CELEX>`, as text from `textutil -convert txt`. Its header names the Cellar document and its version. The text keeps the non-breaking spaces of the Official Journal, such as the one in "Annex III"; the quotes in `gates.yaml` use plain spaces, and the tests count any run of whitespace as one space.
+
+A quote links to the Official Journal text that the copies hold. A unit that the result only links, such as an assumption or an item that is not checked yet, opens the AI Act as amended by Regulation (EU) 2026/1744, in the consolidated text of 27 July 2026 (CELEX 02024R1689-20260727), so that the user checks it against the text in force. That regulation amends none of the units that `gates.yaml` quotes, which read the same in the consolidated text. No act amends the GDPR, so its links open the Official Journal text.

@@ -7,7 +7,7 @@ import type { Group } from "../../service";
 export default function GuidanceExamples({ examples }: { examples: Group[] }) {
   const heading = useId();
   return (
-    <section aria-labelledby={heading}>
+    <section className="examples" aria-labelledby={heading}>
       <h2 id={heading}>Examples from official guidance (not law)</h2>
       {examples.map((group) => (
         <Fragment key={group.entries[0].id}>

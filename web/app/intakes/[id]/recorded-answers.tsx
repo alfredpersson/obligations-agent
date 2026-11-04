@@ -1,4 +1,4 @@
-import { Fragment } from "react";
+import { Fragment, useId } from "react";
 import { REASONS } from "../../not-sure-reason";
 import type { Intake, Schema } from "../../service";
 
@@ -8,16 +8,18 @@ export default function RecordedAnswers({ intake, schema }: { intake: Intake; sc
   // A follow-up slot that was not asked has no answer, so it is not in the list of answers.
   const answered = slots.filter((slot) => slot.id in intake.answers);
   const open = slots.filter((slot) => intake.open_slots.includes(slot.id));
+  const heading = useId();
+  // A region named by its heading, below the result (GATE-4).
   return (
-    <>
-      <h1>Recorded answers</h1>
+    <section aria-labelledby={heading}>
+      <h2 id={heading}>Recorded answers</h2>
       {schema.description.map((field) => (
         <Fragment key={field.id}>
-          <h2>{field.label}</h2>
+          <h3>{field.label}</h3>
           <p>{intake.description[field.id]}</p>
         </Fragment>
       ))}
-      <h2>Answers</h2>
+      <h3>Answers</h3>
       <dl>
         {answered.map((slot) => (
           <div key={slot.id}>
@@ -26,7 +28,7 @@ export default function RecordedAnswers({ intake, schema }: { intake: Intake; sc
           </div>
         ))}
       </dl>
-      <h2>Open questions</h2>
+      <h3>Open questions</h3>
       {open.length === 0 ? (
         <p>No open questions.</p>
       ) : (
@@ -45,6 +47,6 @@ export default function RecordedAnswers({ intake, schema }: { intake: Intake; sc
           })}
         </ul>
       )}
-    </>
+    </section>
   );
 }

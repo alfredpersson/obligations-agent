@@ -31,6 +31,32 @@ class UniqueKeyLoader(yaml.SafeLoader):
         return super().construct_mapping(node, deep=deep)
 
 
+def load_yaml(text: str, error: type[Exception]) -> Any:
+    """Reads YAML text with UniqueKeyLoader, and refuses a key used twice with the error of the file that it reads."""
+    try:
+        return yaml.load(text, Loader=UniqueKeyLoader)
+    except SchemaError as found:
+        raise error(str(found)) from found
+
+
+def read_items[T: BaseModel](
+    model: type[T], kind: str, raws: list[Any], error: type[Exception]
+) -> list[T]:
+    """Reads each item of a list in a file, refusing one without a required part (named by id, or by position when the id is missing) and an id used twice, with the error of the file."""
+    items: list[T] = []
+    ids: list[Any] = []
+    for position, raw in enumerate(raws, start=1):
+        name = raw.get("id", position)
+        try:
+            items.append(model.model_validate(raw))
+        except ValidationError as found:
+            raise error(f"{kind} {name}: {found}") from found
+        if name in ids:
+            raise error(f"{kind} {name}: the id is used twice")
+        ids.append(name)
+    return items
+
+
 class Value(BaseModel):
     id: str
     label: str

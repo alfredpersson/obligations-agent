@@ -15,6 +15,7 @@ import yaml
 from fastapi.testclient import TestClient
 
 from obligations_agent import server
+from obligations_agent.gates import Gates, load_gates
 from obligations_agent.guidance import load_guidance
 from obligations_agent.intake_model import PROMPT_VERSION, new_client
 from obligations_agent.schema import Schema, load_schema, parse_schema
@@ -65,6 +66,9 @@ SHOWN = [WRITTEN[2], WRITTEN[1], WRITTEN[0]]
 
 SCHEMA = load_schema()
 GUIDANCE = load_guidance(SCHEMA)
+GATES = load_gates(SCHEMA)
+# For a test schema, which has none of the slots of the gates.
+NO_GATES = Gates(units=[], gates=[], assumptions=[], not_checked=[])
 # A question without an explanation, a meaning and examples from guidance (RESP-5, RESP-6).
 PLAIN: dict[str, Any] = {
     "explanation": "",
@@ -155,7 +159,9 @@ def finish(request: httpx2.Request) -> httpx2.Response:
     return ask({}, name="finish")
 
 
-def service(handler: Handler, schema: Schema = SCHEMA) -> TestClient:
+def service(
+    handler: Handler, schema: Schema = SCHEMA, gates: Gates = GATES
+) -> TestClient:
     """A client for the service, with a model client that sends each request to the handler."""
     transport = httpx2.MockTransport(handler)
     # with_options keeps the timeout and the retries of the service's client.
@@ -163,7 +169,7 @@ def service(handler: Handler, schema: Schema = SCHEMA) -> TestClient:
         http_client=anthropic.DefaultHttpxClient(transport=transport)
     )
     # The test schemas have no slot with entries, so they get the guidance of the repository too.
-    return TestClient(create_app(schema, GUIDANCE, {}, model))
+    return TestClient(create_app(schema, GUIDANCE, gates, {}, model))
 
 
 def recording(requests: list[httpx2.Request]) -> Handler:
@@ -534,7 +540,9 @@ def test_without_a_model_client_each_question_has_its_default_text(
     caplog.set_level(logging.INFO)
 
     created = (
-        TestClient(create_app(SCHEMA, GUIDANCE, {})).post("/intakes", json=FORM).json()
+        TestClient(create_app(SCHEMA, GUIDANCE, GATES, {}))
+        .post("/intakes", json=FORM)
+        .json()
     )
 
     assert created["step"] == DEFAULT_STEP
@@ -559,7 +567,7 @@ def test_without_a_model_client_no_slot_is_asked_a_second_time(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     caplog.set_level(logging.INFO)
-    client = TestClient(create_app(SCHEMA, GUIDANCE, {}))
+    client = TestClient(create_app(SCHEMA, GUIDANCE, GATES, {}))
     created = client.post("/intakes", json=FORM).json()
 
     steps = [
@@ -746,7 +754,9 @@ def test_a_chain_of_conditions_is_followed_when_answers_are_removed() -> None:
         ("c", {"b": ["yes"]}),
     )
     client = service(
-        scripted([], asking("a"), asking("b"), asking("c"), asking("camera")), schema
+        scripted([], asking("a"), asking("b"), asking("c"), asking("camera")),
+        schema,
+        NO_GATES,
     )
     created = client.post(
         "/intakes", json={**camera_form("not_sure"), "not_sure": {"camera": UNCLEAR}}
@@ -866,7 +876,7 @@ def test_no_request_goes_to_the_model_after_eight_questions() -> None:
         *[(f"q{number}", {"camera": ["yes"]}) for number in range(1, 10)]
     )
     requests: list[httpx2.Request] = []
-    client = service(recording(requests), schema)
+    client = service(recording(requests), schema, NO_GATES)
     created = client.post("/intakes", json=camera_form("yes")).json()
 
     steps = [answer(client, created["id"], number, "no") for number in range(1, 9)]

@@ -11,6 +11,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from obligations_agent.gates import Gates, decide, load_gates
 from obligations_agent.guidance import Guidance, load_guidance
 from obligations_agent.intake_model import new_client, next_question
 from obligations_agent.intakes import (
@@ -56,6 +57,7 @@ def step(intake: Intake) -> dict[str, Any]:
 def create_app(
     schema: Schema,
     guidance: Guidance,
+    gates: Gates,
     intakes: dict[str, Intake],
     client: anthropic.Anthropic | None = None,
 ) -> FastAPI:
@@ -109,6 +111,11 @@ def create_app(
             "open_slots": open_slots(schema, intake),
             "not_sure": intake.not_sure,
             "step": step(intake),
+            # The result is computed from the answers each time, once the intake has ended
+            # (GATE-4).
+            "result": None
+            if waiting(intake) is not None
+            else decide(gates, schema, intake).model_dump(),
         }
 
     @app.post("/intakes/{intake_id}/answers")
@@ -131,12 +138,13 @@ def create_app(
 # HTTP client of the SDK, keep the default level and log only warnings.
 logging.basicConfig()
 logging.getLogger("obligations_agent").setLevel(logging.INFO)
-# The schema and the examples from guidance are loaded once, when the service starts. The model is
-# called only when the key is set (INTAKE-1).
+# The schema, the examples from guidance and the gates are loaded once, when the service starts. The
+# model is called only when the key is set (INTAKE-1).
 SCHEMA = load_schema()
 app = create_app(
     SCHEMA,
     load_guidance(SCHEMA),
+    load_gates(SCHEMA),
     {},
     new_client() if os.environ.get("ANTHROPIC_API_KEY") else None,
 )

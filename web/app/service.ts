@@ -45,10 +45,36 @@ export type Question = {
 
 export type Step = Question | { type: "ready_to_confirm" };
 
+// A unit that the result quotes or links: its citation, its link to EUR-Lex, and its quote, or
+// null for a unit that is only linked (MEMO-7, MEMO-8).
+export type Cited = { citation: string; link: string; quote: string | null };
+
+// An open slot that a result depends on, with the result for its answers: of the gate itself, or,
+// for a gate under another one, where the gate above applies (MEMO-6).
+export type Condition = { slot: string; gate: string; cases: { values: string[]; result: string }[] };
+
+// The result of one gate (GATE-2, GATE-4).
+export type Outcome = {
+  gate: string;
+  label: string;
+  status: "applies" | "does_not_apply" | "conditional";
+  result: "applies" | "does_not_apply" | "listed_use" | null;
+  derogation: "always" | "unless" | null;
+  answers: Record<string, string>;
+  conditions: Condition[];
+  quotes: Cited[];
+};
+
+export type Statement = { text: string; links: Cited[] };
+
+export type Result = { assumptions: Statement[]; gates: Outcome[]; not_checked: Statement[] };
+
 export type Intake = {
   description: Record<string, string>;
   answers: Record<string, string>;
   open_slots: string[];
   not_sure: Record<string, NotSure>;
   step: Step;
+  // Null until the intake has ended.
+  result: Result | null;
 };

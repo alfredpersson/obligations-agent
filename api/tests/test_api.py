@@ -1,4 +1,4 @@
-"""Tests for GET /schema, POST /intakes, GET /intakes/{id} and POST /intakes/{id}/answers: acceptance criteria 2 to 7 of issue #7, the three description fields of issue #12, acceptance criteria 2 to 7 of issue #16, and acceptance criteria 1 and 3 of issue #24."""
+"""Tests for GET /schema, POST /intakes, GET /intakes/{id} and POST /intakes/{id}/answers: acceptance criteria 2 to 7 of issue #7, the three description fields of issue #12, acceptance criteria 2 to 7 of issue #16, acceptance criteria 1 and 3 of issue #24, and the result in GET /intakes/{id} of issue #37."""
 
 import re
 from typing import Any
@@ -7,6 +7,7 @@ import pytest
 import yaml
 from fastapi.testclient import TestClient
 
+from obligations_agent.gates import Gates, link, load_gates
 from obligations_agent.guidance import load_guidance
 from obligations_agent.intakes import Intake
 from obligations_agent.schema import load_schema, parse_schema
@@ -96,6 +97,9 @@ READY_TO_CONFIRM = {"type": "ready_to_confirm"}
 # Read once: the tests do not change the schema.
 SCHEMA = load_schema()
 GUIDANCE = load_guidance(SCHEMA)
+GATES = load_gates(SCHEMA)
+# For a test schema, which has none of the slots of the gates.
+NO_GATES = Gates(units=[], gates=[], assumptions=[], not_checked=[])
 
 
 @pytest.fixture
@@ -105,7 +109,7 @@ def intakes() -> dict[str, Intake]:
 
 @pytest.fixture
 def client(intakes: dict[str, Intake]) -> TestClient:
-    return TestClient(create_app(SCHEMA, GUIDANCE, intakes))
+    return TestClient(create_app(SCHEMA, GUIDANCE, GATES, intakes))
 
 
 def follow_up(slot_id: str, relevant: dict[str, list[str]]) -> dict[str, Any]:
@@ -142,7 +146,7 @@ def start_test_intake(
         {"description": [description], "slots": [camera, *follow_ups]}
     )
     # The test schema has no slot with entries, so it gets the guidance of the repository too.
-    client = TestClient(create_app(parse_schema(text), GUIDANCE, {}))
+    client = TestClient(create_app(parse_schema(text), GUIDANCE, NO_GATES, {}))
     created = client.post(
         "/intakes",
         json={
@@ -501,7 +505,55 @@ def test_get_intake_returns_the_answers_and_the_open_slots_in_schema_order(
             "use_case_area": {"reason": "unknown", "note": ""},
         },
         "step": FIRST_QUESTION,
+        # The intake has not ended.
+        "result": None,
     }
+
+
+def test_the_result_is_null_while_a_question_waits_and_computed_once_the_intake_has_ended(
+    client: TestClient,
+) -> None:
+    answers = {
+        "personal_data": "yes",
+        "under_own_name": "yes",
+        "use_case_area": "employment",
+    }
+    created = client.post(
+        "/intakes", json={"answers": answers, "description": DESCRIPTION}
+    ).json()
+    assert client.get(f"/intakes/{created['id']}").json()["result"] is None
+
+    answer_each_question(
+        client, created, {slot.id: "yes" for slot in SCHEMA.follow_up_slots}
+    )
+    intake = client.get(f"/intakes/{created['id']}").json()
+
+    assert intake["result"]["gates"][0] == {
+        "gate": "gdpr_applies",
+        "label": "GDPR applies",
+        "status": "applies",
+        "result": "applies",
+        "derogation": None,
+        "answers": {"personal_data": "yes"},
+        "conditions": [],
+        "quotes": [
+            {
+                "citation": "GDPR Article 2(1)",
+                "link": link(
+                    next(unit for unit in GATES.units if unit.id == "gdpr:art2(1)")
+                ),
+                "quote": "This Regulation applies to the processing of personal data wholly or partly by automated means and to the processing other than by automated means of personal data which form part of a filing system or are intended to form part of a filing system.",
+            }
+        ],
+    }
+    assert [item["status"] for item in intake["result"]["gates"]] == [
+        "applies",
+        "applies",
+        "applies",
+        "applies",
+        "conditional",
+        "applies",
+    ]
 
 
 def test_post_intakes_stores_the_reason_and_the_note_of_each_form_slot_answered_not_sure(
