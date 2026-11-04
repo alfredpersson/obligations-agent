@@ -406,7 +406,7 @@ def test_the_result_has_a_gate_for_each_fact_of_the_issue_in_order() -> None:
     ]
 
 
-def test_the_result_states_two_assumptions_and_five_items_not_checked_each_with_its_links() -> (
+def test_the_result_states_two_assumptions_and_six_items_not_checked_each_with_its_links() -> (
     None
 ):
     result = result_of(
@@ -433,6 +433,9 @@ def test_the_result_states_two_assumptions_and_five_items_not_checked_each_with_
         ("Deployer", ["AI Act Article 3(4)"]),
         ("Prohibited practices", ["AI Act Article 5"]),
         ("High-risk under Annex I", ["AI Act Article 6(1)"]),
+        # The intake does not ask whether the interaction is obvious, nor about systems authorised by
+        # law for criminal offences.
+        ("The exceptions in Article 50(1)", ["AI Act Article 50(1)"]),
         (
             "Transparency: synthetic content, emotion recognition and biometric categorisation, deepfakes",
             ["AI Act Article 50(2) to 50(4)"],
@@ -664,28 +667,73 @@ def test_a_gate_under_a_gate_that_is_not_earlier_is_refused_with_its_name() -> N
         parse_gates(gates_text([controller, GATE]), SCHEMA)
 
 
+# A gate for the use-case area with its table for Article 6(3), which gives "always" or "unless" for
+# an area of Annex III.
+HIGH_RISK: dict[str, Any] = {
+    **GATE,
+    "id": "high_risk_annex_iii",
+    "slot": "use_case_area",
+    "rows": [
+        {"values": [area for area, _, _ in ANNEX_III], "result": "listed_use"},
+        {"values": ["none"], "result": "does_not_apply"},
+    ],
+    "derogation": {
+        "slot": "profiling",
+        "not_asked": "no",
+        "quotes": ["gdpr:art2(1)"],
+        "rows": [
+            {"values": ["yes"], "result": "always"},
+            {"values": ["no"], "result": "unless"},
+        ],
+    },
+}
+
+
+def test_a_gate_with_a_table_for_article_6_3_is_read() -> None:
+    gates = parse_gates(gates_text([HIGH_RISK]), SCHEMA)
+
+    derogation = gates.gates[0].derogation
+    assert derogation is not None and derogation.not_asked == "no"
+
+
 def test_a_derogation_whose_value_when_not_asked_is_not_in_its_rows_is_refused() -> (
     None
 ):
     area = {
-        **GATE,
-        "id": "high_risk_annex_iii",
-        "slot": "use_case_area",
-        "rows": [
-            {"values": [area for area, _, _ in ANNEX_III], "result": "listed_use"},
-            {"values": ["none"], "result": "does_not_apply"},
-        ],
-        "derogation": {
-            **without(GATE, "id"),
-            "slot": "profiling",
-            "not_asked": "maybe",
-        },
+        **HIGH_RISK,
+        "derogation": {**HIGH_RISK["derogation"], "not_asked": "maybe"},
     }
 
     with pytest.raises(
         GatesError, match=r"\bgate high_risk_annex_iii\b.*\bnot_asked\b"
     ):
         parse_gates(gates_text([area]), SCHEMA)
+
+
+@pytest.mark.parametrize("table", ["gate", "derogation"])
+def test_a_row_with_a_result_of_the_other_kind_of_table_is_refused_with_the_gate(
+    table: str,
+) -> None:
+    # A gate gives applies, does not apply or a listed use (GATE-2), and the table for Article 6(3)
+    # gives always or unless.
+    if table == "gate":
+        rows = [HIGH_RISK["rows"][0], {"values": ["none"], "result": "always"}]
+        area = {**HIGH_RISK, "rows": rows}
+    else:
+        rows = [
+            {"values": ["yes"], "result": "applies"},
+            HIGH_RISK["derogation"]["rows"][1],
+        ]
+        area = {**HIGH_RISK, "derogation": {**HIGH_RISK["derogation"], "rows": rows}}
+
+    with pytest.raises(GatesError, match=r"\bgate high_risk_annex_iii\b.*\bresult\b"):
+        parse_gates(gates_text([area]), SCHEMA)
+
+
+def test_a_gate_that_quotes_no_unit_is_refused_with_its_name() -> None:
+    # Each gate names the unit that defines it (GATE-1).
+    with pytest.raises(GatesError, match=r"\bgate gdpr_applies\b.*\bunit\b"):
+        parse_gates(gates_text([{**GATE, "quotes": []}]), SCHEMA)
 
 
 @pytest.mark.parametrize(

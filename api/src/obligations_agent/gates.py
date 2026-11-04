@@ -150,6 +150,17 @@ def parse_gates(text: str, schema: Schema) -> Gates:
                 raise GatesError(
                     f"gate {gate.id}: not_asked is not a value of {table.slot}"
                 )
+            # A gate gives applies, does not apply or a listed use (GATE-2), and the table for
+            # Article 6(3) gives always or unless.
+            results = (
+                ("always", "unless")
+                if isinstance(table, Derogation)
+                else ("applies", "does_not_apply", "listed_use")
+            )
+            if any(row.result not in results for row in table.rows):
+                raise GatesError(
+                    f"gate {gate.id}: a row of {table.slot} has a result that this table does not give"
+                )
             for unit_id in [
                 *table.quotes,
                 *(id for row in table.rows for id in row.quotes),
@@ -158,6 +169,9 @@ def parse_gates(text: str, schema: Schema) -> Gates:
                     raise GatesError(f"gate {gate.id}: the unit {unit_id} has no quote")
         if gate.under is not None and gate.under not in earlier:
             raise GatesError(f"gate {gate.id}: {gate.under} is not an earlier gate")
+        # Each gate names the unit that defines it (GATE-1).
+        if not [*gate.quotes, *(unit for row in gate.rows for unit in row.quotes)]:
+            raise GatesError(f"gate {gate.id}: the gate names no unit that defines it")
         earlier.append(gate.id)
     linked = [unit.id for unit in gates.units]
     for statement in [*gates.assumptions, *gates.not_checked]:

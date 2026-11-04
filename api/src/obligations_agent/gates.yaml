@@ -239,6 +239,10 @@ not_checked:
     links: ["aia:art5"]
   - text: High-risk under Annex I
     links: ["aia:art6(1)"]
+  # The intake does not ask whether the interaction is obvious, nor about a system authorised by law
+  # for criminal offences.
+  - text: The exceptions in Article 50(1)
+    links: ["aia:art50(1)"]
   - text: "Transparency: synthetic content, emotion recognition and biometric categorisation, deepfakes"
     links: ["aia:art50(2)"]
   - text: The exclusions from each regulation
