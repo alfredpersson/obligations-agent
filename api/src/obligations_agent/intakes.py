@@ -44,24 +44,30 @@ class Option(BaseModel):
 
 
 class Example(BaseModel):
-    """An entry of guidance.yaml that the model matched to the user's text, with the model's line about that text, and the entry's quotes and source from the file (RESP-5)."""
+    """An entry of guidance.yaml that the model matched to the user's text, with the entry's quotes and source from the file (RESP-5)."""
 
     id: str
-    line: str
     two_sided: bool
     quotes: list[Quote]
     source: Source
 
 
+class Group(BaseModel):
+    """The entries that the model matched to one part of the user's text, with the model's line about that part (RESP-5)."""
+
+    line: str
+    entries: list[Example]
+
+
 class Question(BaseModel):
-    """A follow-up question: the slot it asks about, its three texts (the explanation, the question and what each answer means, RESP-6), its options, and the examples from guidance with the check line (RESP-5)."""
+    """A follow-up question: the slot it asks about, its three texts (the explanation, the question and what each answer means, RESP-6), its options, and the examples from guidance in groups with the check line (RESP-5)."""
 
     slot: str
     text: str
     explanation: str = ""
     meaning: str = ""
     options: list[Option]
-    examples: list[Example] = []
+    examples: list[Group] = []
     check: str = ""
 
 

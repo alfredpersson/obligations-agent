@@ -1,4 +1,4 @@
-"""Tests for the follow-up questions that the model chooses and writes: acceptance criteria 1 to 6 of issues #20 and #22, acceptance criteria 2 and 4 to 6 of issue #24, the acceptance criteria of issue #32, acceptance criteria 1 to 3 of issue #34, and failure cases from their plans. The model client sends each request to a fake transport, so no test calls the provider."""
+"""Tests for the follow-up questions that the model chooses and writes: acceptance criteria 1 to 6 of issues #20 and #22, acceptance criteria 2 and 4 to 6 of issue #24, the acceptance criteria of issue #32, acceptance criteria 1 to 3 of issues #34 and #36, and failure cases from their plans. The model client sends each request to a fake transport, so no test calls the provider."""
 
 import importlib
 import json
@@ -252,8 +252,10 @@ PERSONAL_DATA_UNCLEAR = {
         "under_own_name": {"reason": "unclear", "note": FORM_NOTE},
     },
 }
-# An entry that the model names with its line, and that the step can show.
-KEPT = ("names_and_phone_numbers", "Your description mentions the names of customers.")
+# An entry that the model names and that the step can show, and the lines of two groups.
+KEPT = "names_and_phone_numbers"
+NAMES = "Your description mentions the names of customers."
+EMAILS = "Your description mentions email addresses."
 # Markers in a line and in the check line that the model writes. They must not reach a log line.
 LINE_MARKER = "Okapi-2718"
 CHECK_MARKER = "Tapir-3141"
@@ -274,13 +276,12 @@ def guidance_of(slot: str) -> list[dict[str, Any]]:
     ]
 
 
-def from_file(entry_id: str, line: str) -> dict[str, Any]:
-    """An entry of guidance.yaml as the step shows it, with the model's line and the entry's source."""
+def from_file(entry_id: str) -> dict[str, Any]:
+    """An entry of guidance.yaml as the step shows it, with its quotes and its source."""
     [entry] = [entry for entry in GUIDANCE.entries if entry.id == entry_id]
     [source] = [source for source in GUIDANCE.sources if source.id == entry.source]
     return {
         "id": entry.id,
-        "line": line,
         "two_sided": entry.two_sided,
         "quotes": [
             {"heading": quote.heading, "text": quote.text} for quote in entry.quotes
@@ -289,11 +290,16 @@ def from_file(entry_id: str, line: str) -> dict[str, Any]:
     }
 
 
-def naming(slot: str, examples: list[tuple[str, str]], check: str = "") -> Handler:
-    """A model that asks about the given slot and names the given entries, each with its line, and the check line."""
+def group(line: str, *entry_ids: str) -> dict[str, Any]:
+    """A group of examples as the step shows it: the model's line and the entries from guidance.yaml."""
+    return {"line": line, "entries": [from_file(entry_id) for entry_id in entry_ids]}
+
+
+def naming(slot: str, groups: list[tuple[str, list[str]]], check: str = "") -> Handler:
+    """A model that asks about the given slot and names the given groups, each with its line and its entry ids, and the check line."""
 
     def handler(request: httpx2.Request) -> httpx2.Response:
-        named = [{"entry": entry, "line": line} for entry, line in examples]
+        named = [{"entries": entries, "line": line} for line, entries in groups]
         tool_input = {
             "slot": slot,
             "text": TEXT,
@@ -891,7 +897,7 @@ def test_the_request_has_the_prompt_file_the_strict_tool_ask_and_the_description
     )
     assert first["system"] == prompt
     # The log lines carry the version that the first line of the prompt file names.
-    assert PROMPT_VERSION == "5"
+    assert PROMPT_VERSION == "6"
     assert first["tool_choice"] == {"type": "auto", "disable_parallel_tool_use": True}
     [tool] = first["tools"]
     assert tool["name"] == "ask"
@@ -907,6 +913,19 @@ def test_the_request_has_the_prompt_file_the_strict_tool_ask_and_the_description
     ]
     assert tool["input_schema"]["properties"]["explanation"] == {"type": "string"}
     assert tool["input_schema"]["properties"]["meaning"] == {"type": "string"}
+    # A group of examples gives its ids before its line, because the model writes the keys in this
+    # order and so chooses the entries first (TOOL-1).
+    groups = tool["input_schema"]["properties"]["examples"]["items"]
+    assert groups == {
+        "type": "object",
+        "properties": {
+            "entries": {"type": "array", "items": {"type": "string"}},
+            "line": {"type": "string"},
+        },
+        "required": ["entries", "line"],
+        "additionalProperties": False,
+    }
+    assert list(groups["properties"]) == ["entries", "line"]
     outside = json.dumps(
         {name: part for name, part in first.items() if name != "messages"}
     )
@@ -1140,51 +1159,88 @@ def test_the_user_message_gives_each_fact_the_entries_of_its_slot_in_guidance() 
     }
 
 
-def test_the_step_shows_the_named_entries_in_the_models_order_with_their_quotes_and_sources() -> (
+def test_the_step_holds_each_group_with_its_line_and_its_entries_in_the_models_order() -> (
     None
 ):
-    email = "Your description mentions email addresses."
-    client = service(naming("personal_data", [KEPT, ("email_address", email)]))
+    numbers = "Your description mentions order numbers and the names of customers."
+    # In the file, email_address comes before names_and_phone_numbers, and that entry before
+    # identification_numbers.
+    client = service(
+        naming(
+            "personal_data",
+            [(numbers, ["identification_numbers", KEPT]), (EMAILS, ["email_address"])],
+        )
+    )
     created = client.post("/intakes", json=PERSONAL_DATA_UNCLEAR).json()
 
     examples = created["step"]["examples"]
-    # The model's order, not the order of the ids or of the file.
-    assert examples == [from_file(*KEPT), from_file("email_address", email)]
-    assert (
-        examples[1]["quotes"][1]["text"]
-        == "an email address such as 'info@company.com'"
-    )
-    assert examples[1]["source"]["body"] == "European Commission"
-    # The question is stored with its examples, so a reload shows the same step.
+    # The model's order of the groups and of the entries in each, not the order of the file.
+    assert examples == [
+        group(numbers, "identification_numbers", KEPT),
+        group(EMAILS, "email_address"),
+    ]
+    email = examples[1]["entries"][0]
+    assert email["quotes"][1]["text"] == "an email address such as 'info@company.com'"
+    assert email["source"]["body"] == "European Commission"
+    # The question is stored with its groups, so a reload shows the same step.
     assert client.get(f"/intakes/{created['id']}").json()["step"] == created["step"]
 
 
 @pytest.mark.parametrize(
-    "named",
+    ("groups", "shown"),
     [
         pytest.param(
-            [("phone_book", "Your description mentions a phone book."), KEPT],
+            [(NAMES, ["phone_book", KEPT])],
+            [group(NAMES, KEPT)],
             id="an_id_not_in_the_file",
         ),
         pytest.param(
-            [("call_centre", "Your description mentions customers."), KEPT],
+            [(NAMES, ["call_centre", KEPT])],
+            [group(NAMES, KEPT)],
             id="an_entry_of_another_slot",
         ),
-        pytest.param([KEPT, KEPT], id="an_entry_named_twice"),
-        pytest.param([("email_address", " "), KEPT], id="an_entry_with_an_empty_line"),
+        pytest.param(
+            [(NAMES, [KEPT, KEPT])],
+            [group(NAMES, KEPT)],
+            id="an_entry_named_twice_in_a_group",
+        ),
+        pytest.param(
+            [(NAMES, [KEPT]), (EMAILS, [KEPT, "email_address"])],
+            [group(NAMES, KEPT), group(EMAILS, "email_address")],
+            id="an_entry_of_an_earlier_group",
+        ),
     ],
 )
-def test_code_leaves_out_an_entry_that_it_cannot_show_and_keeps_the_question(
-    named: list[tuple[str, str]],
+def test_a_group_keeps_its_other_entries_when_code_leaves_out_an_id(
+    groups: list[tuple[str, list[str]]], shown: list[dict[str, Any]]
 ) -> None:
     created = (
-        service(naming("personal_data", named))
+        service(naming("personal_data", groups))
         .post("/intakes", json=PERSONAL_DATA_UNCLEAR)
         .json()
     )
 
     assert created["step"]["text"] == TEXT
-    assert created["step"]["examples"] == [from_file(*KEPT)]
+    assert created["step"]["examples"] == shown
+
+
+@pytest.mark.parametrize(
+    "left_out",
+    [
+        pytest.param((" ", ["email_address"]), id="a_line_of_spaces"),
+        pytest.param((EMAILS, ["phone_book", "call_centre"]), id="no_entry_left"),
+    ],
+)
+def test_code_leaves_out_a_group_without_a_line_or_without_an_entry_left(
+    left_out: tuple[str, list[str]],
+) -> None:
+    created = (
+        service(naming("personal_data", [left_out, (NAMES, [KEPT])]))
+        .post("/intakes", json=PERSONAL_DATA_UNCLEAR)
+        .json()
+    )
+
+    assert created["step"]["examples"] == [group(NAMES, KEPT)]
 
 
 @pytest.mark.parametrize(
@@ -1240,18 +1296,20 @@ def test_the_log_line_of_a_question_counts_its_examples_the_ids_left_out_and_the
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     caplog.set_level(logging.INFO)
-    named = [
-        ("email_address", "Your description mentions email addresses."),
-        ("phone_book", "Your description mentions a phone book."),
-        KEPT,
+    groups = [
+        (EMAILS, ["email_address", "phone_book"]),
+        # A group without a line: code leaves out its id too.
+        (" ", ["home_address"]),
+        (NAMES, [KEPT, "identification_numbers"]),
     ]
 
-    service(naming("personal_data", named, "Check the order numbers.")).post(
+    service(naming("personal_data", groups, "Check the order numbers.")).post(
         "/intakes", json=PERSONAL_DATA_UNCLEAR
     )
 
+    # Three entries shown in two groups, and two ids left out.
     assert (
-        f"question 1 slot=personal_data model=claude-sonnet-5-5 prompt={PROMPT_VERSION} written_by=model examples=2 left_out=1 check=yes"
+        f"question 1 slot=personal_data model=claude-sonnet-5-5 prompt={PROMPT_VERSION} written_by=model examples=3 left_out=2 check=yes"
         in caplog.text
     )
 
@@ -1264,7 +1322,7 @@ def test_no_log_line_holds_a_line_or_the_check_line_that_the_model_wrote(
     check = f"Check the booking details. {CHECK_MARKER}"
 
     created = (
-        service(naming("personal_data", [("email_address", line)], check))
+        service(naming("personal_data", [(line, ["email_address"])], check))
         .post("/intakes", json=PERSONAL_DATA_UNCLEAR)
         .json()
     )
@@ -1286,7 +1344,7 @@ def test_a_call_with_examples_that_fails_another_check_gives_the_default_questio
             "text": TEXT,
             # The value not_sure is left out.
             "options": WRITTEN[1:],
-            "examples": [{"entry": KEPT[0], "line": KEPT[1]}],
+            "examples": [{"entries": [KEPT], "line": NAMES}],
             "check": "Check the order numbers.",
         }
         return ask(tool_input)
