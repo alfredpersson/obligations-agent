@@ -1,0 +1,245 @@
+# The gates of GATE-3 in docs/spec.md for the facts that the intake asks (GATE-1, GATE-4), and the
+# units of the two regulations that the result quotes or links. A quote is word for word from the
+# stored copy in docs/regulations/ (MEMO-8), and a test finds it there; a unit without a quote is
+# only linked. The link opens the document on EUR-Lex at the anchor (MEMO-7). Each gate is a
+# decision table: each value of its slot except not_sure is in one row.
+
+units:
+  - id: "gdpr:art2(1)"
+    citation: GDPR Article 2(1)
+    document: "32016R0679"
+    anchor: "002.001"
+    quote: |-
+      This Regulation applies to the processing of personal data wholly or partly by automated means and to the processing other than by automated means of personal data which form part of a filing system or are intended to form part of a filing system.
+  - id: "gdpr:art4(7)"
+    citation: GDPR Article 4(7)
+    document: "32016R0679"
+    anchor: "art_4"
+    quote: |-
+      ‘controller’ means the natural or legal person, public authority, agency or other body which, alone or jointly with others, determines the purposes and means of the processing of personal data; where the purposes and means of such processing are determined by Union or Member State law, the controller or the specific criteria for its nomination may be provided for by Union or Member State law;
+  - id: "gdpr:art4(8)"
+    citation: GDPR Article 4(8)
+    document: "32016R0679"
+    anchor: "art_4"
+    quote: |-
+      ‘processor’ means a natural or legal person, public authority, agency or other body which processes personal data on behalf of the controller;
+  - id: "aia:art3(3)"
+    citation: AI Act Article 3(3)
+    document: "32024R1689"
+    anchor: "art_3"
+    quote: |-
+      ‘provider’ means a natural or legal person, public authority, agency or other body that develops an AI system or a general-purpose AI model or that has an AI system or a general-purpose AI model developed and places it on the market or puts the AI system into service under its own name or trademark, whether for payment or free of charge;
+  - id: "aia:art6(2)"
+    citation: AI Act Article 6(2)
+    document: "32024R1689"
+    anchor: "006.002"
+    quote: |-
+      In addition to the high-risk AI systems referred to in paragraph 1, AI systems referred to in Annex III shall be considered to be high-risk.
+  - id: "aia:art6(3)"
+    citation: AI Act Article 6(3)
+    document: "32024R1689"
+    anchor: "006.003"
+    quote: |-
+      By derogation from paragraph 2, an AI system referred to in Annex III shall not be considered to be high-risk where it does not pose a significant risk of harm to the health, safety or fundamental rights of natural persons, including by not materially influencing the outcome of decision making.
+      The first subparagraph shall apply where any of the following conditions is fulfilled:
+      (a) the AI system is intended to perform a narrow procedural task;
+      (b) the AI system is intended to improve the result of a previously completed human activity;
+      (c) the AI system is intended to detect decision-making patterns or deviations from prior decision-making patterns and is not meant to replace or influence the previously completed human assessment, without proper human review; or
+      (d) the AI system is intended to perform a preparatory task to an assessment relevant for the purposes of the use cases listed in Annex III.
+      Notwithstanding the first subparagraph, an AI system referred to in Annex III shall always be considered to be high-risk where the AI system performs profiling of natural persons.
+  - id: "aia:annexIII(1)"
+    citation: AI Act Annex III, point 1
+    document: "32024R1689"
+    anchor: "anx_III"
+    quote: |-
+      Biometrics, in so far as their use is permitted under relevant Union or national law:
+      (a) remote biometric identification systems.
+      This shall not include AI systems intended to be used for biometric verification the sole purpose of which is to confirm that a specific natural person is the person he or she claims to be;
+      (b) AI systems intended to be used for biometric categorisation, according to sensitive or protected attributes or characteristics based on the inference of those attributes or characteristics;
+      (c) AI systems intended to be used for emotion recognition.
+  - id: "aia:annexIII(2)"
+    citation: AI Act Annex III, point 2
+    document: "32024R1689"
+    anchor: "anx_III"
+    quote: |-
+      Critical infrastructure: AI systems intended to be used as safety components in the management and operation of critical digital infrastructure, road traffic, or in the supply of water, gas, heating or electricity.
+  - id: "aia:annexIII(3)"
+    citation: AI Act Annex III, point 3
+    document: "32024R1689"
+    anchor: "anx_III"
+    quote: |-
+      Education and vocational training:
+      (a) AI systems intended to be used to determine access or admission or to assign natural persons to educational and vocational training institutions at all levels;
+      (b) AI systems intended to be used to evaluate learning outcomes, including when those outcomes are used to steer the learning process of natural persons in educational and vocational training institutions at all levels;
+      (c) AI systems intended to be used for the purpose of assessing the appropriate level of education that an individual will receive or will be able to access, in the context of or within educational and vocational training institutions at all levels;
+      (d) AI systems intended to be used for monitoring and detecting prohibited behaviour of students during tests in the context of or within educational and vocational training institutions at all levels.
+  - id: "aia:annexIII(4)"
+    citation: AI Act Annex III, point 4
+    document: "32024R1689"
+    anchor: "anx_III"
+    quote: |-
+      Employment, workers’ management and access to self-employment:
+      (a) AI systems intended to be used for the recruitment or selection of natural persons, in particular to place targeted job advertisements, to analyse and filter job applications, and to evaluate candidates;
+      (b) AI systems intended to be used to make decisions affecting terms of work-related relationships, the promotion or termination of work-related contractual relationships, to allocate tasks based on individual behaviour or personal traits or characteristics or to monitor and evaluate the performance and behaviour of persons in such relationships.
+  - id: "aia:annexIII(5)"
+    citation: AI Act Annex III, point 5
+    document: "32024R1689"
+    anchor: "anx_III"
+    quote: |-
+      Access to and enjoyment of essential private services and essential public services and benefits:
+      (a) AI systems intended to be used by public authorities or on behalf of public authorities to evaluate the eligibility of natural persons for essential public assistance benefits and services, including healthcare services, as well as to grant, reduce, revoke, or reclaim such benefits and services;
+      (b) AI systems intended to be used to evaluate the creditworthiness of natural persons or establish their credit score, with the exception of AI systems used for the purpose of detecting financial fraud;
+      (c) AI systems intended to be used for risk assessment and pricing in relation to natural persons in the case of life and health insurance;
+      (d) AI systems intended to evaluate and classify emergency calls by natural persons or to be used to dispatch, or to establish priority in the dispatching of, emergency first response services, including by police, firefighters and medical aid, as well as of emergency healthcare patient triage systems.
+  - id: "aia:annexIII(6)"
+    citation: AI Act Annex III, point 6
+    document: "32024R1689"
+    anchor: "anx_III"
+    quote: |-
+      Law enforcement, in so far as their use is permitted under relevant Union or national law:
+      (a) AI systems intended to be used by or on behalf of law enforcement authorities, or by Union institutions, bodies, offices or agencies in support of law enforcement authorities or on their behalf to assess the risk of a natural person becoming the victim of criminal offences;
+      (b) AI systems intended to be used by or on behalf of law enforcement authorities or by Union institutions, bodies, offices or agencies in support of law enforcement authorities as polygraphs or similar tools;
+      (c) AI systems intended to be used by or on behalf of law enforcement authorities, or by Union institutions, bodies, offices or agencies, in support of law enforcement authorities to evaluate the reliability of evidence in the course of the investigation or prosecution of criminal offences;
+      (d) AI systems intended to be used by law enforcement authorities or on their behalf or by Union institutions, bodies, offices or agencies in support of law enforcement authorities for assessing the risk of a natural person offending or re-offending not solely on the basis of the profiling of natural persons as referred to in Article 3(4) of Directive (EU) 2016/680, or to assess personality traits and characteristics or past criminal behaviour of natural persons or groups;
+      (e) AI systems intended to be used by or on behalf of law enforcement authorities or by Union institutions, bodies, offices or agencies in support of law enforcement authorities for the profiling of natural persons as referred to in Article 3(4) of Directive (EU) 2016/680 in the course of the detection, investigation or prosecution of criminal offences.
+  - id: "aia:annexIII(7)"
+    citation: AI Act Annex III, point 7
+    document: "32024R1689"
+    anchor: "anx_III"
+    quote: |-
+      Migration, asylum and border control management, in so far as their use is permitted under relevant Union or national law:
+      (a) AI systems intended to be used by or on behalf of competent public authorities or by Union institutions, bodies, offices or agencies as polygraphs or similar tools;
+      (b) AI systems intended to be used by or on behalf of competent public authorities or by Union institutions, bodies, offices or agencies to assess a risk, including a security risk, a risk of irregular migration, or a health risk, posed by a natural person who intends to enter or who has entered into the territory of a Member State;
+      (c) AI systems intended to be used by or on behalf of competent public authorities or by Union institutions, bodies, offices or agencies to assist competent public authorities for the examination of applications for asylum, visa or residence permits and for associated complaints with regard to the eligibility of the natural persons applying for a status, including related assessments of the reliability of evidence;
+      (d) AI systems intended to be used by or on behalf of competent public authorities, or by Union institutions, bodies, offices or agencies, in the context of migration, asylum or border control management, for the purpose of detecting, recognising or identifying natural persons, with the exception of the verification of travel documents.
+  - id: "aia:annexIII(8)"
+    citation: AI Act Annex III, point 8
+    document: "32024R1689"
+    anchor: "anx_III"
+    quote: |-
+      Administration of justice and democratic processes:
+      (a) AI systems intended to be used by a judicial authority or on their behalf to assist a judicial authority in researching and interpreting facts and the law and in applying the law to a concrete set of facts, or to be used in a similar way in alternative dispute resolution;
+      (b) AI systems intended to be used for influencing the outcome of an election or referendum or the voting behaviour of natural persons in the exercise of their vote in elections or referenda. This does not include AI systems to the output of which natural persons are not directly exposed, such as tools used to organise, optimise or structure political campaigns from an administrative or logistical point of view.
+  - id: "aia:art50(1)"
+    citation: AI Act Article 50(1)
+    document: "32024R1689"
+    anchor: "050.001"
+    quote: |-
+      Providers shall ensure that AI systems intended to interact directly with natural persons are designed and developed in such a way that the natural persons concerned are informed that they are interacting with an AI system, unless this is obvious from the point of view of a natural person who is reasonably well-informed, observant and circumspect, taking into account the circumstances and the context of use. This obligation shall not apply to AI systems authorised by law to detect, prevent, investigate or prosecute criminal offences, subject to appropriate safeguards for the rights and freedoms of third parties, unless those systems are available for the public to report a criminal offence.
+  - id: "aia:art3(1)"
+    citation: AI Act Article 3(1)
+    document: "02024R1689-20260727"
+    anchor: "art_3"
+  - id: "aia:art2(1)"
+    citation: AI Act Article 2(1)
+    document: "02024R1689-20260727"
+    anchor: "art_2"
+  - id: "gdpr:art3"
+    citation: GDPR Article 3
+    document: "32016R0679"
+    anchor: "art_3"
+  - id: "aia:art3(4)"
+    citation: AI Act Article 3(4)
+    document: "02024R1689-20260727"
+    anchor: "art_3"
+  - id: "aia:art5"
+    citation: AI Act Article 5
+    document: "02024R1689-20260727"
+    anchor: "art_5"
+  - id: "aia:art6(1)"
+    citation: AI Act Article 6(1)
+    document: "02024R1689-20260727"
+    anchor: "art_6"
+  - id: "aia:art50(2)"
+    citation: AI Act Article 50(2) to 50(4)
+    document: "02024R1689-20260727"
+    anchor: "art_50"
+  - id: "aia:art2"
+    citation: AI Act Article 2
+    document: "02024R1689-20260727"
+    anchor: "art_2"
+  - id: "gdpr:art2"
+    citation: GDPR Article 2
+    document: "32016R0679"
+    anchor: "art_2"
+
+gates:
+  - id: gdpr_applies
+    label: GDPR applies
+    slot: personal_data
+    quotes: ["gdpr:art2(1)"]
+    rows:
+      - { values: ["yes"], result: applies }
+      - { values: ["no"], result: does_not_apply }
+  - id: controller
+    label: Controller
+    under: gdpr_applies
+    slot: decides_purposes
+    quotes: ["gdpr:art4(7)"]
+    rows:
+      - { values: ["yes"], result: applies }
+      - { values: ["no"], result: does_not_apply }
+  - id: processor
+    label: Processor
+    under: gdpr_applies
+    slot: processes_for_customer
+    quotes: ["gdpr:art4(8)"]
+    rows:
+      - { values: ["yes"], result: applies }
+      - { values: ["no"], result: does_not_apply }
+  - id: provider
+    label: Provider
+    slot: under_own_name
+    quotes: ["aia:art3(3)"]
+    rows:
+      - { values: ["yes"], result: applies }
+      - { values: ["no"], result: does_not_apply }
+  - id: high_risk_annex_iii
+    label: High-risk under Annex III
+    slot: use_case_area
+    quotes: ["aia:art6(2)"]
+    rows:
+      - { values: [biometrics], result: listed_use, quotes: ["aia:annexIII(1)"] }
+      - { values: [critical_infrastructure], result: listed_use, quotes: ["aia:annexIII(2)"] }
+      - { values: [education], result: listed_use, quotes: ["aia:annexIII(3)"] }
+      - { values: [employment], result: listed_use, quotes: ["aia:annexIII(4)"] }
+      - { values: [essential_services], result: listed_use, quotes: ["aia:annexIII(5)"] }
+      - { values: [law_enforcement], result: listed_use, quotes: ["aia:annexIII(6)"] }
+      - { values: [migration], result: listed_use, quotes: ["aia:annexIII(7)"] }
+      - { values: [justice], result: listed_use, quotes: ["aia:annexIII(8)"] }
+      - { values: [none], result: does_not_apply }
+    # Article 6(3), for an area of Annex III. Profiling is not asked without personal data, and a
+    # product without personal data does not profile.
+    derogation:
+      slot: profiling
+      not_asked: "no"
+      quotes: ["aia:art6(3)"]
+      rows:
+        - { values: ["yes"], result: always }
+        - { values: ["no"], result: unless }
+  - id: transparency_interaction
+    label: "Transparency: people interact with the product"
+    under: provider
+    slot: interacts_with_people
+    quotes: ["aia:art50(1)"]
+    rows:
+      - { values: ["yes"], result: applies }
+      - { values: ["no"], result: does_not_apply }
+
+assumptions:
+  - text: The product is an AI system as defined in AI Act Article 3(1).
+    links: ["aia:art3(1)"]
+  - text: The product is offered or used in the EU.
+    links: ["aia:art2(1)", "gdpr:art3"]
+
+not_checked:
+  - text: Deployer
+    links: ["aia:art3(4)"]
+  - text: Prohibited practices
+    links: ["aia:art5"]
+  - text: High-risk under Annex I
+    links: ["aia:art6(1)"]
+  - text: "Transparency: synthetic content, emotion recognition and biometric categorisation, deepfakes"
+    links: ["aia:art50(2)"]
+  - text: The exclusions from each regulation
+    links: ["aia:art2", "gdpr:art2"]

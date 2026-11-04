@@ -56,16 +56,26 @@ dd {
 
 /* The examples from guidance: a line on the left marks the block, and its headings keep the size of
    the text. */
-section {
+.examples {
   border-left: 3px solid #999;
   padding-left: 0.75rem;
 }
 
-section h2,
-section h3 {
+.examples h2,
+.examples h3 {
   font-size: 1rem;
 }
 
 blockquote {
   margin: 0 0 0.5rem 1rem;
+}
+
+/* The dialog before a link to EUR-Lex is as wide as the text of the page at most. */
+dialog {
+  max-width: 36rem;
+}
+
+/* A quote from a regulation keeps the line of each paragraph and point. */
+blockquote.unit {
+  white-space: pre-line;
 }

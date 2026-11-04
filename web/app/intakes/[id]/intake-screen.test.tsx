@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import type { Intake, Question } from "../../service";
-import { PLAIN, stubFetch, testSchema } from "../../testing";
+import { PLAIN, stubFetch, testResult, testSchema } from "../../testing";
 import IntakeScreen from "./intake-screen";
 
 vi.mock("next/navigation", () => ({ useParams: () => ({ id: "kq2V8yZx0bP4mT7nLw3sAg" }) }));
@@ -27,19 +27,29 @@ function question(number: number, slot: string, text: string) {
 const FIRST = question(1, "stores_video", "Does the product store video?");
 const SECOND = question(2, "shares_video", "Does the product share video with others?");
 
-// An intake that waits for the answer to its second question, and the same intake at its end.
+// An intake that waits for the answer to its second question, and the same intake at its end, with
+// its result.
 const waiting = {
   description: { purpose: "A door camera.", people: "Building staff." },
   answers: { uses_camera: "yes", audience: "staff", stores_video: "yes" },
   open_slots: [],
   not_sure: {},
   step: SECOND,
+  result: null,
 } satisfies Intake;
 const ended = {
   ...waiting,
   answers: { ...waiting.answers, shares_video: "no" },
   step: { type: "ready_to_confirm" },
+  result: testResult,
 } satisfies Intake;
+
+// The result, then the recorded answers below it (GATE-4).
+async function expectResultThenAnswers() {
+  const result = await screen.findByRole("heading", { level: 1, name: "Result" });
+  const answers = screen.getByRole("heading", { level: 2, name: "Recorded answers" });
+  expect(result.compareDocumentPosition(answers) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+}
 
 afterEach(() => {
   cleanup();
@@ -61,11 +71,11 @@ test("an intake that waits for an answer opens on that question, under the label
   expect(screen.queryByRole("heading", { name: /Question/ })).toBeNull();
 });
 
-test("an intake that has ended opens on the recorded answers", async () => {
+test("an intake that has ended opens on the result, with the recorded answers below it", async () => {
   stubFetch({ [INTAKE_URL]: Response.json(ended), "/api/schema": Response.json(testSchema) });
   render(<IntakeScreen />);
 
-  expect(await screen.findByRole("heading", { level: 1, name: "Recorded answers" })).toBeTruthy();
+  await expectResultThenAnswers();
 });
 
 test("after an answer, the next question of the response is shown under the label of its fact, with no choice selected", async () => {
@@ -86,7 +96,7 @@ test("after an answer, the next question of the response is shown under the labe
   expect(radios.map((radio) => radio.checked)).toEqual([false, false, false]);
 });
 
-test("after the last answer, the intake is loaded again and the recorded answers are shown", async () => {
+test("after the last answer, the intake is loaded again and the result and the recorded answers are shown", async () => {
   stubFetch({ [INTAKE_URL]: Response.json(waiting), "/api/schema": Response.json(testSchema) });
   render(<IntakeScreen />);
   await screen.findByRole("group", { name: SECOND.text });
@@ -99,7 +109,7 @@ test("after the last answer, the intake is loaded again and the recorded answers
 
   sendAnswer(SECOND.text, "No");
 
-  expect(await screen.findByRole("heading", { level: 1, name: "Recorded answers" })).toBeTruthy();
+  await expectResultThenAnswers();
   expect(fetchMock.mock.calls.filter(([url]) => url === INTAKE_URL)).toHaveLength(1);
   expect(screen.getAllByRole("term").map((term) => term.textContent)).toContain("Video sharing");
 });

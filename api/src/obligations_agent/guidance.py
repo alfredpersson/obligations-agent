@@ -2,12 +2,10 @@
 
 from datetime import date
 from importlib.resources import files
-from typing import Any
 
-import yaml
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field
 
-from obligations_agent.schema import Schema, SchemaError, UniqueKeyLoader
+from obligations_agent.schema import Schema, load_yaml, read_items
 
 
 class GuidanceError(Exception):
@@ -54,30 +52,11 @@ class Guidance(BaseModel):
     entries: list[Entry]
 
 
-def _read[T: BaseModel](model: type[T], kind: str, raws: list[Any]) -> list[T]:
-    """Reads each item, refusing one without a required part (named by id, or by position when the id is missing) and an id used twice."""
-    items: list[T] = []
-    ids: list[Any] = []
-    for position, raw in enumerate(raws, start=1):
-        name = raw.get("id", position)
-        try:
-            items.append(model.model_validate(raw))
-        except ValidationError as error:
-            raise GuidanceError(f"{kind} {name}: {error}") from error
-        if name in ids:
-            raise GuidanceError(f"{kind} {name}: the id is used twice")
-        ids.append(name)
-    return items
-
-
 def parse_guidance(text: str, schema: Schema) -> Guidance:
     """Reads the examples from YAML text, and checks that each entry names a slot of the schema and a source of the file."""
-    try:
-        data: Any = yaml.load(text, Loader=UniqueKeyLoader)
-    except SchemaError as error:
-        raise GuidanceError(str(error)) from error
-    sources = _read(Source, "source", data["sources"])
-    entries = _read(Entry, "entry", data["entries"])
+    data = load_yaml(text, GuidanceError)
+    sources = read_items(Source, "source", data["sources"], GuidanceError)
+    entries = read_items(Entry, "entry", data["entries"], GuidanceError)
     slot_ids = [slot.id for slot in [*schema.slots, *schema.follow_up_slots]]
     source_ids = [source.id for source in sources]
     for entry in entries:

@@ -20,7 +20,7 @@ It covers what a user does when the web app and the Python service run on the us
 | --- | --- | --- |
 | Which facts can be asked about and recorded (FACT) | `schema.yaml` | The list of facts that can be recorded is fixed in a data file. A model cannot add to it. |
 | Examples from official guidance (FACT-6) | `guidance.yaml` and the stored copies in `docs/guidance/` | Each quote must be word for word and checked against its copy. A model cannot add or change one. |
-| Which regulations, roles and risk tiers apply (GATE) | `gates.yaml` and the gate code | The same facts must always give the same result, and the text of the description must not be able to change it. |
+| Which regulations, roles and risk tiers apply (GATE) | `gates.yaml`, the gate code and the stored copies in `docs/regulations/` | The same facts must always give the same result, and the text of the description must not be able to change it. |
 | Follow-up questions (INTAKE, TOOL) | intake system prompt and the intake tool code | The model chooses the questions and writes them. Code enforces the limits and the allowed values. |
 | Whether a clause applies (MEMO) | judge prompt | Deciding whether a clause applies to the given facts needs a model's judgment. |
 | Memo content and text (MEMO, RESP) | writer prompt and the code that builds the memo | The model writes the meaning and the action. Code adds the citation and the quoted clause. |
@@ -88,6 +88,8 @@ The prompts therefore implement only part of the specification. A prompt cannot 
 - GDPR applies (Articles 2 and 3)
 - controller (Article 4(7))
 - processor (Article 4(8))
+
+**GATE-4.** When an intake has ended, the service computes the result of the gates for the facts that the intake asks from the recorded answers, each time the intake is read, and the web app shows it above the recorded answers. For each gate whose slot is relevant, the result gives applies, does not apply or conditional (GATE-2), the answers that decided it, and the units that define it, each quoted (MEMO-8) and linked (MEMO-7). A conditional result names each open slot that it depends on, with the reason and the note of a "not sure" answer, and the result for each answer (VALID-2). A result under a conditional gate is conditional on the same slots, unless its own answer gives "does not apply" (MEMO-6). For an area of Annex III, the high-risk result is conditional on whether the product's intended use is one of the uses listed under that point, which the user decides, and it says what Article 6(3) gives for the answer about profiling. The result states that it assumes an AI system as defined in AI Act Article 3(1) that is offered or used in the EU, and lists the gates of GATE-3 and the parts of them that the intake does not ask as not checked, each with a link. Before the web app opens a link to EUR-Lex, it shows a dialog that says that EUR-Lex checks the browser on a first visit and again after some minutes, and then opens at the top of the page, and the user opens the link from the dialog. The dialog does not show while less than five minutes have passed since the user last opened EUR-Lex from it.
 
 ## 4. Intake
 

@@ -32,7 +32,7 @@ const FOLLOW_UP_NOTE = "Does a chat window on the shop's website count?";
 
 // After a navigation, Next.js keeps the previous page in the document, hidden. The test finds
 // elements by role, because role queries skip hidden elements.
-test("a filled-in form and the answered follow-up questions lead to the screen with the recorded answers", async ({
+test("a filled-in form and the answered follow-up questions lead to the result, with the recorded answers below it", async ({
   page,
 }) => {
   await page.goto("/");
@@ -70,11 +70,24 @@ test("a filled-in form and the answered follow-up questions lead to the screen w
     await page.getByRole("button", { name: "Next" }).click();
   }
 
-  await expect(page.getByRole("heading", { level: 1, name: "Recorded answers" })).toBeVisible();
+  // The result of the gates first, then the recorded answers below it, in their own region, since
+  // the result has list items of its own.
+  await expect(page.getByRole("heading", { level: 1, name: "Result" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2 })).toHaveText([
+    "GDPR applies",
+    "Controller",
+    "Processor",
+    "Provider",
+    "High-risk under Annex III",
+    "Transparency: people interact with the product",
+    "Not checked yet",
+    "Recorded answers",
+  ]);
+  const recorded = page.getByRole("region", { name: "Recorded answers" });
   for (const [, text] of DESCRIPTION) {
-    await expect(page.getByRole("paragraph").filter({ hasText: text })).toBeVisible();
+    await expect(recorded.getByRole("paragraph").filter({ hasText: text })).toBeVisible();
   }
-  await expect(page.getByRole("term")).toHaveText([
+  await expect(recorded.getByRole("term")).toHaveText([
     "Personal data",
     "Under own name or trademark",
     "Use-case area",
@@ -84,7 +97,7 @@ test("a filled-in form and the answered follow-up questions lead to the screen w
     "Automated decisions about people",
     "Interacts with people",
   ]);
-  await expect(page.getByRole("definition")).toHaveText([
+  await expect(recorded.getByRole("definition")).toHaveText([
     "Yes",
     "Not sure",
     "None of these",
@@ -95,7 +108,7 @@ test("a filled-in form and the answered follow-up questions lead to the screen w
     "Not sure",
   ]);
   // The label, the reason and the note are lines of their own, so the rendered text separates them.
-  await expect(page.getByRole("listitem")).toHaveText(
+  await expect(recorded.getByRole("listitem")).toHaveText(
     [
       `Under own name or trademark I don't know this about the product Note: ${FORM_NOTE}`,
       `Interacts with people I don't understand the question Note: ${FOLLOW_UP_NOTE}`,

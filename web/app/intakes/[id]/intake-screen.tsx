@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import type { Intake, Schema, Step } from "../../service";
 import FollowUpQuestion from "./follow-up-question";
+import IntakeResult from "./intake-result";
 import RecordedAnswers from "./recorded-answers";
 
 // The screen of one intake: the question that waits for its answer, or the recorded answers.
@@ -57,5 +58,11 @@ export default function IntakeScreen() {
       </>
     );
   }
-  return <RecordedAnswers intake={intake} schema={schema} />;
+  // The result first, then the recorded answers (GATE-4).
+  return (
+    <>
+      {intake.result && <IntakeResult result={intake.result} notSure={intake.not_sure} schema={schema} />}
+      <RecordedAnswers intake={intake} schema={schema} />
+    </>
+  );
 }

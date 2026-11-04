@@ -10,6 +10,7 @@ const intake = {
   open_slots: ["audience"],
   not_sure: { audience: { reason: "unknown", note: "" } },
   step: { type: "ready_to_confirm" },
+  result: null,
 } satisfies Intake;
 
 afterEach(cleanup);
@@ -22,7 +23,9 @@ function openSlots() {
 test("the screen shows each description field under its label as text, each slot with the label of its value, and the open slots", () => {
   render(<RecordedAnswers intake={intake} schema={testSchema} />);
 
-  expect(screen.getByRole("heading", { level: 1, name: "Recorded answers" })).toBeTruthy();
+  // Below the result, whose heading is the one at level 1, in a region of their own (GATE-4).
+  expect(screen.getByRole("heading", { level: 2, name: "Recorded answers" })).toBeTruthy();
+  expect(screen.getByRole("region", { name: "Recorded answers" })).toBeTruthy();
   expect(screen.getByText("A door camera. <b>It records video.</b>")).toBeTruthy();
   expect(document.querySelector("b")).toBeNull();
   const texts = [
