@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import type { Intake, Question } from "../../service";
 import { PLAIN, stubFetch, testResult, testSchema } from "../../testing";
@@ -112,6 +112,52 @@ test("after the last answer, the intake is loaded again and the result and the r
   await expectResultThenAnswers();
   expect(fetchMock.mock.calls.filter(([url]) => url === INTAKE_URL)).toHaveLength(1);
   expect(screen.getAllByRole("term").map((term) => term.textContent)).toContain("Video sharing");
+});
+
+test("while the intake loads, a status says that the answers are loading", () => {
+  vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
+  render(<IntakeScreen />);
+
+  expect(screen.getByRole("status").textContent).toBe("Loading the answers.");
+});
+
+test("after the last answer, the screen's status says that the result is loading until the result is shown, in the same element before, during and after the wait", async () => {
+  stubFetch({ [INTAKE_URL]: Response.json(waiting), "/api/schema": Response.json(testSchema) });
+  render(<IntakeScreen />);
+  await screen.findByRole("group", { name: SECOND.text });
+  // The screen's status comes first, before the status after Next. It is the same element in each
+  // view of the screen, so that screen readers announce the change of its message.
+  const [status] = screen.getAllByRole("status");
+  expect(status.textContent).toBe("");
+  const intake = Promise.withResolvers<Response>();
+  vi.stubGlobal(
+    "fetch",
+    vi.fn<typeof fetch>(async (input) => {
+      if (input === ANSWERS_URL) return Response.json({ step: { type: "ready_to_confirm" } });
+      if (input === "/api/schema") return Response.json(testSchema);
+      return intake.promise;
+    }),
+  );
+
+  sendAnswer(SECOND.text, "No");
+
+  await waitFor(() => expect(status.textContent).toBe("Loading the result."));
+  expect(screen.getAllByRole("status")).toEqual([status]);
+  intake.resolve(Response.json(ended));
+  await expectResultThenAnswers();
+  expect(screen.getAllByRole("status")).toEqual([status]);
+  expect(status.textContent).toBe("");
+});
+
+test("when the intake cannot be loaded, the message shows and the status is empty", async () => {
+  stubFetch({
+    [INTAKE_URL]: new Response(null, { status: 500 }),
+    "/api/schema": Response.json(testSchema),
+  });
+  render(<IntakeScreen />);
+
+  await screen.findByRole("alert");
+  expect(screen.getByRole("status").textContent).toBe("");
 });
 
 test("when the intake cannot be loaded after the last answer, the message for a failed load shows", async () => {

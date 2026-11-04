@@ -1,6 +1,8 @@
 import { Fragment, type MouseEvent, useEffect, useId, useRef, useState } from "react";
+import actions from "../../actions.module.css";
 import { REASONS } from "../../not-sure-reason";
 import type { Cited, NotSure, Result, Schema } from "../../service";
+import styles from "./intake-result.module.css";
 
 // What a result says, and what each answer of a conditional result gives (GATE-2, VALID-2).
 const STATUS = { applies: "Applies.", does_not_apply: "Does not apply.", conditional: "Conditional." };
@@ -105,10 +107,10 @@ export default function IntakeResult({
         ))}
       </ul>
       {result.gates.map((outcome) => (
-        <Fragment key={outcome.gate}>
+        <div key={outcome.gate} className={`${styles.gate} ${styles[outcome.status]}`}>
           <h2>{outcome.label}</h2>
           <p>
-            <strong>{STATUS[outcome.status]}</strong>
+            <strong className={styles.status}>{STATUS[outcome.status]}</strong>
             {outcome.result === "listed_use" &&
               " High-risk if the product's intended use is one of the uses listed under the point of Annex III quoted below. You decide this."}
             {outcome.derogation && ` ${DEROGATION[outcome.derogation]}`}
@@ -125,7 +127,7 @@ export default function IntakeResult({
             const entry = notSure[condition.slot];
             const above = result.gates.find((gate) => gate.gate === condition.gate);
             return (
-              <div key={condition.slot}>
+              <div key={condition.slot} className={styles.condition}>
                 <p>
                   This depends on the open answer about {slotOf(condition.slot)?.label}
                   {condition.gate !== outcome.gate && `, on which ${above?.label} depends`}:{" "}
@@ -150,13 +152,13 @@ export default function IntakeResult({
           })}
           {outcome.quotes.map((unit) => (
             <Fragment key={unit.citation}>
-              <p>
+              <p className={styles.citation}>
                 <Links links={[unit]} onOpen={open} />
               </p>
-              <blockquote className="unit">{unit.quote}</blockquote>
+              <blockquote className={styles.quote}>{unit.quote}</blockquote>
             </Fragment>
           ))}
-        </Fragment>
+        </div>
       ))}
       <h2>Not checked yet</h2>
       <ul>
@@ -166,29 +168,32 @@ export default function IntakeResult({
           </li>
         ))}
       </ul>
-      <dialog ref={dialog} aria-labelledby={title} onClose={() => setOpening(null)}>
+      <dialog ref={dialog} aria-labelledby={title} onClose={() => setOpening(null)} className={styles.dialog}>
         <h2 id={title}>Opening EUR-Lex</h2>
         <p>
           EUR-Lex checks the browser on a first visit, and again after some minutes. The page then opens
           at the top, not at the article. Answer the cookie notice if it shows, come back to this page and
           open the link again: it then opens at the article.
         </p>
-        {opening && (
-          <a
-            href={opening.link}
-            target="_blank"
-            rel="noreferrer"
-            onClick={() => {
-              remember(opening.link);
-              dialog.current?.close();
-            }}
-          >
-            Open EUR-Lex
-          </a>
-        )}{" "}
-        <button type="button" onClick={() => dialog.current?.close()}>
-          Cancel
-        </button>
+        <div className={actions.actions}>
+          {opening && (
+            <a
+              href={opening.link}
+              target="_blank"
+              rel="noreferrer"
+              className={styles.open}
+              onClick={() => {
+                remember(opening.link);
+                dialog.current?.close();
+              }}
+            >
+              Open EUR-Lex
+            </a>
+          )}
+          <button type="button" className={styles.cancel} onClick={() => dialog.current?.close()}>
+            Cancel
+          </button>
+        </div>
       </dialog>
     </>
   );

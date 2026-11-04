@@ -1,0 +1,117 @@
+/* Each gate is a row under a thin rule, with its title in the font of the text after a square by
+   its status. */
+.gate {
+  margin: var(--space-6) 0;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-rule);
+}
+
+.gate h2 {
+  margin-top: var(--space-2);
+  padding-top: 0;
+  font-family: var(--font-text);
+  font-size: var(--size-h2);
+  letter-spacing: -0.01em;
+  text-transform: none;
+}
+
+.gate h2::before {
+  position: static;
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: var(--space-3);
+  vertical-align: 0.15em;
+}
+
+.status {
+  display: inline-block;
+  margin-right: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  font-family: var(--font-label);
+  font-size: var(--size-label);
+  font-weight: 500;
+}
+
+.applies h2::before {
+  background: var(--color-applies-mark);
+}
+
+.applies .status {
+  color: var(--color-applies-text);
+  background: var(--color-applies);
+}
+
+.does_not_apply h2::before {
+  background: var(--color-does-not-apply-mark);
+}
+
+.does_not_apply .status {
+  color: var(--color-does-not-apply-text);
+  background: var(--color-does-not-apply);
+}
+
+.conditional h2::before {
+  background: var(--color-conditional-mark);
+}
+
+.conditional .status {
+  color: var(--color-conditional-text);
+  background: var(--color-conditional);
+}
+
+/* An open answer that a conditional result depends on, with the result for each answer. */
+.condition {
+  margin: 0 0 var(--space-4);
+  padding-left: var(--space-4);
+  border-left: 3px solid var(--color-rule);
+}
+
+.citation {
+  margin: var(--space-4) 0 var(--space-1);
+  font-family: var(--font-label);
+  font-size: var(--size-note);
+  font-weight: 500;
+}
+
+/* A quote from a regulation keeps the line of each paragraph and point. */
+.quote {
+  white-space: pre-line;
+}
+
+/* The dialog before a link to EUR-Lex: the paper of the page over the page dimmed, as wide as the
+   text of the page at most, and inside the window on a narrow screen. */
+.dialog {
+  max-width: min(36rem, 100% - 2 * var(--gutter));
+  padding: var(--space-6);
+  color: var(--color-text);
+  background: var(--color-page);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius);
+}
+
+.dialog::backdrop {
+  background: var(--color-backdrop);
+}
+
+.dialog h2 {
+  margin-top: 0;
+}
+
+/* Opening EUR-Lex is what the dialog is for, so its link has the look of the button, and Cancel is
+   a quiet button. */
+.open {
+  padding: var(--space-3) var(--space-6);
+  font-family: var(--font-label);
+  font-size: var(--size-button);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--color-accent-text);
+  background: var(--color-accent);
+  text-decoration: none;
+}
+
+.cancel {
+  color: var(--color-accent);
+  background: var(--color-page);
+}

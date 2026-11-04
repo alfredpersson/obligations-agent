@@ -1,6 +1,8 @@
 "use client";
 
 import { type SubmitEvent, useId, useState, useTransition } from "react";
+import styles from "../../actions.module.css";
+import LoadingStatus, { WRITING } from "../../loading-status";
 import NotSureReason from "../../not-sure-reason";
 import { NOT_SURE, type NotSure, type Question, type Step } from "../../service";
 import GuidanceExamples from "./guidance-examples";
@@ -73,12 +75,15 @@ export default function FollowUpQuestion({
         {value === NOT_SURE && <NotSureReason value={notSure} onChange={setNotSure} />}
       </fieldset>
       {message && <p role="alert">{message}</p>}
-      <button
-        type="submit"
-        disabled={value === null || (value === NOT_SURE && !notSure.reason) || sending}
-      >
-        Next
-      </button>
+      <div className={styles.actions}>
+        <button
+          type="submit"
+          disabled={value === null || (value === NOT_SURE && !notSure.reason) || sending}
+        >
+          Next
+        </button>
+        <LoadingStatus message={sending ? WRITING : null} />
+      </div>
     </form>
   );
 }

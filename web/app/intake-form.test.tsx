@@ -157,6 +157,37 @@ test("Send is disabled while the answers are sent, so that a second click sends 
   await waitFor(() => expect(sendButton().disabled).toBe(false));
 });
 
+test("while the schema loads, a status says that the form is loading", () => {
+  vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
+  render(<IntakeForm />);
+
+  expect(screen.getByRole("status").textContent).toBe("Loading the form.");
+});
+
+test("while the answers are sent, the status after Send says that the next question is being written, and it is empty again after an error", async () => {
+  const sent = Promise.withResolvers<Response>();
+  vi.stubGlobal(
+    "fetch",
+    vi.fn<typeof fetch>((input) =>
+      input === "/api/schema" ? Promise.resolve(Response.json(testSchema)) : sent.promise,
+    ),
+  );
+  render(<IntakeForm />);
+  await fillIn();
+  // The status is in the page, empty, before the wait, so that screen readers announce its message.
+  const status = screen.getByRole("status");
+  expect(status.textContent).toBe("");
+  expect(status.previousElementSibling).toBe(sendButton());
+
+  fireEvent.click(sendButton());
+  await waitFor(() => expect(status.textContent).toBe("Writing the next question. This can take several seconds."));
+
+  sent.reject(new TypeError("fetch failed"));
+  await screen.findByRole("alert");
+  await waitFor(() => expect(status.textContent).toBe(""));
+  expect(screen.getByRole("status")).toBe(status);
+});
+
 test.each([
   ["a 500 response", new Response(null, { status: 500 })],
   ["a fetch that fails", new TypeError("fetch failed")],

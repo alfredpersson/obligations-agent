@@ -1,0 +1,9 @@
+/* A row that starts with a button or a link: the button of the form and of the question with the
+   loading status, and the actions of the dialog before a link to EUR-Lex. On a narrow screen, what
+   does not fit goes to the next line. */
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3) var(--space-4);
+  align-items: center;
+}

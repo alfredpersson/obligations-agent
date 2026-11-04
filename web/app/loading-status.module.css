@@ -1,0 +1,30 @@
+.status {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  margin: 0;
+}
+
+/* The spinner turns once in 0.9 s, or once in 3 s when the user's system asks for reduced motion.
+   Screen readers read the message, not the spinner. */
+.spinner {
+  flex: none;
+  width: 1.25em;
+  height: 1.25em;
+  border: 3px solid var(--color-rule);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 3s;
+  }
+}
