@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import type { Question } from "../../service";
-import { stubFetch } from "../../testing";
+import { PLAIN, stubFetch } from "../../testing";
 import FollowUpQuestion from "./follow-up-question";
 
 const ID = "kq2V8yZx0bP4mT7nLw3sAg";
@@ -11,12 +11,14 @@ const ANSWERS_URL = `/api/intakes/${ID}/answers`;
 const question = {
   type: "question",
   number: 2,
+  slot: "stores_video",
   text: "Is video from the camera kept after it is shown?",
   options: [
     { value: "yes", label: "Yes, it is kept" },
     { value: "no", label: "No, it is not kept" },
     { value: "not_sure", label: "Not sure" },
   ],
+  ...PLAIN,
 } satisfies Question;
 
 // The model writes the labels, so the screen finds the option "not sure" by its value.
@@ -28,6 +30,61 @@ const unsure = {
     { value: "not_sure", label: "I don't know" },
   ],
 } satisfies Question;
+
+const CAMERA_GUIDANCE = {
+  title: "Camera guidance",
+  body: "European Data Protection Board",
+  link: "https://example.org/camera-guidance",
+  checked: "2026-10-28",
+  note: null,
+};
+
+// A question with every part (RESP-5, RESP-6): an explanation, three examples in an order that is
+// not that of their ids, the second with two quotes under the same heading and the third from a
+// source with a note, a check line, and a meaning.
+const full = {
+  ...question,
+  explanation: "Video is kept when the product stores it after it is shown, for any length of time.",
+  meaning: "Yes means that the product stores some video. No means that it stores none.",
+  examples: [
+    {
+      id: "z_doorbell",
+      line: "Your description mentions a door camera.",
+      quotes: [
+        { heading: "Examples of video that is kept", text: "a recording that a doorbell saves for a day" },
+        {
+          heading: "Examples of video that is not kept",
+          text: "a live picture that is shown and then deleted",
+        },
+      ],
+      source: CAMERA_GUIDANCE,
+    },
+    {
+      id: "a_backup",
+      line: "Your note mentions backups.",
+      quotes: [
+        { heading: "Examples of copies that are kept", text: "a copy in a backup" },
+        { heading: "Examples of copies that are kept", text: "a clip sent to a phone" },
+      ],
+      source: CAMERA_GUIDANCE,
+    },
+    {
+      id: "m_shop",
+      line: "Your description mentions a shop.",
+      quotes: [{ heading: "Products", text: "a camera that a shop sells" }],
+      source: {
+        title: "Product rules guide",
+        body: "European Commission",
+        link: "https://example.org/product-rules",
+        checked: "2026-10-28",
+        note: "EU product rules, written for goods.",
+      },
+    },
+  ],
+  check: "Check whether the product keeps a copy of the video on the device.",
+} satisfies Question;
+
+const EXAMPLES = "Examples from official guidance (not law)";
 
 afterEach(() => {
   cleanup();
@@ -52,10 +109,9 @@ function note() {
   return screen.getByRole("textbox") as HTMLTextAreaElement;
 }
 
-test("the question shows its number, its text and the options of the step, none selected, and Next is disabled until a choice is selected", () => {
+test("the question shows its text and the options of the step, none selected, and Next is disabled until a choice is selected", () => {
   render(<FollowUpQuestion id={ID} question={question} onStep={vi.fn()} />);
 
-  expect(screen.getByRole("heading", { level: 1, name: "Question 2" })).toBeTruthy();
   const radios = within(screen.getByRole("group", { name: question.text })).getAllByRole(
     "radio",
   ) as HTMLInputElement[];
@@ -75,8 +131,10 @@ test("a sent answer posts the question number and the value of the choice, and p
   const next = {
     type: "question",
     number: 3,
+    slot: "shares_video",
     text: "Does the product share video with others?",
     options: [{ value: "not_sure", label: "Not sure" }],
+    ...PLAIN,
   } satisfies Question;
   const fetchMock = stubFetch({ [ANSWERS_URL]: Response.json({ step: next }) });
   const onStep = vi.fn();
@@ -225,4 +283,86 @@ test("the reason and the note stay while another option is chosen, and another a
 
   await waitFor(() => expect(onStep).toHaveBeenCalled());
   expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({ question: 2, value: "no" });
+});
+
+test("the explanation, the examples and the check line come first, then the question with its meaning directly above the options", () => {
+  const { container } = render(<FollowUpQuestion id={ID} question={full} onStep={vi.fn()} />);
+
+  const form = container.querySelector("form") as HTMLFormElement;
+  const group = screen.getByRole("group", { name: full.text });
+  expect([...form.children].map((child) => child.tagName)).toEqual([
+    "P",
+    "SECTION",
+    "P",
+    "FIELDSET",
+    "BUTTON",
+  ]);
+  expect(form.children[0].textContent).toBe(full.explanation);
+  expect(form.children[1]).toBe(screen.getByRole("region", { name: EXAMPLES }));
+  expect(form.children[2].textContent).toBe(full.check);
+  expect(form.children[3]).toBe(group);
+  const meaning = group.querySelector("legend")?.nextElementSibling;
+  expect(meaning?.textContent).toBe(full.meaning);
+  expect(meaning?.nextElementSibling?.querySelector("input[type=radio]")).toBeTruthy();
+});
+
+test("a question without an explanation, examples, a check line and a meaning shows only its options and Next", () => {
+  const { container } = render(<FollowUpQuestion id={ID} question={question} onStep={vi.fn()} />);
+
+  const form = container.querySelector("form") as HTMLFormElement;
+  expect([...form.children].map((child) => child.tagName)).toEqual(["FIELDSET", "BUTTON"]);
+  expect(form.querySelector("legend")?.nextElementSibling?.querySelector("input[type=radio]")).toBeTruthy();
+});
+
+test("the examples show each line as a heading and each quote in the step's order, with a heading once for quotes in a row that share it, and no side", () => {
+  render(<FollowUpQuestion id={ID} question={full} onStep={vi.fn()} />);
+
+  const region = screen.getByRole("region", { name: EXAMPLES });
+  expect(within(region).getAllByRole("heading", { level: 3 }).map((heading) => heading.textContent)).toEqual([
+    "Your description mentions a door camera.",
+    "Your note mentions backups.",
+    "Your description mentions a shop.",
+  ]);
+  const quotes = within(region).getAllByRole("blockquote");
+  expect(quotes.map((quote) => quote.textContent)).toEqual([
+    "a recording that a doorbell saves for a day",
+    "a live picture that is shown and then deleted",
+    "a copy in a backup",
+    "a clip sent to a phone",
+    "a camera that a shop sells",
+  ]);
+  expect(quotes[1].previousElementSibling?.textContent).toBe("Examples of video that is not kept");
+  // The second quote of the backups shares the heading of the first, so no heading stands before it.
+  expect(within(region).getAllByText("Examples of copies that are kept")).toHaveLength(1);
+  expect(quotes[3].previousElementSibling).toBe(quotes[2]);
+  expect(region.textContent).not.toMatch(/sided/i);
+});
+
+test("the source line gives the body, the title as a link that opens in a new tab, the note where the source has one, and the date its quotes were checked", () => {
+  render(<FollowUpQuestion id={ID} question={full} onStep={vi.fn()} />);
+
+  const region = screen.getByRole("region", { name: EXAMPLES });
+  const [camera] = within(region).getAllByRole("link", { name: "Camera guidance" });
+  expect(camera.getAttribute("href")).toBe("https://example.org/camera-guidance");
+  expect(camera.getAttribute("target")).toBe("_blank");
+  expect(camera.getAttribute("rel")).toBe("noreferrer");
+  expect(camera.parentElement?.textContent).toBe(
+    "European Data Protection Board, Camera guidance, checked 2026-10-28",
+  );
+  const rules = within(region).getByRole("link", { name: "Product rules guide" });
+  expect(rules.parentElement?.textContent).toBe(
+    "European Commission, Product rules guide (EU product rules, written for goods.), checked 2026-10-28",
+  );
+  expect(region.textContent).not.toMatch(/\bsource\b/i);
+});
+
+test("the group of the options is named by the question and described by its meaning, and has no description without a meaning", () => {
+  render(<FollowUpQuestion id={ID} question={full} onStep={vi.fn()} />);
+
+  expect(screen.getByRole("group", { name: full.text, description: full.meaning })).toBeTruthy();
+  cleanup();
+
+  render(<FollowUpQuestion id={ID} question={question} onStep={vi.fn()} />);
+
+  expect(screen.getByRole("group", { name: question.text }).hasAttribute("aria-describedby")).toBe(false);
 });

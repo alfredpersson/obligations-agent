@@ -46,8 +46,16 @@ export default function IntakeScreen() {
   }
 
   if (intake.step.type === "question") {
-    // A key for each question, so that no choice of the previous question stays selected.
-    return <FollowUpQuestion key={intake.step.number} id={id} question={intake.step} onStep={show} />;
+    const step = intake.step;
+    // The heading is the label of the fact that the question asks about (RESP-6).
+    const slot = [...schema.slots, ...schema.follow_up_slots].find((slot) => slot.id === step.slot);
+    return (
+      <>
+        <h1>{slot?.label}</h1>
+        {/* A key for each question, so that no choice of the previous question stays selected. */}
+        <FollowUpQuestion key={step.number} id={id} question={step} onStep={show} />
+      </>
+    );
   }
   return <RecordedAnswers intake={intake} schema={schema} />;
 }

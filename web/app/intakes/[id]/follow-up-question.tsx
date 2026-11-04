@@ -1,11 +1,13 @@
 "use client";
 
-import { type SubmitEvent, useState, useTransition } from "react";
+import { type SubmitEvent, useId, useState, useTransition } from "react";
 import NotSureReason from "../../not-sure-reason";
 import { NOT_SURE, type NotSure, type Question, type Step } from "../../service";
+import GuidanceExamples from "./guidance-examples";
 
 // One follow-up question with the options of its step, and the button that sends the answer
-// (INTAKE-1).
+// (INTAKE-1). The explanation, the examples and the check line come first, then the question
+// with what each answer means, directly above the options (RESP-6).
 export default function FollowUpQuestion({
   id,
   question,
@@ -19,6 +21,7 @@ export default function FollowUpQuestion({
   const [notSure, setNotSure] = useState<Partial<NotSure>>({});
   const [message, setMessage] = useState<string | null>(null);
   const [sending, startTransition] = useTransition();
+  const meaning = useId();
 
   function send(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -50,9 +53,12 @@ export default function FollowUpQuestion({
 
   return (
     <form onSubmit={send}>
-      <h1>Question {question.number}</h1>
-      <fieldset>
+      {question.explanation && <p>{question.explanation}</p>}
+      {question.examples.length > 0 && <GuidanceExamples examples={question.examples} />}
+      {question.check && <p>{question.check}</p>}
+      <fieldset aria-describedby={question.meaning ? meaning : undefined}>
         <legend>{question.text}</legend>
+        {question.meaning && <p id={meaning}>{question.meaning}</p>}
         {question.options.map((option) => (
           <label key={option.value}>
             <input

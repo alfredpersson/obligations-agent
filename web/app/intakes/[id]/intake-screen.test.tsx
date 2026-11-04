@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import type { Intake, Question } from "../../service";
-import { stubFetch, testSchema } from "../../testing";
+import { PLAIN, stubFetch, testSchema } from "../../testing";
 import IntakeScreen from "./intake-screen";
 
 vi.mock("next/navigation", () => ({ useParams: () => ({ id: "kq2V8yZx0bP4mT7nLw3sAg" }) }));
@@ -9,21 +9,23 @@ vi.mock("next/navigation", () => ({ useParams: () => ({ id: "kq2V8yZx0bP4mT7nLw3
 const INTAKE_URL = "/api/intakes/kq2V8yZx0bP4mT7nLw3sAg";
 const ANSWERS_URL = `${INTAKE_URL}/answers`;
 
-function question(number: number, text: string) {
+function question(number: number, slot: string, text: string) {
   return {
     type: "question",
     number,
+    slot,
     text,
     options: [
       { value: "yes", label: "Yes" },
       { value: "no", label: "No" },
       { value: "not_sure", label: "Not sure" },
     ],
+    ...PLAIN,
   } satisfies Question;
 }
 
-const FIRST = question(1, "Does the product store video?");
-const SECOND = question(2, "Does the product share video with others?");
+const FIRST = question(1, "stores_video", "Does the product store video?");
+const SECOND = question(2, "shares_video", "Does the product share video with others?");
 
 // An intake that waits for the answer to its second question, and the same intake at its end.
 const waiting = {
@@ -49,12 +51,14 @@ function sendAnswer(text: string, label: string) {
   fireEvent.click(screen.getByRole("button", { name: "Next" }));
 }
 
-test("an intake that waits for an answer opens on that question, for example after a reload", async () => {
+test("an intake that waits for an answer opens on that question, under the label of its fact as the heading, for example after a reload", async () => {
   stubFetch({ [INTAKE_URL]: Response.json(waiting), "/api/schema": Response.json(testSchema) });
   render(<IntakeScreen />);
 
-  expect(await screen.findByRole("heading", { level: 1, name: "Question 2" })).toBeTruthy();
-  expect(screen.getByRole("group", { name: SECOND.text })).toBeTruthy();
+  const heading = await screen.findByRole("heading", { level: 1, name: "Video sharing" });
+  const group = screen.getByRole("group", { name: SECOND.text });
+  expect(heading.compareDocumentPosition(group) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(screen.queryByRole("heading", { name: /Question/ })).toBeNull();
 });
 
 test("an intake that has ended opens on the recorded answers", async () => {
@@ -64,7 +68,7 @@ test("an intake that has ended opens on the recorded answers", async () => {
   expect(await screen.findByRole("heading", { level: 1, name: "Recorded answers" })).toBeTruthy();
 });
 
-test("after an answer, the next question of the response is shown with no choice selected", async () => {
+test("after an answer, the next question of the response is shown under the label of its fact, with no choice selected", async () => {
   stubFetch({
     [INTAKE_URL]: Response.json({ ...waiting, step: FIRST }),
     "/api/schema": Response.json(testSchema),
@@ -72,11 +76,12 @@ test("after an answer, the next question of the response is shown with no choice
   });
   render(<IntakeScreen />);
   await screen.findByRole("group", { name: FIRST.text });
+  expect(screen.getByRole("heading", { level: 1, name: "Video storage" })).toBeTruthy();
 
   sendAnswer(FIRST.text, "No");
 
   const second = await screen.findByRole("group", { name: SECOND.text });
-  expect(screen.getByRole("heading", { level: 1, name: "Question 2" })).toBeTruthy();
+  expect(screen.getByRole("heading", { level: 1, name: "Video sharing" })).toBeTruthy();
   const radios = within(second).getAllByRole("radio") as HTMLInputElement[];
   expect(radios.map((radio) => radio.checked)).toEqual([false, false, false]);
 });

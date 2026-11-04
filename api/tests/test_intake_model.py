@@ -1,4 +1,4 @@
-"""Tests for the follow-up questions that the model chooses and writes: acceptance criteria 1 to 6 of issues #20 and #22, acceptance criteria 2 and 4 to 6 of issue #24, the acceptance criteria of issue #32, and failure cases from their plans. The model client sends each request to a fake transport, so no test calls the provider."""
+"""Tests for the follow-up questions that the model chooses and writes: acceptance criteria 1 to 6 of issues #20 and #22, acceptance criteria 2 and 4 to 6 of issue #24, the acceptance criteria of issue #32, acceptance criteria 1 to 3 of issue #34, and failure cases from their plans. The model client sends each request to a fake transport, so no test calls the provider."""
 
 import importlib
 import json
@@ -16,7 +16,7 @@ from fastapi.testclient import TestClient
 
 from obligations_agent import server
 from obligations_agent.guidance import load_guidance
-from obligations_agent.intake_model import new_client
+from obligations_agent.intake_model import PROMPT_VERSION, new_client
 from obligations_agent.schema import Schema, load_schema, parse_schema
 from obligations_agent.server import create_app
 
@@ -65,8 +65,13 @@ SHOWN = [WRITTEN[2], WRITTEN[1], WRITTEN[0]]
 
 SCHEMA = load_schema()
 GUIDANCE = load_guidance(SCHEMA)
-# A question without examples from guidance (RESP-5).
-NO_EXAMPLES: dict[str, Any] = {"examples": [], "check": ""}
+# A question without an explanation, a meaning and examples from guidance (RESP-5, RESP-6).
+PLAIN: dict[str, Any] = {
+    "explanation": "",
+    "meaning": "",
+    "examples": [],
+    "check": "",
+}
 YES_NO_NOT_SURE = [
     {"value": "yes", "label": "Yes"},
     {"value": "no", "label": "No"},
@@ -79,7 +84,7 @@ DEFAULT_STEP = {
     "slot": "decides_purposes",
     "text": "Do you decide, alone or together with others, what the personal data is used for and how it is processed?",
     "options": YES_NO_NOT_SURE,
-    **NO_EXAMPLES,
+    **PLAIN,
 }
 READY_TO_CONFIRM = {"type": "ready_to_confirm"}
 
@@ -136,11 +141,11 @@ def asks(request: httpx2.Request) -> httpx2.Response:
     return ask({"slot": chosen(request), "text": TEXT, "options": WRITTEN})
 
 
-def asking(slot: str, text: str = TEXT) -> Handler:
-    """A model that asks about the given slot, with the options in reverse schema order."""
+def asking(slot: str, text: str = TEXT, **fields: str) -> Handler:
+    """A model that asks about the given slot, with the options in reverse schema order and any further inputs of ask, such as the explanation and the meaning."""
 
     def handler(request: httpx2.Request) -> httpx2.Response:
-        return ask({"slot": slot, "text": text, "options": WRITTEN})
+        return ask({"slot": slot, "text": text, "options": WRITTEN, **fields})
 
     return handler
 
@@ -301,6 +306,13 @@ def naming(slot: str, examples: list[tuple[str, str]], check: str = "") -> Handl
     return handler
 
 
+# An explanation and a meaning as the model writes them (RESP-6).
+EXPLANATION = (
+    "Deciding means setting the purpose of the processing and its essential means."
+)
+MEANING = "Yes means you decide them, alone or with others. No means others decide them, or nobody does."
+
+
 def test_the_step_shows_the_slot_the_text_and_the_labels_that_the_model_chooses_in_schema_order() -> (
     None
 ):
@@ -323,7 +335,7 @@ def test_the_step_shows_the_slot_the_text_and_the_labels_that_the_model_chooses_
         "slot": "special_categories",
         "text": special,
         "options": SHOWN,
-        **NO_EXAMPLES,
+        **PLAIN,
     }
     assert created["step"] == first
     # The question is stored with its slot and its text, so a reload shows the same question.
@@ -337,7 +349,7 @@ def test_the_step_shows_the_slot_the_text_and_the_labels_that_the_model_chooses_
         "slot": "processes_for_customer",
         "text": "Does the shop process the order data for a customer?",
         "options": SHOWN,
-        **NO_EXAMPLES,
+        **PLAIN,
     }
 
 
@@ -354,7 +366,7 @@ def test_a_slot_on_the_form_answered_not_sure_can_be_asked_once_more(
 
     assert step == {**DEFAULT_STEP, "number": 2}
     assert (
-        "question 2 slot=decides_purposes model=claude-sonnet-5-5 prompt=4 written_by=default reason=limit_reached"
+        f"question 2 slot=decides_purposes model=claude-sonnet-5-5 prompt={PROMPT_VERSION} written_by=default reason=limit_reached"
         in caplog.text
     )
 
@@ -382,7 +394,7 @@ def test_a_follow_up_slot_answered_not_sure_can_be_asked_a_second_time(
         "slot": "decides_purposes",
         "text": second,
         "options": SHOWN,
-        **NO_EXAMPLES,
+        **PLAIN,
     }
     assert client.get(f"/intakes/{created['id']}").json()["step"] == step
     assert (
@@ -399,7 +411,7 @@ def test_a_follow_up_slot_answered_not_sure_can_be_asked_a_second_time(
         "slot": "processes_for_customer",
         "text": "Do you process personal data on behalf of a customer, following the customer's instructions?",
         "options": YES_NO_NOT_SURE,
-        **NO_EXAMPLES,
+        **PLAIN,
     }
     assert "question 3 slot=processes_for_customer" in caplog.text
     assert "written_by=default reason=limit_reached" in caplog.text
@@ -553,7 +565,7 @@ def test_without_a_model_client_no_slot_is_asked_a_second_time(
     open_slots = client.get(f"/intakes/{created['id']}").json()["open_slots"]
     assert open_slots == ["under_own_name", *FOLLOW_UPS]
     assert (
-        "end after 5 questions model=claude-sonnet-5-5 prompt=4 reason=no_key"
+        f"end after 5 questions model=claude-sonnet-5-5 prompt={PROMPT_VERSION} reason=no_key"
         in caplog.text
     )
 
@@ -661,7 +673,7 @@ def test_when_no_slot_is_queued_a_refused_or_failed_call_ends_the_intake(
         "under_own_name"
     ]
     assert (
-        f"end after 5 questions model=claude-sonnet-5-5 prompt=4 reason={reason}"
+        f"end after 5 questions model=claude-sonnet-5-5 prompt={PROMPT_VERSION} reason={reason}"
         in caplog.text
     )
 
@@ -838,7 +850,7 @@ def test_code_ends_the_intake_without_a_request_when_the_slots_left_are_answered
         "decides_purposes",
     ]
     assert (
-        "end after 5 questions model=claude-sonnet-5-5 prompt=4 reason=no_askable_slot"
+        f"end after 5 questions model=claude-sonnet-5-5 prompt={PROMPT_VERSION} reason=no_askable_slot"
         in caplog.text
     )
 
@@ -878,6 +890,8 @@ def test_the_request_has_the_prompt_file_the_strict_tool_ask_and_the_description
         .read_text(encoding="utf-8")
     )
     assert first["system"] == prompt
+    # The log lines carry the version that the first line of the prompt file names.
+    assert PROMPT_VERSION == "5"
     assert first["tool_choice"] == {"type": "auto", "disable_parallel_tool_use": True}
     [tool] = first["tools"]
     assert tool["name"] == "ask"
@@ -885,10 +899,14 @@ def test_the_request_has_the_prompt_file_the_strict_tool_ask_and_the_description
     assert tool["input_schema"]["required"] == [
         "slot",
         "text",
+        "explanation",
+        "meaning",
         "options",
         "examples",
         "check",
     ]
+    assert tool["input_schema"]["properties"]["explanation"] == {"type": "string"}
+    assert tool["input_schema"]["properties"]["meaning"] == {"type": "string"}
     outside = json.dumps(
         {name: part for name, part in first.items() if name != "messages"}
     )
@@ -931,8 +949,10 @@ def test_the_user_message_lists_each_askable_slot_with_its_earlier_questions_and
         "label": "Under own name or trademark",
         "default_question": form_question,
         "values": YES_NO_NOT_SURE,
-        # The form's question is the first question about a slot on the form.
-        "earlier_questions": [form_question],
+        # The form's question is the first question about a slot on the form, with its default text.
+        "earlier_questions": [
+            {"text": form_question, "explanation": "", "meaning": ""}
+        ],
         "note": FORM_NOTE,
         "questions_left": 1,
         "guidance": guidance_of("under_own_name"),
@@ -942,10 +962,14 @@ def test_the_user_message_lists_each_askable_slot_with_its_earlier_questions_and
     assert first["facts"][1]["questions_left"] == 2
     assert second["questions_left"] == 7
     [decides] = [fact for fact in second["facts"] if fact["id"] == "decides_purposes"]
-    assert decides["earlier_questions"] == [TEXT]
+    assert decides["earlier_questions"] == [
+        {"text": TEXT, "explanation": "", "meaning": ""}
+    ]
     assert decides["note"] == UNCLEAR["note"]
     assert decides["questions_left"] == 1
     assert "processes_for_customer" not in [fact["id"] for fact in third["facts"]]
+    # Compact JSON: the user message holds no line break.
+    assert "\n" not in json.loads(requests[0].content)["messages"][0]["content"]
 
 
 def test_a_repeated_answer_while_the_model_writes_the_next_question_calls_the_model_once() -> (
@@ -1026,14 +1050,14 @@ def test_each_question_and_the_end_get_one_log_line_without_the_description_or_t
     ]
     assert lines == [
         "not sure answer on the form slot=under_own_name reason=unclear",
-        "question 1 slot=decides_purposes model=claude-sonnet-5-5 prompt=4 written_by=model examples=0 left_out=0 check=no",
-        "question 2 slot=processes_for_customer model=claude-sonnet-5-5 prompt=4 written_by=default reason=invalid_output examples=0 left_out=0 check=no",
-        "question 3 slot=special_categories model=claude-sonnet-5-5 prompt=4 written_by=model examples=0 left_out=0 check=no",
-        "question 4 slot=automated_decisions model=claude-sonnet-5-5 prompt=4 written_by=model examples=0 left_out=0 check=no",
-        "question 5 slot=interacts_with_people model=claude-sonnet-5-5 prompt=4 written_by=model examples=0 left_out=0 check=no",
+        f"question 1 slot=decides_purposes model=claude-sonnet-5-5 prompt={PROMPT_VERSION} written_by=model examples=0 left_out=0 check=no",
+        f"question 2 slot=processes_for_customer model=claude-sonnet-5-5 prompt={PROMPT_VERSION} written_by=default reason=invalid_output examples=0 left_out=0 check=no",
+        f"question 3 slot=special_categories model=claude-sonnet-5-5 prompt={PROMPT_VERSION} written_by=model examples=0 left_out=0 check=no",
+        f"question 4 slot=automated_decisions model=claude-sonnet-5-5 prompt={PROMPT_VERSION} written_by=model examples=0 left_out=0 check=no",
+        f"question 5 slot=interacts_with_people model=claude-sonnet-5-5 prompt={PROMPT_VERSION} written_by=model examples=0 left_out=0 check=no",
         "not sure answer to question 5 slot=interacts_with_people reason=unknown",
-        "question 6 slot=under_own_name model=claude-sonnet-5-5 prompt=4 written_by=model examples=0 left_out=0 check=no",
-        "end after 6 questions model=claude-sonnet-5-5 prompt=4 reason=no_askable_slot",
+        f"question 6 slot=under_own_name model=claude-sonnet-5-5 prompt={PROMPT_VERSION} written_by=model examples=0 left_out=0 check=no",
+        f"end after 6 questions model=claude-sonnet-5-5 prompt={PROMPT_VERSION} reason=no_askable_slot",
     ]
     assert MARKER not in caplog.text
     assert NOTE_MARKER not in caplog.text
@@ -1208,7 +1232,7 @@ def test_a_question_without_examples_has_an_empty_list_and_an_empty_check_line()
         "slot": "processes_for_customer",
         "text": TEXT,
         "options": SHOWN,
-        **NO_EXAMPLES,
+        **PLAIN,
     }
 
 
@@ -1227,7 +1251,7 @@ def test_the_log_line_of_a_question_counts_its_examples_the_ids_left_out_and_the
     )
 
     assert (
-        "question 1 slot=personal_data model=claude-sonnet-5-5 prompt=4 written_by=model examples=2 left_out=1 check=yes"
+        f"question 1 slot=personal_data model=claude-sonnet-5-5 prompt={PROMPT_VERSION} written_by=model examples=2 left_out=1 check=yes"
         in caplog.text
     )
 
@@ -1291,3 +1315,89 @@ def test_the_service_loads_guidance_yaml_when_it_starts(
     assert user_data(requests[0])["facts"][0]["guidance"] == guidance_of(
         "personal_data"
     )
+
+
+def test_the_step_holds_the_explanation_the_question_and_the_meaning_that_the_model_writes() -> (
+    None
+):
+    # Both form slots were unclear to the user, so each follow-up question about them is a second
+    # question, which keeps its explanation.
+    client = service(
+        scripted(
+            [],
+            asking(
+                "under_own_name",
+                explanation=f"  {EXPLANATION}\n",
+                meaning=f" {MEANING}  ",
+            ),
+            asking("personal_data", explanation="   ", meaning=" "),
+        )
+    )
+    created = client.post("/intakes", json=PERSONAL_DATA_UNCLEAR).json()
+
+    # The explanation and the meaning without the spaces at their ends.
+    question = {
+        "type": "question",
+        "number": 1,
+        "slot": "under_own_name",
+        "text": TEXT,
+        "options": SHOWN,
+        **PLAIN,
+        "explanation": EXPLANATION,
+        "meaning": MEANING,
+    }
+    assert created["step"] == question
+    assert client.get(f"/intakes/{created['id']}").json()["step"] == question
+
+    step = answer(client, created["id"], 1, "no")
+
+    # Spaces only are an empty explanation and an empty meaning.
+    assert step["slot"] == "personal_data"
+    assert step["explanation"] == ""
+    assert step["meaning"] == ""
+
+
+def test_code_keeps_the_explanation_only_for_a_slot_that_had_a_question_before() -> (
+    None
+):
+    client = service(
+        scripted(
+            [],
+            asking("decides_purposes", explanation=EXPLANATION, meaning=MEANING),
+            asking("decides_purposes", explanation=EXPLANATION, meaning=MEANING),
+        )
+    )
+    created = client.post("/intakes", json=FORM).json()
+
+    # decides_purposes had no question before its first follow-up question (TOOL-1).
+    assert created["step"]["explanation"] == ""
+    assert created["step"]["meaning"] == MEANING
+
+    step = answer(client, created["id"], 1, "not_sure", UNCLEAR)
+
+    assert step["slot"] == "decides_purposes"
+    assert step["explanation"] == EXPLANATION
+
+
+def test_the_user_message_gives_each_earlier_question_with_its_three_texts() -> None:
+    requests: list[httpx2.Request] = []
+    client = service(
+        scripted(
+            requests,
+            asking("decides_purposes", explanation=EXPLANATION, meaning=MEANING),
+            asks,
+        )
+    )
+    created = client.post("/intakes", json=FORM).json()
+
+    answer(client, created["id"], 1, "not_sure", UNCLEAR)
+
+    [decides] = [
+        fact
+        for fact in user_data(requests[1])["facts"]
+        if fact["id"] == "decides_purposes"
+    ]
+    # The texts that the user saw: code kept no explanation for the first question.
+    assert decides["earlier_questions"] == [
+        {"text": TEXT, "explanation": "", "meaning": MEANING}
+    ]

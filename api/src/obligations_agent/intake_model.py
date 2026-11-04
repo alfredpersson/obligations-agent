@@ -1,4 +1,4 @@
-"""The intake model: chooses the slot of each follow-up question among the askable ones, writes the text and the option labels, and names the examples from guidance that are about the user's text (INTAKE-2, INTAKE-4, TOOL-1, RESP-5). Code ends the intake. Without a key, or when the call gives no valid ask, code asks about the next slot in the queue with its default text, or ends the intake (INTAKE-1)."""
+"""The intake model: chooses the slot of each follow-up question among the askable ones, writes the question as three texts (the explanation, the question and what each answer means) and the option labels, and names the examples from guidance that are about the user's text (INTAKE-2, INTAKE-4, TOOL-1, RESP-5, RESP-6). Code ends the intake. Without a key, or when the call gives no valid ask, code asks about the next slot in the queue with its default text, or ends the intake (INTAKE-1)."""
 
 import json
 import logging
@@ -38,13 +38,15 @@ PROMPT_VERSION = PROMPT.split("\n", 1)[0].removeprefix("Version: ")
 
 ASK: ToolParam = {
     "name": "ask",
-    "description": "Asks the user one question about one of the facts: the id of the fact, the question text, one option for each allowed value of the fact, the entries of the fact's guidance that are about the user's text, each with a line, and a check line.",
+    "description": "Asks the user one question about one of the facts: the id of the fact, the question as three texts (the question alone, the explanation that the user reads before the examples and the question, and what each answer means), one option for each allowed value of the fact, the entries of the fact's guidance that are about the user's text, each with a line, and a check line.",
     "strict": True,
     "input_schema": {
         "type": "object",
         "properties": {
             "slot": {"type": "string"},
             "text": {"type": "string"},
+            "explanation": {"type": "string"},
+            "meaning": {"type": "string"},
             "options": {
                 "type": "array",
                 "items": {
@@ -71,7 +73,15 @@ ASK: ToolParam = {
             },
             "check": {"type": "string"},
         },
-        "required": ["slot", "text", "options", "examples", "check"],
+        "required": [
+            "slot",
+            "text",
+            "explanation",
+            "meaning",
+            "options",
+            "examples",
+            "check",
+        ],
         "additionalProperties": False,
     },
 }
@@ -103,6 +113,8 @@ class Asked(BaseModel):
 
     slot: str
     text: str
+    explanation: str = ""
+    meaning: str = ""
     options: list[Option]
     examples: list[Named] = []
     check: str = ""
@@ -130,7 +142,7 @@ def user_message(
         "questions_left": QUESTION_LIMIT - len(intake.questions),
         "facts": [fact(guidance, intake, slot) for slot in slots],
     }
-    return json.dumps(data, ensure_ascii=False, indent=2)
+    return json.dumps(data, ensure_ascii=False)
 
 
 def fact(guidance: Guidance, intake: Intake, slot: Slot) -> dict[str, object]:
@@ -141,7 +153,10 @@ def fact(guidance: Guidance, intake: Intake, slot: Slot) -> dict[str, object]:
         "label": slot.label,
         "default_question": slot.question,
         "values": [{"value": value.id, "label": value.label} for value in slot.values],
-        "earlier_questions": earlier,
+        "earlier_questions": [
+            question.model_dump(include={"text", "explanation", "meaning"})
+            for question in earlier
+        ],
         "note": intake.not_sure.get(slot.id, NotSure()).note,
         "questions_left": SLOT_LIMIT - len(earlier),
         "guidance": [
@@ -241,9 +256,14 @@ def ask_model(
     examples = matched(guidance, slot, asked.examples)
     # The check line only for a slot whose entries the model received (RESP-5).
     has_entries = any(entry.slot == slot.id for entry in guidance.entries)
+    # The explanation only for a slot that had a question before, which the user did not
+    # understand (TOOL-1).
+    asked_again = bool(asked_before(intake, slot))
     question = Question(
         slot=slot.id,
         text=asked.text,
+        explanation=asked.explanation.strip() if asked_again else "",
+        meaning=asked.meaning.strip(),
         options=asked.options,
         examples=examples,
         check=asked.check.strip() if has_entries else "",
