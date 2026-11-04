@@ -32,6 +32,7 @@ const unsure = {
 } satisfies Question;
 
 const CAMERA_GUIDANCE = {
+  id: "camera_guidance",
   title: "Camera guidance",
   body: "European Data Protection Board",
   link: "https://example.org/camera-guidance",
@@ -39,46 +40,71 @@ const CAMERA_GUIDANCE = {
   note: null,
 };
 
-// A question with every part (RESP-5, RESP-6): an explanation, three examples in an order that is
-// not that of their ids, the second with two quotes under the same heading and the third from a
-// source with a note, a check line, and a meaning.
+const PRODUCT_RULES = {
+  id: "product_rules",
+  title: "Product rules guide",
+  body: "European Commission",
+  link: "https://example.org/product-rules",
+  checked: "2026-10-28",
+  note: "EU product rules, written for goods.",
+};
+
+const KEPT = "Examples of video that is kept";
+
+// A question with every part (RESP-5, RESP-6): an explanation, two groups of examples, a check line
+// and a meaning. The first group has three entries in an order that is not that of their ids: one
+// from a source with a note, then two from the camera guidance, where the heading of the first
+// entry's last quote goes on into the second entry. The second group starts with an entry from the
+// camera guidance under the heading that the first group shows last, then has an entry from the
+// other source under the same heading.
 const full = {
   ...question,
   explanation: "Video is kept when the product stores it after it is shown, for any length of time.",
   meaning: "Yes means that the product stores some video. No means that it stores none.",
   examples: [
     {
-      id: "z_doorbell",
-      line: "Your description mentions a door camera.",
-      quotes: [
-        { heading: "Examples of video that is kept", text: "a recording that a doorbell saves for a day" },
+      line: "Your description mentions a shop, a door camera and backups.",
+      entries: [
         {
-          heading: "Examples of video that is not kept",
-          text: "a live picture that is shown and then deleted",
+          id: "m_shop",
+          quotes: [{ heading: "Products", text: "a camera that a shop sells" }],
+          source: PRODUCT_RULES,
+        },
+        {
+          id: "z_doorbell",
+          quotes: [
+            {
+              heading: "Examples of video that is not kept",
+              text: "a live picture that is shown and then deleted",
+            },
+            { heading: KEPT, text: "a recording that a doorbell saves for a day" },
+          ],
+          source: CAMERA_GUIDANCE,
+        },
+        {
+          id: "a_backup",
+          quotes: [
+            { heading: KEPT, text: "a copy in a backup" },
+            { heading: KEPT, text: "a clip sent to a phone" },
+          ],
+          source: CAMERA_GUIDANCE,
         },
       ],
-      source: CAMERA_GUIDANCE,
     },
     {
-      id: "a_backup",
-      line: "Your note mentions backups.",
-      quotes: [
-        { heading: "Examples of copies that are kept", text: "a copy in a backup" },
-        { heading: "Examples of copies that are kept", text: "a clip sent to a phone" },
+      line: "Your note mentions a phone and a shop camera.",
+      entries: [
+        {
+          id: "k_phone",
+          quotes: [{ heading: KEPT, text: "a clip on the owner's phone" }],
+          source: CAMERA_GUIDANCE,
+        },
+        {
+          id: "p_shop_camera",
+          quotes: [{ heading: KEPT, text: "a recording that a shop camera keeps for a week" }],
+          source: PRODUCT_RULES,
+        },
       ],
-      source: CAMERA_GUIDANCE,
-    },
-    {
-      id: "m_shop",
-      line: "Your description mentions a shop.",
-      quotes: [{ heading: "Products", text: "a camera that a shop sells" }],
-      source: {
-        title: "Product rules guide",
-        body: "European Commission",
-        link: "https://example.org/product-rules",
-        checked: "2026-10-28",
-        note: "EU product rules, written for goods.",
-      },
     },
   ],
   check: "Check whether the product keeps a copy of the video on the device.",
@@ -314,28 +340,61 @@ test("a question without an explanation, examples, a check line and a meaning sh
   expect(form.querySelector("legend")?.nextElementSibling?.querySelector("input[type=radio]")).toBeTruthy();
 });
 
-test("the examples show each line as a heading and each quote in the step's order, with a heading once for quotes in a row that share it, and no side", () => {
+test("the examples show the line of each group once, as a heading above the quotes of all its entries, in the step's order, and no side", () => {
   render(<FollowUpQuestion id={ID} question={full} onStep={vi.fn()} />);
 
   const region = screen.getByRole("region", { name: EXAMPLES });
-  expect(within(region).getAllByRole("heading", { level: 3 }).map((heading) => heading.textContent)).toEqual([
-    "Your description mentions a door camera.",
-    "Your note mentions backups.",
-    "Your description mentions a shop.",
-  ]);
-  const quotes = within(region).getAllByRole("blockquote");
-  expect(quotes.map((quote) => quote.textContent)).toEqual([
-    "a recording that a doorbell saves for a day",
+  // The lines and the quotes in the order of the document: each line once, above the quotes of all
+  // the entries of its group.
+  expect([...region.querySelectorAll("h3, blockquote")].map((element) => element.textContent)).toEqual([
+    "Your description mentions a shop, a door camera and backups.",
+    "a camera that a shop sells",
     "a live picture that is shown and then deleted",
+    "a recording that a doorbell saves for a day",
     "a copy in a backup",
     "a clip sent to a phone",
-    "a camera that a shop sells",
+    "Your note mentions a phone and a shop camera.",
+    "a clip on the owner's phone",
+    "a recording that a shop camera keeps for a week",
   ]);
-  expect(quotes[1].previousElementSibling?.textContent).toBe("Examples of video that is not kept");
-  // The second quote of the backups shares the heading of the first, so no heading stands before it.
-  expect(within(region).getAllByText("Examples of copies that are kept")).toHaveLength(1);
-  expect(quotes[3].previousElementSibling).toBe(quotes[2]);
   expect(region.textContent).not.toMatch(/sided/i);
+});
+
+test("inside a group a heading shows once for quotes in a row that share it, also across entries, and again after the source line of another source and in the next group", () => {
+  render(<FollowUpQuestion id={ID} question={full} onStep={vi.fn()} />);
+
+  const region = screen.getByRole("region", { name: EXAMPLES });
+  const quotes = within(region).getAllByRole("blockquote");
+  // What stands directly before each quote: its heading, or the quote before it.
+  expect(quotes.map((quote) => quote.previousElementSibling?.textContent)).toEqual([
+    "Products",
+    "Examples of video that is not kept",
+    KEPT,
+    "a recording that a doorbell saves for a day",
+    "a copy in a backup",
+    KEPT,
+    KEPT,
+  ]);
+});
+
+test("inside a group the source line shows once, after the quotes of entries in a row from the same source, and the next group shows it again", () => {
+  render(<FollowUpQuestion id={ID} question={full} onStep={vi.fn()} />);
+
+  const region = screen.getByRole("region", { name: EXAMPLES });
+  const quotes = within(region).getAllByRole("blockquote");
+  // The source linked directly after each quote, if any.
+  expect(
+    quotes.map((quote) => quote.nextElementSibling?.querySelector("a")?.textContent ?? null),
+  ).toEqual([
+    "Product rules guide",
+    null,
+    null,
+    null,
+    "Camera guidance",
+    "Camera guidance",
+    "Product rules guide",
+  ]);
+  expect(within(region).getAllByRole("link")).toHaveLength(4);
 });
 
 test("the source line gives the body, the title as a link that opens in a new tab, the note where the source has one, and the date its quotes were checked", () => {
@@ -349,7 +408,7 @@ test("the source line gives the body, the title as a link that opens in a new ta
   expect(camera.parentElement?.textContent).toBe(
     "European Data Protection Board, Camera guidance, checked 2026-10-28",
   );
-  const rules = within(region).getByRole("link", { name: "Product rules guide" });
+  const [rules] = within(region).getAllByRole("link", { name: "Product rules guide" });
   expect(rules.parentElement?.textContent).toBe(
     "European Commission, Product rules guide (EU product rules, written for goods.), checked 2026-10-28",
   );

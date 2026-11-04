@@ -14,6 +14,7 @@ from obligations_agent.intakes import (
     QUESTION_LIMIT,
     SLOT_LIMIT,
     Example,
+    Group,
     Intake,
     NotSure,
     Option,
@@ -38,7 +39,7 @@ PROMPT_VERSION = PROMPT.split("\n", 1)[0].removeprefix("Version: ")
 
 ASK: ToolParam = {
     "name": "ask",
-    "description": "Asks the user one question about one of the facts: the id of the fact, the question as three texts (the question alone, the explanation that the user reads before the examples and the question, and what each answer means), one option for each allowed value of the fact, the entries of the fact's guidance that are about the user's text, each with a line, and a check line.",
+    "description": "Asks the user one question about one of the facts: the id of the fact, the question as three texts (the question alone, the explanation that the user reads before the examples and the question, and what each answer means), one option for each allowed value of the fact, the entries of the fact's guidance that are about the user's text in groups, each with a line about one part of the user's text, and a check line.",
     "strict": True,
     "input_schema": {
         "type": "object",
@@ -64,10 +65,10 @@ ASK: ToolParam = {
                 "items": {
                     "type": "object",
                     "properties": {
-                        "entry": {"type": "string"},
+                        "entries": {"type": "array", "items": {"type": "string"}},
                         "line": {"type": "string"},
                     },
-                    "required": ["entry", "line"],
+                    "required": ["entries", "line"],
                     "additionalProperties": False,
                 },
             },
@@ -102,9 +103,9 @@ logger = logging.getLogger(__name__)
 
 
 class Named(BaseModel):
-    """An entry that the model names for its question, with its line about the user's text."""
+    """A group of entries that the model names for its question: the ids of the entries about one part of the user's text, and its line about that part."""
 
-    entry: str
+    entries: list[str]
     line: str
 
 
@@ -167,29 +168,31 @@ def fact(guidance: Guidance, intake: Intake, slot: Slot) -> dict[str, object]:
     }
 
 
-def matched(guidance: Guidance, slot: Slot, named: list[Named]) -> list[Example]:
-    """The entries of the slot that the model names, in its order, with their quotes and sources. An id that is not an entry of the slot, an entry named again and an entry without a line are left out (TOOL-1, RESP-5)."""
+def matched(guidance: Guidance, slot: Slot, named: list[Named]) -> list[Group]:
+    """The groups that the model names, in its order, each with its line and the entries of the slot that it names, in its order, with their quotes and sources. An id that is not an entry of the slot and an entry named again are left out, and so is a group without a line or without an entry left (TOOL-1, RESP-5)."""
     entries = {entry.id: entry for entry in guidance.entries if entry.slot == slot.id}
     sources = {source.id: source for source in guidance.sources}
-    examples: list[Example] = []
+    groups: list[Group] = []
     for item in named:
-        entry = entries.get(item.entry)
-        if (
-            entry is None
-            or not item.line.strip()
-            or entry.id in [example.id for example in examples]
-        ):
+        if not item.line.strip():
             continue
-        examples.append(
-            Example(
-                id=entry.id,
-                line=item.line,
-                two_sided=entry.two_sided,
-                quotes=entry.quotes,
-                source=sources[entry.source],
+        examples: list[Example] = []
+        for entry_id in item.entries:
+            # Taken out of the dict, so that each entry shows once.
+            entry = entries.pop(entry_id, None)
+            if entry is None:
+                continue
+            examples.append(
+                Example(
+                    id=entry.id,
+                    two_sided=entry.two_sided,
+                    quotes=entry.quotes,
+                    source=sources[entry.source],
+                )
             )
-        )
-    return examples
+        if examples:
+            groups.append(Group(line=item.line, entries=examples))
+    return groups
 
 
 def ask_model(
@@ -253,7 +256,7 @@ def ask_model(
     if sorted(option.value for option in asked.options) != sorted(values):
         return "invalid_option"
     asked.options.sort(key=lambda option: values.index(option.value))
-    examples = matched(guidance, slot, asked.examples)
+    groups = matched(guidance, slot, asked.examples)
     # The check line only for a slot whose entries the model received (RESP-5).
     has_entries = any(entry.slot == slot.id for entry in guidance.entries)
     # The explanation only for a slot that had a question before, which the user did not
@@ -265,10 +268,11 @@ def ask_model(
         explanation=asked.explanation.strip() if asked_again else "",
         meaning=asked.meaning.strip(),
         options=asked.options,
-        examples=examples,
+        examples=groups,
         check=asked.check.strip() if has_entries else "",
     )
-    return question, len(asked.examples) - len(examples)
+    named = sum(len(item.entries) for item in asked.examples)
+    return question, named - sum(len(group.entries) for group in groups)
 
 
 def next_question(
@@ -303,7 +307,7 @@ def next_question(
         MODEL,
         PROMPT_VERSION,
         written_by,
-        len(question.examples),
+        sum(len(group.entries) for group in question.examples),
         left_out,
         "yes" if question.check else "no",
     )
