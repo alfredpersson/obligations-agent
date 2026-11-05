@@ -1,9 +1,29 @@
 /* A row that starts with a button or a link: the button of the form and of the question with the
-   loading status, and the actions of the dialog before a link to EUR-Lex. On a narrow screen, what
-   does not fit goes to the next line. */
+   loading status, the actions of the dialog before a link to EUR-Lex, and the two choices of the
+   start page. On a narrow screen, what does not fit goes to the next line. */
 .actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-3) var(--space-4);
   align-items: center;
+}
+
+/* A link with the look of the button: the dialog's link to EUR-Lex and the choices of the start
+   page. */
+.button {
+  padding: var(--space-3) var(--space-6);
+  font-family: var(--font-label);
+  font-size: var(--size-button);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--color-accent-text);
+  background: var(--color-accent);
+  text-decoration: none;
+}
+
+/* The second choice of the start page: the button's outline, without its fill. */
+.secondary {
+  color: var(--color-accent);
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--color-accent);
 }

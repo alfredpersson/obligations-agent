@@ -3,9 +3,9 @@ import actions from "../../actions.module.css";
 import { REASONS } from "../../not-sure-reason";
 import type { Cited, NotSure, Result, Schema } from "../../service";
 import styles from "./intake-result.module.css";
+import { LISTED_USE, STATUS } from "./result-text";
 
-// What a result says, and what each answer of a conditional result gives (GATE-2, VALID-2).
-const STATUS = { applies: "Applies.", does_not_apply: "Does not apply.", conditional: "Conditional." };
+// What each answer of a conditional result gives (GATE-2, VALID-2).
 const CASE: Record<string, string> = {
   applies: "applies",
   does_not_apply: "does not apply",
@@ -111,8 +111,7 @@ export default function IntakeResult({
           <h2>{outcome.label}</h2>
           <p>
             <strong className={styles.status}>{STATUS[outcome.status]}</strong>
-            {outcome.result === "listed_use" &&
-              " High-risk if the product's intended use is one of the uses listed under the point of Annex III quoted below. You decide this."}
+            {outcome.result === "listed_use" && ` ${LISTED_USE}`}
             {outcome.derogation && ` ${DEROGATION[outcome.derogation]}`}
           </p>
           <dl>
@@ -181,7 +180,7 @@ export default function IntakeResult({
               href={opening.link}
               target="_blank"
               rel="noreferrer"
-              className={styles.open}
+              className={actions.button}
               onClick={() => {
                 remember(opening.link);
                 dialog.current?.close();

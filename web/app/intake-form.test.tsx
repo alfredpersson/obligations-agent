@@ -53,6 +53,90 @@ async function fillIn() {
   fireEvent.change(descriptionField(PEOPLE), { target: { value: "Building staff." } });
 }
 
+// An example in the ids of the test schema: its texts by field and its answers by slot.
+const EXAMPLE = {
+  description: { purpose: "A door camera.", people: "Building staff." },
+  answers: { uses_camera: "yes", audience: "staff" },
+};
+
+// Checks that every field and every slot shows the starting values: the example's, or none.
+function expectStart(example?: typeof EXAMPLE) {
+  const description: Record<string, string> = example?.description ?? {};
+  const answers: Record<string, string> = example?.answers ?? {};
+  for (const field of testSchema.description) {
+    expect(descriptionField(field.question).value).toBe(description[field.id] ?? "");
+  }
+  for (const slot of testSchema.slots) {
+    for (const value of slot.values) {
+      expect(radio(slot.question, value.label).checked).toBe(answers[slot.id] === value.id);
+    }
+  }
+}
+
+test("the form opened without an example has every text field empty and no option chosen", async () => {
+  stubFetch({ "/api/schema": Response.json(testSchema) });
+  render(<IntakeForm />);
+  await screen.findByRole("button", { name: "Send" });
+
+  expectStart();
+});
+
+test("the form opened with an example shows its texts and its answers, and can be sent at once", async () => {
+  stubFetch({ "/api/schema": Response.json(testSchema) });
+  render(<IntakeForm example={EXAMPLE} />);
+  await screen.findByRole("button", { name: "Send" });
+
+  expectStart(EXAMPLE);
+  expect(sendButton().disabled).toBe(false);
+});
+
+test("a text and an answer of the example that the user changes are sent as changed", async () => {
+  const fetchMock = stubFetch({
+    "/api/schema": Response.json(testSchema),
+    "/api/intakes": Response.json(
+      { id: "kq2V8yZx0bP4mT7nLw3sAg", step: { type: "ready_to_confirm" } },
+      { status: 201 },
+    ),
+  });
+  render(<IntakeForm example={EXAMPLE} />);
+  await screen.findByRole("button", { name: "Send" });
+  fireEvent.change(descriptionField(PURPOSE), { target: { value: "A gate camera." } });
+  fireEvent.click(radio("Who uses the product?", "The public"));
+
+  fireEvent.click(sendButton());
+
+  await waitFor(() => expect(push).toHaveBeenCalled());
+  const [, init] = fetchMock.mock.calls.find(([url]) => url === "/api/intakes") ?? [];
+  expect(JSON.parse(String(init?.body))).toEqual({
+    answers: { uses_camera: "yes", audience: "public" },
+    description: { purpose: "A gate camera.", people: "Building staff." },
+    not_sure: {},
+  });
+});
+
+// Next.js keeps a visited page with its state, so a form that keeps the sent answers would show
+// them again when the user starts the next intake.
+test.each([
+  ["without an example", undefined],
+  ["with an example", EXAMPLE],
+])("after a successful send, the form opened %s shows its starting values again", async (_, example) => {
+  stubFetch({
+    "/api/schema": Response.json(testSchema),
+    "/api/intakes": Response.json(
+      { id: "kq2V8yZx0bP4mT7nLw3sAg", step: { type: "ready_to_confirm" } },
+      { status: 201 },
+    ),
+  });
+  render(<IntakeForm example={example} />);
+  await fillIn();
+
+  fireEvent.click(sendButton());
+
+  await waitFor(() => expect(push).toHaveBeenCalledWith("/intakes/kq2V8yZx0bP4mT7nLw3sAg"));
+  await waitFor(() => expectStart(example));
+  expect(screen.queryByRole("group", { name: "Why are you not sure?" })).toBeNull();
+});
+
 test("the form shows the description fields and every slot from the schema, in order, with no choice selected", async () => {
   stubFetch({ "/api/schema": Response.json(testSchema) });
   render(<IntakeForm />);

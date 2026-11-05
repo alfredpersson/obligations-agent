@@ -8,13 +8,17 @@ import NotSureReason from "./not-sure-reason";
 import { NOT_SURE, type NotSure, type Schema } from "./service";
 
 // The form: the description fields, then one group of choices for each slot in the schema
-// (FACT-3 to FACT-5).
-export default function IntakeForm() {
+// (FACT-3 to FACT-5). It opens empty, or with the texts and answers of an example.
+export default function IntakeForm({
+  example,
+}: {
+  example?: { description: Record<string, string>; answers: Record<string, string> };
+}) {
   const router = useRouter();
   const [schema, setSchema] = useState<Schema | null>(null);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [answers, setAnswers] = useState<Record<string, string>>(example?.answers ?? {});
   const [notSure, setNotSure] = useState<Record<string, Partial<NotSure>>>({});
-  const [description, setDescription] = useState<Record<string, string>>({});
+  const [description, setDescription] = useState<Record<string, string>>(example?.description ?? {});
   const [message, setMessage] = useState<string | null>(null);
   const [sending, startTransition] = useTransition();
 
@@ -60,7 +64,14 @@ export default function IntakeForm() {
         });
         if (!response.ok) throw new Error();
         const { id } = (await response.json()) as { id: string };
-        startTransition(() => router.push(`/intakes/${id}`));
+        startTransition(() => {
+          // Next.js keeps this page and its state after the navigation (cacheComponents), so the
+          // form starts again from its starting values for the next intake.
+          setAnswers(example?.answers ?? {});
+          setNotSure({});
+          setDescription(example?.description ?? {});
+          router.push(`/intakes/${id}`);
+        });
       } catch {
         setMessage("The answers could not be sent. Try again.");
       }
