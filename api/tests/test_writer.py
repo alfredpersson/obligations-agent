@@ -1,4 +1,4 @@
-"""Tests for the writer of the meaning and the action of each row: acceptance criteria 7, 8 and 11 to 14 of issue #41, and failure cases from its plan. The model client sends each request to a fake transport, so no test calls the provider."""
+"""Tests for the writer of the meaning and the action of each row: acceptance criteria 7, 8 and 11 to 14 of issue #41, and failure cases from its plan; and the texts for each confirmation of the answers, acceptance criterion 7 of issue #50, with the notes written on the screen of the answers. The model client sends each request to a fake transport, so no test calls the provider."""
 
 import json
 import logging
@@ -125,8 +125,18 @@ def recording(requests: list[httpx2.Request], reply: Handler = writes) -> Handle
 def ended(
     answers: dict[str, str] = ALL_YES, not_sure: dict[str, NotSure] | None = None
 ) -> Intake:
-    """An intake that has ended with these answers: no question waits for its answer."""
-    return Intake(answers=answers, description=DESCRIPTION, not_sure=not_sure or {})
+    """An intake that has ended with these answers, confirmed: no question waits for its answer."""
+    return Intake(
+        answers=answers,
+        description=DESCRIPTION,
+        not_sure=not_sure or {},
+        confirmed=True,
+    )
+
+
+def unconfirmed(answers: dict[str, str] = ALL_YES) -> Intake:
+    """An intake that has ended with these answers, which the user has not confirmed yet."""
+    return Intake(answers=answers, description=DESCRIPTION)
 
 
 def service(handler: Handler | None, intake: Intake) -> TestClient:
@@ -380,7 +390,7 @@ def test_each_request_names_the_model_the_prompt_and_the_tool_write() -> None:
     assert body["max_tokens"] == 1024
 
 
-def test_the_texts_of_an_intake_that_has_not_ended_or_does_not_exist_are_refused() -> (
+def test_the_texts_of_an_intake_whose_question_waits_or_that_does_not_exist_are_refused() -> (
     None
 ):
     question = Question(
@@ -401,8 +411,9 @@ def test_the_texts_of_an_intake_that_has_not_ended_or_does_not_exist_are_refused
     client = service(recording(requests), waiting)
 
     response = client.post("/intakes/one/texts")
+    # An intake whose question waits has no confirmed answers.
     assert response.status_code == 409
-    assert response.json() == {"error": {"code": "not_ended"}}
+    assert response.json() == {"error": {"code": "not_confirmed"}}
     assert client.post("/intakes/two/texts").status_code == 404
     assert requests == []
 
@@ -417,3 +428,173 @@ def test_each_row_gets_a_log_line_and_the_intake_one_with_the_count(
     assert caplog.text.count("texts row=") == ROWS
     assert caplog.text.count("written_by=model") == ROWS
     assert f"texts rows={ROWS} written={ROWS} seconds=" in caplog.text
+
+
+# The texts and the confirmation of the answers (issue #50).
+
+
+def test_no_texts_are_written_before_the_answers_are_confirmed() -> None:
+    requests: list[httpx2.Request] = []
+    client = service(recording(requests), unconfirmed())
+
+    response = client.post("/intakes/one/texts")
+
+    assert response.status_code == 409
+    assert response.json() == {"error": {"code": "not_confirmed"}}
+    intake = client.get("/intakes/one").json()
+    assert intake["result"] is None
+    assert intake["texts"] is None
+    assert requests == []
+
+
+def test_after_a_change_the_texts_are_gone_and_the_next_confirmation_writes_them_once_for_the_rows_of_the_new_result() -> (
+    None
+):
+    requests: list[httpx2.Request] = []
+    client = service(recording(requests), unconfirmed())
+    assert client.post("/intakes/one/confirm").status_code == 200
+    client.post("/intakes/one/texts")
+    assert len(requests) == ROWS
+
+    changed = client.put(
+        "/intakes/one/answers/processes_for_customer", json={"value": "no"}
+    ).json()
+
+    assert changed["confirmed"] is False
+    assert changed["result"] is None
+    assert changed["texts"] is None
+    assert client.post("/intakes/one/texts").json() == {
+        "error": {"code": "not_confirmed"}
+    }
+    client.post("/intakes/one/confirm")
+    assert client.get("/intakes/one").json()["texts"] == {}
+    texts = client.post("/intakes/one/texts").json()["texts"]
+    # The processor does not apply now, so its rows are gone, and each other row is written again,
+    # once, also for a second request.
+    rows = row_ids(client)
+    assert not any(row.startswith("processor:") for row in rows)
+    assert set(texts) == set(rows)
+    assert len(requests) == ROWS + len(rows)
+    assert client.post("/intakes/one/texts").json()["texts"] == texts
+    assert len(requests) == ROWS + len(rows)
+
+
+NOTE = {"reason": "unknown", "note": "Depends on the contract."}
+
+
+@pytest.mark.parametrize(
+    ("method", "path", "body"),
+    [
+        pytest.param("POST", "/intakes/one/confirm", None, id="a second confirmation"),
+        pytest.param(
+            "PUT",
+            "/intakes/one/answers/personal_data",
+            {"value": "yes"},
+            id="the same answer",
+        ),
+        pytest.param(
+            "PUT",
+            "/intakes/one/answers/processes_for_customer",
+            {"value": "not_sure", "not_sure": NOTE},
+            id="the same reason and note",
+        ),
+    ],
+)
+def test_a_second_confirmation_and_a_request_that_alters_nothing_keep_the_texts_and_call_nothing(
+    method: str, path: str, body: dict[str, Any] | None
+) -> None:
+    requests: list[httpx2.Request] = []
+    intake = ended(
+        {**ALL_YES, "processes_for_customer": "not_sure"},
+        {"processes_for_customer": NotSure.model_validate(NOTE)},
+    )
+    client = service(recording(requests), intake)
+    texts = client.post("/intakes/one/texts").json()["texts"]
+    calls = len(requests)
+
+    response = client.request(method, path, json=body)
+
+    assert response.status_code == 200
+    assert response.json()["confirmed"] is True
+    assert response.json()["texts"] == texts
+    assert client.post("/intakes/one/texts").json()["texts"] == texts
+    assert len(requests) == calls
+
+
+# From the review of pull request #55: the texts depend on the reasons and the notes too.
+@pytest.mark.parametrize(
+    "changed",
+    [
+        pytest.param(
+            {"reason": "unknown", "note": "Asked the client."}, id="another note"
+        ),
+        pytest.param(
+            {"reason": "unclear", "note": "Depends on the contract."},
+            id="another reason",
+        ),
+    ],
+)
+def test_another_reason_or_note_removes_the_texts_until_the_next_confirmation(
+    changed: dict[str, str],
+) -> None:
+    requests: list[httpx2.Request] = []
+    intake = ended(
+        {**ALL_YES, "processes_for_customer": "not_sure"},
+        {"processes_for_customer": NotSure.model_validate(NOTE)},
+    )
+    client = service(recording(requests), intake)
+    client.post("/intakes/one/texts")
+
+    response = client.put(
+        "/intakes/one/answers/processes_for_customer",
+        json={"value": "not_sure", "not_sure": changed},
+    )
+
+    assert response.json()["confirmed"] is False
+    assert response.json()["texts"] is None
+    assert client.post("/intakes/one/texts").json() == {
+        "error": {"code": "not_confirmed"}
+    }
+
+
+def test_a_note_written_on_the_screen_of_the_answers_reaches_the_writer_only_in_the_user_message(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.INFO)
+    requests: list[httpx2.Request] = []
+    client = service(recording(requests), unconfirmed())
+    note = f"Depends on the contract. {NOTE_MARKER}"
+    client.put(
+        "/intakes/one/answers/processes_for_customer",
+        json={"value": "not_sure", "not_sure": {"reason": "unknown", "note": note}},
+    )
+    client.post("/intakes/one/confirm")
+
+    client.post("/intakes/one/texts")
+
+    assert requests
+    for request in requests:
+        assert NOTE_MARKER not in json.loads(request.content)["system"]
+        assert {
+            "fact": "Processes personal data for a customer",
+            "reason": "I don't know this about the product",
+            "note": note,
+        } in user_data(request)["notes"]
+    assert NOTE_MARKER not in caplog.text
+
+
+def test_the_screen_of_the_answers_and_the_confirmation_call_no_model() -> None:
+    requests: list[httpx2.Request] = []
+    client = service(recording(requests), unconfirmed())
+
+    # Profiling stops being relevant, becomes relevant again without an answer, and is answered.
+    for slot_id, value in [
+        ("use_case_area", "none"),
+        ("use_case_area", "employment"),
+        ("profiling", "no"),
+    ]:
+        response = client.put(f"/intakes/one/answers/{slot_id}", json={"value": value})
+        assert response.status_code == 200
+    assert client.post("/intakes/one/confirm").status_code == 200
+
+    assert requests == []

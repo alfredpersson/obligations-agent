@@ -1,5 +1,6 @@
-"""Tests for GET /schema, POST /intakes, GET /intakes/{id} and POST /intakes/{id}/answers: acceptance criteria 2 to 7 of issue #7, the three description fields of issue #12, acceptance criteria 2 to 7 of issue #16, acceptance criteria 1 and 3 of issue #24, and the result in GET /intakes/{id} of issue #37."""
+"""Tests for GET /schema, POST /intakes, GET /intakes/{id}, POST /intakes/{id}/answers, PUT /intakes/{id}/answers/{slot} and POST /intakes/{id}/confirm: acceptance criteria 2 to 7 of issue #7, the three description fields of issue #12, acceptance criteria 2 to 7 of issue #16, acceptance criteria 1 and 3 of issue #24, the result in GET /intakes/{id} of issue #37, and acceptance criteria 1 to 6 of issue #50, the screen of the answers and the confirmation."""
 
+import logging
 import re
 from typing import Any
 
@@ -9,7 +10,7 @@ from fastapi.testclient import TestClient
 
 from obligations_agent.gates import Gates, link, load_gates
 from obligations_agent.guidance import load_guidance
-from obligations_agent.intakes import Intake
+from obligations_agent.intakes import Intake, NotSure, Option, Question
 from obligations_agent.schema import load_schema, parse_schema
 from obligations_agent.server import create_app
 
@@ -96,6 +97,24 @@ READY_TO_CONFIRM = {"type": "ready_to_confirm"}
 
 # Read once: the tests do not change the schema.
 SCHEMA = load_schema()
+
+
+def default_of(slot_id: str) -> dict[str, Any]:
+    """The default question of a slot of schema.yaml, as GET /intakes/{id} returns it among the questions of the screen of the answers."""
+    slot = next(
+        slot for slot in [*SCHEMA.slots, *SCHEMA.follow_up_slots] if slot.id == slot_id
+    )
+    return {
+        "slot": slot.id,
+        "text": slot.question,
+        "options": [{"value": value.id, "label": value.label} for value in slot.values],
+        "explanation": "",
+        "meaning": "",
+        "examples": [],
+        "check": "",
+    }
+
+
 GUIDANCE = load_guidance(SCHEMA)
 GATES = load_gates(SCHEMA)
 # For a test schema, which has none of the slots of the gates.
@@ -504,14 +523,30 @@ def test_get_intake_returns_the_answers_and_the_open_slots_in_schema_order(
             "personal_data": {"reason": "unknown", "note": ""},
             "use_case_area": {"reason": "unknown", "note": ""},
         },
+        # The question about each relevant fact that the screen of the answers shows: the default
+        # question of each, since no model asked about any. Interacts with people is not relevant.
+        "questions": {
+            slot_id: default_of(slot_id)
+            for slot_id in [
+                "personal_data",
+                "under_own_name",
+                "use_case_area",
+                "decides_purposes",
+                "processes_for_customer",
+                "special_categories",
+                "automated_decisions",
+                "profiling",
+            ]
+        },
         "step": FIRST_QUESTION,
+        "confirmed": False,
         # The intake has not ended.
         "result": None,
         "texts": None,
     }
 
 
-def test_the_result_is_null_while_a_question_waits_and_computed_once_the_intake_has_ended(
+def test_the_result_is_null_while_a_question_waits_and_computed_once_the_answers_are_confirmed(
     client: TestClient,
 ) -> None:
     answers = {
@@ -527,6 +562,8 @@ def test_the_result_is_null_while_a_question_waits_and_computed_once_the_intake_
     answer_each_question(
         client, created, {slot.id: "yes" for slot in SCHEMA.follow_up_slots}
     )
+    assert client.get(f"/intakes/{created['id']}").json()["result"] is None
+    client.post(f"/intakes/{created['id']}/confirm")
     intake = client.get(f"/intakes/{created['id']}").json()
 
     assert intake["result"]["gates"][0] == {
@@ -1023,3 +1060,438 @@ def test_another_value_for_an_answered_question_records_nothing_and_returns_the_
     assert response.status_code == 200
     assert response.json() == current
     assert intakes[intake_id] == stored
+
+
+# The screen of the answers and the confirmation (issue #50).
+
+# The form answers of the example product of the start page: every follow-up fact is relevant.
+EXAMPLE = {
+    "personal_data": "yes",
+    "under_own_name": "yes",
+    "use_case_area": "employment",
+}
+
+
+def end_intake(
+    client: TestClient,
+    answers: dict[str, str] = ANSWERS,
+    values: dict[str, str] | None = None,
+) -> str:
+    """Creates an intake with the form answers, answers each follow-up question with the value given for its slot, or with no, and returns its id."""
+    created = client.post(
+        "/intakes", json={"answers": answers, "description": DESCRIPTION}
+    ).json()
+    answer_each_question(client, created, values or {})
+    return created["id"]
+
+
+def test_after_the_last_answer_the_answers_wait_for_their_confirmation_and_there_is_no_result(
+    client: TestClient,
+) -> None:
+    intake_id = end_intake(client)
+
+    intake = client.get(f"/intakes/{intake_id}").json()
+
+    assert intake["step"] == READY_TO_CONFIRM
+    assert intake["confirmed"] is False
+    assert intake["result"] is None
+    assert intake["texts"] is None
+
+
+def asked(slot_id: str, text: str, explanation: str = "") -> Question:
+    """A question that a model wrote about a slot with yes, no and not sure."""
+    return Question(
+        slot=slot_id,
+        text=text,
+        explanation=explanation,
+        options=[Option.model_validate(option) for option in OPTIONS],
+    )
+
+
+# An ended intake whose model asked twice about under own name and twice about interacts with
+# people, each time answered "not sure" because the question was unclear.
+ASKED_TWICE = Intake(
+    answers={
+        "personal_data": "no",
+        "under_own_name": "not_sure",
+        "use_case_area": "none",
+        "interacts_with_people": "not_sure",
+    },
+    description=DESCRIPTION,
+    not_sure={
+        "under_own_name": NotSure(reason="unclear"),
+        "interacts_with_people": NotSure(reason="unclear"),
+    },
+    questions=[
+        asked("under_own_name", "Is the shop's assistant sold under your name?"),
+        asked("interacts_with_people", "Do the shop's customers chat with it?"),
+        asked(
+            "interacts_with_people",
+            "Do the shop's customers type messages to the assistant?",
+            "A chat window on the shop's website counts.",
+        ),
+    ],
+    replies=["not_sure", "not_sure", "not_sure"],
+)
+
+
+def test_get_intake_returns_the_last_question_asked_about_each_relevant_fact_or_its_default_question(
+    client: TestClient, intakes: dict[str, Intake]
+) -> None:
+    intakes["one"] = ASKED_TWICE
+
+    intake = client.get("/intakes/one").json()
+
+    # A form fact that the model asked about again has the model's question, one that it did not
+    # ask about the form's default question, and a follow-up fact the last of its questions.
+    assert intake["questions"] == {
+        "personal_data": default_of("personal_data"),
+        "under_own_name": ASKED_TWICE.questions[0].model_dump(),
+        "use_case_area": default_of("use_case_area"),
+        "interacts_with_people": ASKED_TWICE.questions[2].model_dump(),
+    }
+
+
+def test_a_change_is_recorded_at_once_and_answered_with_the_intake_as_get_returns_it(
+    client: TestClient,
+) -> None:
+    intake_id = end_intake(client)
+
+    response = client.put(
+        f"/intakes/{intake_id}/answers/processes_for_customer", json={"value": "yes"}
+    )
+
+    assert response.status_code == 200
+    assert response.json()["answers"]["processes_for_customer"] == "yes"
+    assert response.json() == client.get(f"/intakes/{intake_id}").json()
+
+
+def test_a_change_removes_the_answers_reasons_notes_and_questions_of_the_facts_that_are_no_longer_relevant(
+    client: TestClient,
+) -> None:
+    intake_id = end_intake(client, EXAMPLE)
+    client.put(
+        f"/intakes/{intake_id}/answers/decides_purposes",
+        json={
+            "value": "not_sure",
+            "not_sure": {"reason": "unknown", "note": "Ask the client companies."},
+        },
+    )
+
+    intake = client.put(
+        f"/intakes/{intake_id}/answers/personal_data", json={"value": "no"}
+    ).json()
+
+    # The four facts of the GDPR roles and profiling need personal data.
+    assert intake["answers"] == {
+        "personal_data": "no",
+        "under_own_name": "yes",
+        "use_case_area": "employment",
+        "interacts_with_people": "no",
+    }
+    assert intake["not_sure"] == {}
+    assert intake["open_slots"] == []
+    assert list(intake["questions"]) == [
+        "personal_data",
+        "under_own_name",
+        "use_case_area",
+        "interacts_with_people",
+    ]
+
+
+def test_a_change_removes_the_answers_of_a_chain_of_facts_that_are_no_longer_relevant() -> (
+    None
+):
+    # b depends on a, which depends on the form slot camera.
+    client, created = start_test_intake(
+        follow_up("a", {"camera": ["yes"]}), follow_up("b", {"a": ["yes"]})
+    )
+    answer_each_question(client, created, {"a": "yes", "b": "yes"})
+
+    intake = client.put(
+        f"/intakes/{created['id']}/answers/camera", json={"value": "no"}
+    ).json()
+
+    assert intake["answers"] == {"camera": "no"}
+    assert list(intake["questions"]) == ["camera"]
+
+
+def test_a_change_that_makes_a_fact_relevant_shows_it_open_with_its_default_question(
+    client: TestClient,
+) -> None:
+    intake_id = end_intake(client, {**EXAMPLE, "use_case_area": "none"})
+
+    intake = client.put(
+        f"/intakes/{intake_id}/answers/use_case_area", json={"value": "employment"}
+    ).json()
+
+    assert "profiling" not in intake["answers"]
+    assert intake["open_slots"] == ["profiling"]
+    assert intake["questions"]["profiling"] == default_of("profiling")
+    # The screen asks no question: the step stays.
+    assert intake["step"] == READY_TO_CONFIRM
+
+
+def test_a_fact_that_becomes_relevant_again_is_open_with_the_last_question_asked_about_it(
+    client: TestClient, intakes: dict[str, Intake]
+) -> None:
+    intakes["one"] = ASKED_TWICE.model_copy(deep=True)
+    client.put("/intakes/one/answers/under_own_name", json={"value": "no"})
+
+    intake = client.put(
+        "/intakes/one/answers/under_own_name", json={"value": "yes"}
+    ).json()
+
+    # Its answer, reason and note were removed while it was not relevant.
+    assert "interacts_with_people" not in intake["answers"]
+    assert "interacts_with_people" not in intake["not_sure"]
+    assert intake["open_slots"] == ["interacts_with_people"]
+    assert (
+        intake["questions"]["interacts_with_people"]
+        == ASKED_TWICE.questions[2].model_dump()
+    )
+    # No question was added, and no answer to one.
+    assert intakes["one"].questions == ASKED_TWICE.questions
+    assert intakes["one"].replies == ASKED_TWICE.replies
+
+
+def test_not_sure_on_the_screen_of_the_answers_stores_its_reason_and_its_note_and_counts_without_a_reason_as_unknown(
+    client: TestClient,
+) -> None:
+    intake_id = end_intake(client)
+    path = f"/intakes/{intake_id}/answers/processes_for_customer"
+    unclear = {"reason": "unclear", "note": "What does on behalf mean?"}
+
+    first = client.put(path, json={"value": "not_sure", "not_sure": unclear}).json()
+    second = client.put(path, json={"value": "not_sure"}).json()
+    third = client.put(path, json={"value": "no"}).json()
+
+    assert first["not_sure"]["processes_for_customer"] == unclear
+    assert "processes_for_customer" in first["open_slots"]
+    # A later answer replaces the reason and the note, and an answer other than "not sure" removes
+    # them.
+    assert second["not_sure"]["processes_for_customer"] == {
+        "reason": "unknown",
+        "note": "",
+    }
+    assert "processes_for_customer" not in third["not_sure"]
+    assert "processes_for_customer" not in third["open_slots"]
+
+
+@pytest.mark.parametrize(
+    ("slot_id", "body", "code", "field"),
+    [
+        pytest.param(
+            "nothing", {"value": "yes"}, "invalid_slot", "slot", id="no such slot"
+        ),
+        pytest.param(
+            "profiling",
+            {"value": "yes"},
+            "invalid_slot",
+            "slot",
+            id="a slot that is not relevant",
+        ),
+        pytest.param(
+            "personal_data",
+            {"value": "maybe"},
+            "invalid_value",
+            "value",
+            id="value not allowed",
+        ),
+        pytest.param(
+            "personal_data",
+            {"value": "Yes"},
+            "invalid_value",
+            "value",
+            id="value in another case",
+        ),
+        pytest.param("personal_data", {}, "invalid_value", "value", id="value missing"),
+        pytest.param(
+            "personal_data",
+            {"value": "no", "not_sure": {"reason": "unknown"}},
+            "invalid_value",
+            "not_sure",
+            id="a reason with another value",
+        ),
+        pytest.param(
+            "personal_data",
+            {"value": "not_sure", "not_sure": {"reason": "vague"}},
+            "invalid_value",
+            "reason",
+            id="a reason that is not one of the two",
+        ),
+        pytest.param(
+            "personal_data",
+            {"value": "not_sure", "not_sure": {"note": "a" * 501}},
+            "invalid_value",
+            "note",
+            id="a note of 501 characters",
+        ),
+    ],
+)
+def test_put_answer_refuses_a_change_and_stores_nothing(
+    client: TestClient,
+    intakes: dict[str, Intake],
+    slot_id: str,
+    body: dict[str, Any],
+    code: str,
+    field: str,
+) -> None:
+    intake_id = end_intake(client)
+    client.post(f"/intakes/{intake_id}/confirm")
+    before = intakes[intake_id].model_copy(deep=True)
+
+    response = client.put(f"/intakes/{intake_id}/answers/{slot_id}", json=body)
+
+    assert response.status_code == 422
+    assert response.json() == {"error": {"code": code, "field": field}}
+    assert intakes[intake_id] == before
+
+
+def test_a_change_while_a_question_waits_is_refused_and_stores_nothing(
+    client: TestClient, intakes: dict[str, Intake]
+) -> None:
+    intake_id = post_intake(client)
+    before = intakes[intake_id].model_copy(deep=True)
+
+    response = client.put(
+        f"/intakes/{intake_id}/answers/personal_data", json={"value": "no"}
+    )
+
+    assert response.status_code == 409
+    assert response.json() == {"error": {"code": "not_ended"}}
+    assert intakes[intake_id] == before
+
+
+def test_a_change_or_a_confirmation_of_an_intake_that_is_not_stored_returns_not_found(
+    client: TestClient,
+) -> None:
+    put = client.put(
+        "/intakes/kq2V8yZx0bP4mT7nLw3sAg/answers/personal_data", json={"value": "no"}
+    )
+    post = client.post("/intakes/kq2V8yZx0bP4mT7nLw3sAg/confirm")
+
+    assert put.status_code == post.status_code == 404
+    assert put.json() == post.json() == {"error": {"code": "not_found"}}
+
+
+def test_the_confirmation_shows_the_result_of_the_confirmed_answers(
+    client: TestClient,
+) -> None:
+    intake_id = end_intake(client, values={"decides_purposes": "yes"})
+
+    response = client.post(f"/intakes/{intake_id}/confirm")
+
+    assert response.status_code == 200
+    assert response.json() == client.get(f"/intakes/{intake_id}").json()
+    intake = response.json()
+    assert intake["confirmed"] is True
+    statuses = {gate["gate"]: gate["status"] for gate in intake["result"]["gates"]}
+    assert statuses["controller"] == "applies"
+    assert statuses["processor"] == "does_not_apply"
+
+
+def test_a_second_confirmation_changes_nothing(
+    client: TestClient, intakes: dict[str, Intake]
+) -> None:
+    intake_id = end_intake(client)
+    first = client.post(f"/intakes/{intake_id}/confirm")
+    before = intakes[intake_id].model_copy(deep=True)
+
+    second = client.post(f"/intakes/{intake_id}/confirm")
+
+    assert first.status_code == second.status_code == 200
+    assert second.json() == first.json()
+    assert intakes[intake_id] == before
+
+
+def test_a_confirmation_while_a_question_waits_is_refused(
+    client: TestClient, intakes: dict[str, Intake]
+) -> None:
+    intake_id = post_intake(client)
+    before = intakes[intake_id].model_copy(deep=True)
+
+    response = client.post(f"/intakes/{intake_id}/confirm")
+
+    assert response.status_code == 409
+    assert response.json() == {"error": {"code": "not_ended"}}
+    assert intakes[intake_id] == before
+
+
+def test_a_change_after_the_confirmation_ends_it_and_the_next_confirmation_shows_the_result_of_the_changed_answers(
+    client: TestClient,
+) -> None:
+    intake_id = end_intake(client)
+    client.post(f"/intakes/{intake_id}/confirm")
+
+    changed = client.put(
+        f"/intakes/{intake_id}/answers/processes_for_customer", json={"value": "yes"}
+    ).json()
+
+    assert changed["confirmed"] is False
+    assert changed["result"] is None
+    intake = client.post(f"/intakes/{intake_id}/confirm").json()
+    statuses = {gate["gate"]: gate["status"] for gate in intake["result"]["gates"]}
+    assert statuses["processor"] == "applies"
+
+
+@pytest.mark.parametrize(
+    ("first", "again", "confirmed"),
+    [
+        pytest.param({"value": "no"}, {"value": "no"}, True, id="the same answer"),
+        pytest.param(
+            {"value": "not_sure", "not_sure": {"reason": "unknown", "note": "Ask."}},
+            {"value": "not_sure", "not_sure": {"reason": "unknown", "note": "Ask."}},
+            True,
+            id="the same reason and note",
+        ),
+        pytest.param(
+            {"value": "not_sure", "not_sure": {"reason": "unknown", "note": "Ask."}},
+            {"value": "not_sure", "not_sure": {"reason": "unknown", "note": "Asked."}},
+            False,
+            id="another note",
+        ),
+        pytest.param(
+            {"value": "not_sure", "not_sure": {"reason": "unknown"}},
+            {"value": "not_sure", "not_sure": {"reason": "unclear"}},
+            False,
+            id="another reason",
+        ),
+    ],
+)
+def test_a_request_that_alters_nothing_keeps_the_confirmation_and_another_reason_or_note_ends_it(
+    client: TestClient,
+    first: dict[str, Any],
+    again: dict[str, Any],
+    confirmed: bool,
+) -> None:
+    intake_id = end_intake(client)
+    path = f"/intakes/{intake_id}/answers/processes_for_customer"
+    client.put(path, json=first)
+    client.post(f"/intakes/{intake_id}/confirm")
+
+    intake = client.put(path, json=again).json()
+
+    assert intake["confirmed"] is confirmed
+    assert (intake["result"] is not None) is confirmed
+
+
+def test_a_not_sure_answer_on_the_screen_of_the_answers_has_a_log_line_with_its_reason_and_without_its_note(
+    client: TestClient, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level(logging.INFO)
+    intake_id = end_intake(client)
+
+    client.put(
+        f"/intakes/{intake_id}/answers/processes_for_customer",
+        json={
+            "value": "not_sure",
+            "not_sure": {"reason": "unclear", "note": "Platypus-2718"},
+        },
+    )
+
+    assert (
+        "not sure answer on the screen of the answers slot=processes_for_customer reason=unclear"
+        in caplog.text
+    )
+    assert "Platypus-2718" not in caplog.text

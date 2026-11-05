@@ -27,8 +27,19 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+// The address of the screen of the answers of the intake (INTAKE-5).
+const ANSWERS = "/intakes/kq2V8yZx0bP4mT7nLw3sAg/answers";
+
 function show(gates: Outcome[] = testResult.gates, texts: Texts = null) {
-  render(<IntakeResult result={{ ...testResult, gates }} notSure={notSure} schema={testSchema} texts={texts} />);
+  render(
+    <IntakeResult
+      result={{ ...testResult, gates }}
+      notSure={notSure}
+      schema={testSchema}
+      texts={texts}
+      answers={ANSWERS}
+    />,
+  );
 }
 
 // The part of the screen from a heading to the next heading of the same level or higher.
@@ -46,6 +57,27 @@ function under(name: string) {
 function text(parts: Element[]) {
   return parts.map((part) => (part as HTMLElement).textContent).join(" ");
 }
+
+// The text and the address of each link in the parts.
+function links(parts: Element[]) {
+  return parts
+    .flatMap((part) => within(part as HTMLElement).queryAllByRole("link"))
+    .map((link) => [link.textContent, link.getAttribute("href")]);
+}
+
+// The way back to the answers (issue #50): in place of the recorded answers, a link to the screen
+// of the answers under the summary, and a link to each open fact there.
+test("the result links to the screen of the answers below its heading and before the results, and shows no recorded answers", () => {
+  show();
+
+  const back = screen.getByRole("link", { name: "Check or change the answers" });
+  expect(back.getAttribute("href")).toBe(ANSWERS);
+  const heading = screen.getByRole("heading", { level: 1, name: "Result" });
+  const first = screen.getByRole("heading", { level: 2, name: "Camera Law" });
+  expect(heading.compareDocumentPosition(back) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(back.compareDocumentPosition(first) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(screen.queryByRole("heading", { name: "Recorded answers" })).toBeNull();
+});
 
 test("the result has its heading, the assumptions and the items not checked, each with its links", () => {
   show();
@@ -177,9 +209,11 @@ test("a conditional result names its open slot with the reason and the note, and
   expect(screen.getAllByRole("listitem").map((item) => item.textContent)).toContain(
     "If The public: does not apply.",
   );
+  // The open fact's label links to the fact on the screen of the answers.
+  expect(links(under("Audience rules apply"))).toContainEqual(["Audience", `${ANSWERS}#audience`]);
 });
 
-test("a slot of the gate above names that gate, and a relevant slot without an answer says that it was not asked", () => {
+test("a slot of the gate above names that gate, and a relevant slot without an answer says that it is not answered yet", () => {
   show();
 
   const parts = text(under("Storage role"));
@@ -187,10 +221,12 @@ test("a slot of the gate above names that gate, and a relevant slot without an a
     "This depends on the open answer about Audience, on which Audience rules apply depends: I don't know this about the product. Note: We sell to both.",
   );
   expect(parts).toContain("If Staff: depends on the other open answer.");
-  expect(parts).toContain(
-    "This depends on the open answer about Video storage: not asked before the intake ended.",
-  );
+  expect(parts).toContain("This depends on the open answer about Video storage: not answered yet.");
   expect(parts).toContain("If Yes: applies.");
+  expect(links(under("Storage role"))).toEqual([
+    ["Audience", `${ANSWERS}#audience`],
+    ["Video storage", `${ANSWERS}#stores_video`],
+  ]);
 });
 
 test("a slot of the gate that decides whether a regulation applies names the regulation", () => {
@@ -203,8 +239,9 @@ test("a slot of the gate that decides whether a regulation applies names the reg
   ]);
 
   expect(text(under("Storage role"))).toContain(
-    "This depends on the open answer about Camera, as for the Camera Law above: not asked before the intake ended.",
+    "This depends on the open answer about Camera, as for the Camera Law above: not answered yet.",
   );
+  expect(links(under("Storage role"))).toContainEqual(["Camera", `${ANSWERS}#uses_camera`]);
 });
 
 test.each([
@@ -306,8 +343,12 @@ test("each row shows its label, its status, the date from which it applies, what
   expect(screen.getAllByRole("columnheader").map((cell) => cell.textContent)).toEqual(["Obligation"]);
   expect(rowHeaders()).toEqual([
     "Delete old videoApplies. From 25 May 2018 (Rule 99(2)).Rule 5(1)Show the quoted textVideo is deleted after a month.",
-    "A notice at the doorConditional. Depends on the open answer about Video sharing. From 2 December 2027 (Rule 113). Needs Video sharing: not asked before the intake ended.Rule 6(1)Show the quoted textA notice is shown at each door.",
+    "A notice at the doorConditional. Depends on the open answer about Video sharing. From 2 December 2027 (Rule 113). Needs Video sharing: not answered yet.Rule 6(1)Show the quoted textA notice is shown at each door.",
   ]);
+  // The open fact that the row needs links to the fact on the screen of the answers.
+  expect(
+    within(screen.getAllByRole("rowheader")[1]).getByRole("link", { name: "Video sharing" }).getAttribute("href"),
+  ).toBe(`${ANSWERS}#shares_video`);
   expect(screen.getByRole("link", { name: "Rule 99(2)" }).getAttribute("href")).toBe(
     "https://eur-lex.europa.eu/rule#099.002",
   );
@@ -321,6 +362,8 @@ test("a row that needs the answer yes of a fact names that answer", () => {
   show(withRows([{ ...testRows[1], status: "applies", needs: { slot: "shares_video", value: "yes", gate: null, status: null } }]));
 
   expect(rowHeaders()[0]).toContain("Applies. From 2 December 2027 (Rule 113). Needs Video sharing: Yes.");
+  // A fact with an answer other than "not sure" is not open, so its label is no link.
+  expect(within(screen.getByRole("rowheader")).queryByRole("link", { name: "Video sharing" })).toBeNull();
 });
 
 test("a row that needs another result names it and its status", () => {

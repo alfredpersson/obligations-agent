@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Fragment, type MouseEvent, useEffect, useId, useRef, useState } from "react";
 import actions from "../../actions.module.css";
 import loading from "../../loading-status.module.css";
@@ -72,7 +73,14 @@ type Context = {
   labelOf: (slot: string) => string | undefined;
   valueOf: (slot: string, value: string) => string | undefined;
   onOpen: Open;
+  // The address of the screen of the answers, where an open fact has an anchor by its id.
+  answers: string;
 };
+
+// The label of an open fact, as a link to the fact on the screen of the answers (INTAKE-5).
+function Fact({ slot, ctx }: { slot: string; ctx: Context }) {
+  return <Link href={`${ctx.answers}#${slot}`}>{ctx.labelOf(slot)}</Link>;
+}
 
 // A status as a label in the color of the status.
 function Status({ status }: { status: keyof typeof STATUS }) {
@@ -120,13 +128,13 @@ function ResultHead({ outcome, ctx }: { outcome: Outcome; ctx: Context }) {
         return (
           <div key={condition.slot} className={styles.condition}>
             <p>
-              This depends on the open answer about {labelOf(condition.slot)}
+              This depends on the open answer about <Fact slot={condition.slot} ctx={ctx} />
               {condition.gate !== outcome.gate &&
                 (head ? `, as for the ${head.name} above` : `, on which ${above?.label} depends`)}
               :{" "}
               {entry
                 ? `${REASONS.find((reason) => reason.reason === entry.reason)?.label}.`
-                : "not asked before the intake ended."}
+                : "not answered yet."}
               {entry?.note && ` Note: ${entry.note}`}
             </p>
             <ul>
@@ -170,9 +178,12 @@ function Obligation({ row, outcome, ctx }: { row: Row; outcome: Outcome; ctx: Co
   const { result, labelOf, valueOf, onOpen } = ctx;
   const needs = row.needs;
   const gate = needs?.gate ? result.gates.find((item) => item.gate === needs.gate) : undefined;
+  // A fact that the row also needs is open while its answer is not "yes": with "no", the row does
+  // not show (MEMO-6).
+  const open = needs?.value !== "yes";
   const because = [
     outcome.status === "conditional" && "on the same as the result above",
-    needs?.slot && needs.value !== "yes" && `on the open answer about ${labelOf(needs.slot)}`,
+    needs?.slot && open && `on the open answer about ${labelOf(needs.slot)}`,
     gate?.status === "conditional" && `on what ${gate.label} depends on`,
   ].filter(Boolean);
   return (
@@ -183,8 +194,13 @@ function Obligation({ row, outcome, ctx }: { row: Row; outcome: Outcome; ctx: Co
         {because.length > 0 && ` Depends ${because.join(", and ")}.`} From {DAY.format(new Date(row.date))} (
         <Links links={[row.date_unit]} onOpen={onOpen} />
         ).
-        {needs?.slot &&
-          ` Needs ${labelOf(needs.slot)}: ${needs.value ? valueOf(needs.slot, needs.value) : "not asked before the intake ended"}.`}
+        {needs?.slot && (
+          <>
+            {" "}
+            Needs {open ? <Fact slot={needs.slot} ctx={ctx} /> : labelOf(needs.slot)}:{" "}
+            {needs.value ? valueOf(needs.slot, needs.value) : "not answered yet"}.
+          </>
+        )}
         {gate && ` Needs ${gate.label}: ${STATUS[gate.status]}`}
       </p>
       <Clause unit={row.unit} onOpen={onOpen} />
@@ -388,11 +404,13 @@ export default function IntakeResult({
   notSure,
   schema,
   texts,
+  answers,
 }: {
   result: Result;
   notSure: Record<string, NotSure>;
   schema: Schema;
   texts: Texts;
+  answers: string;
 }) {
   const slots = [...schema.slots, ...schema.follow_up_slots];
   const slotOf = (id: string) => slots.find((slot) => slot.id === id);
@@ -413,7 +431,15 @@ export default function IntakeResult({
     setOpening(unit);
   }
 
-  const ctx: Context = { result, notSure, texts, labelOf: (slot) => slotOf(slot)?.label, valueOf, onOpen: open };
+  const ctx: Context = {
+    result,
+    notSure,
+    texts,
+    labelOf: (slot) => slotOf(slot)?.label,
+    valueOf,
+    onOpen: open,
+    answers,
+  };
   const rows = result.gates.flatMap((outcome) => outcome.rows);
   const list = groups(result);
   return (
@@ -424,6 +450,12 @@ export default function IntakeResult({
           {summary(rows, result.gates.filter((outcome) => outcome.rows.length > 0).length)}
         </p>
       )}
+      {/* The way back to the answers, in place of the recorded answers (INTAKE-5). */}
+      <p className={actions.actions}>
+        <Link href={answers} className={`${actions.button} ${actions.secondary}`}>
+          Check or change the answers
+        </Link>
+      </p>
       <p className={styles.assumes}>
         This result assumes:{" "}
         {result.assumptions.map((item, index) => (

@@ -3,7 +3,7 @@
 
 type Value = { id: string; label: string };
 
-type Slot = { id: string; label: string; question: string; values: Value[] };
+export type Slot = { id: string; label: string; question: string; values: Value[] };
 
 type DescriptionField = { id: string; label: string; question: string; max_length: number };
 
@@ -31,9 +31,9 @@ export type Example = {
 // (RESP-5).
 export type Group = { line: string; entries: Example[] };
 
-export type Question = {
-  type: "question";
-  number: number;
+// A question about one fact: a follow-up question as the model or code wrote it, or the default
+// question of a fact (RESP-6).
+export type Asked = {
   slot: string;
   text: string;
   explanation: string;
@@ -42,6 +42,9 @@ export type Question = {
   examples: Group[];
   check: string;
 };
+
+// The follow-up question that waits for its answer, with its number.
+export type Question = Asked & { type: "question"; number: number };
 
 export type Step = Question | { type: "ready_to_confirm" };
 
@@ -107,8 +110,12 @@ export type Intake = {
   answers: Record<string, string>;
   open_slots: string[];
   not_sure: Record<string, NotSure>;
+  // The last question asked about each relevant fact, or its default question (INTAKE-5).
+  questions: Record<string, Asked>;
   step: Step;
-  // Null until the intake has ended.
+  // True from the user's confirmation until the next change of an answer.
+  confirmed: boolean;
+  // Null until the answers are confirmed.
   result: Result | null;
   texts: Texts;
 };

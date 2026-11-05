@@ -101,7 +101,7 @@
    the next step. On a narrow screen they are one column, without the heads. */
 .steps {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: var(--space-8);
   margin: 0;
   padding: 0;

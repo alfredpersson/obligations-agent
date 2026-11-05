@@ -1,41 +1,29 @@
 "use client";
 
-import { useParams } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { useEffect } from "react";
 import layout from "../../layout.module.css";
-import LoadingStatus from "../../loading-status";
-import type { Intake, Schema, Step, Texts } from "../../service";
+import LoadingStatus, { WRITING } from "../../loading-status";
+import type { Intake, Step, Texts } from "../../service";
 import FollowUpQuestion from "./follow-up-question";
 import IntakeResult from "./intake-result";
-import RecordedAnswers from "./recorded-answers";
+import { useIntake } from "./use-intake";
 
 // The message while the meaning and the action of each row are written.
 const WRITING_TEXTS = "Writing what each row means for your product, and an action. This takes a few seconds.";
 
-// The screen of one intake: the question that waits for its answer, in one column, or the result
-// and the recorded answers, at the page's width.
+// Once the questions have ended, the result shows only for confirmed answers, and an intake whose
+// answers are not confirmed goes to the screen of the answers (INTAKE-5).
+function redirect(intake: Intake, id: string) {
+  return intake.step.type !== "question" && !intake.confirmed ? `/intakes/${id}/answers` : null;
+}
+
+// The screen of one intake: the question that waits for its answer, in one column, or the result of
+// the confirmed answers, at the page's width.
 export default function IntakeScreen() {
   const { id } = useParams<{ id: string }>();
-  const [data, setData] = useState<{ intake: Intake; schema: Schema } | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
-  const [loading, setLoading] = useState("Loading the answers.");
-
-  const load = useCallback(() => {
-    Promise.all([fetch(`/api/intakes/${id}`), fetch("/api/schema")])
-      .then(async ([intakeResponse, schemaResponse]) => {
-        if (intakeResponse.status === 404) {
-          setMessage("This intake was not found.");
-          return;
-        }
-        if (!intakeResponse.ok || !schemaResponse.ok) throw new Error();
-        const intake = (await intakeResponse.json()) as Intake;
-        const schema = (await schemaResponse.json()) as Schema;
-        setData({ intake, schema });
-      })
-      .catch(() => setMessage("The answers could not be loaded. Reload the page to try again."));
-  }, [id]);
-
-  useEffect(load, [load]);
+  const router = useRouter();
+  const { data, setData, message } = useIntake(id, redirect);
 
   // Once the result shows with rows and no texts yet, the screen asks the service to write them. The
   // service writes them once and returns the stored texts to a repeated request, so an effect that
@@ -47,13 +35,17 @@ export default function IntakeScreen() {
     (data.intake.result?.gates.some((outcome) => outcome.rows.length > 0) ?? false);
   useEffect(() => {
     if (!pending) return;
+    // A response that ends after the page was hidden changes nothing: the page shown again sends its
+    // own request.
+    let current = true;
     fetch(`/api/intakes/${id}/texts`, { method: "POST" })
       .then(async (response) => {
         if (!response.ok) throw new Error();
         return ((await response.json()) as { texts: Texts }).texts;
       })
       .catch(() => "failed" as const)
-      .then((texts) =>
+      .then((texts) => {
+        if (!current) return;
         setData(
           (old) =>
             old && {
@@ -69,14 +61,17 @@ export default function IntakeScreen() {
                     : texts,
               },
             },
-        ),
-      );
-  }, [pending, id]);
+        );
+      });
+    return () => {
+      current = false;
+    };
+  }, [pending, id, setData]);
 
   // One status for the screen, first in each of its views, so that React keeps its element and
-  // screen readers announce the message after the last answer.
+  // screen readers announce a change of its message, such as the writing of the texts.
   const status = (
-    <LoadingStatus message={data === null && message === null ? loading : pending ? WRITING_TEXTS : null} />
+    <LoadingStatus message={data === null && message === null ? "Loading the answers." : pending ? WRITING_TEXTS : null} />
   );
 
   if (data === null) {
@@ -94,10 +89,8 @@ export default function IntakeScreen() {
     if (step.type === "question") {
       setData({ schema, intake: { ...intake, step } });
     } else {
-      // The recorded answers need the new answers, so the intake is loaded again.
-      setLoading("Loading the result.");
-      setData(null);
-      load();
+      // After the last answer, the user checks the answers on their own screen.
+      router.replace(`/intakes/${id}/answers`);
     }
   }
 
@@ -110,18 +103,30 @@ export default function IntakeScreen() {
         {status}
         <h1>{slot?.label}</h1>
         {/* A key for each question, so that no choice of the previous question stays selected. */}
-        <FollowUpQuestion key={step.number} id={id} question={step} onStep={show} />
+        <FollowUpQuestion
+          key={step.number}
+          question={step}
+          request={{ url: `/api/intakes/${id}/answers`, method: "POST", body: { question: step.number } }}
+          button="Next"
+          waiting={WRITING}
+          onSent={(sent: { step: Step }) => show(sent.step)}
+        />
       </div>
     );
   }
-  // The result first, then the recorded answers (GATE-4).
+  // The result of the confirmed answers, with the way back to the screen of the answers (GATE-4).
   return (
     <div className={layout.wide}>
       {status}
       {intake.result && (
-        <IntakeResult result={intake.result} notSure={intake.not_sure} schema={schema} texts={intake.texts} />
+        <IntakeResult
+          result={intake.result}
+          notSure={intake.not_sure}
+          schema={schema}
+          texts={intake.texts}
+          answers={`/intakes/${id}/answers`}
+        />
       )}
-      <RecordedAnswers intake={intake} schema={schema} />
     </div>
   );
 }

@@ -9,7 +9,9 @@ from pydantic import BaseModel, Field
 from obligations_agent.guidance import Quote, Source
 from obligations_agent.schema import NOT_SURE, Schema, Slot
 
-ErrorCode = Literal["invalid_slot", "invalid_value", "not_found", "not_ended"]
+ErrorCode = Literal[
+    "invalid_slot", "invalid_value", "not_found", "not_ended", "not_confirmed"
+]
 # Why the model may not ask about a slot (TOOL-1).
 Refusal = Literal["not_askable", "limit_reached"]
 
@@ -79,10 +81,11 @@ class Text(BaseModel):
 
 
 class Intake(Form):
-    """A stored intake. The answers hold one current value for each slot, the follow-up answers included, and not_sure the reason and the note of each slot whose current value is "not sure". questions holds each follow-up question, in the order asked, and replies the answer to each question that has one, in the same order. texts holds the meaning and the action of each row by its id, or None for a row whose texts could not be written, once they are written."""
+    """A stored intake. The answers hold one current value for each slot, the follow-up answers included, and not_sure the reason and the note of each slot whose current value is "not sure". questions holds each follow-up question, in the order asked, and replies the answer to each question that has one, in the same order. confirmed is true from the user's confirmation until the next change of an answer (INTAKE-5). texts holds the meaning and the action of each row by its id, or None for a row whose texts could not be written, once they are written for the confirmed answers."""
 
     questions: list[Question] = []
     replies: list[str] = []
+    confirmed: bool = False
     texts: dict[str, Text | None] | None = None
 
 
@@ -93,6 +96,13 @@ class Answer(BaseModel):
     """The body of POST /intakes/{id}/answers: the number of a question, the value of one of its options, and for "not sure" the reason and the note."""
 
     question: int
+    value: str
+    not_sure: NotSure | None = None
+
+
+class Change(BaseModel):
+    """The body of PUT /intakes/{id}/answers/{slot}: the value, and for "not sure" the reason and the note."""
+
     value: str
     not_sure: NotSure | None = None
 
@@ -178,19 +188,39 @@ def create_intake(
         if not text.strip() or len(text) > field.max_length:
             raise IntakeError("invalid_value", field.id)
     intake = Intake(
-        answers={slot_id: answers[slot_id] for slot_id in form_slots},
-        description={field_id: description[field_id] for field_id in fields},
-        not_sure={
-            slot_id: not_sure.get(slot_id, NotSure())
-            for slot_id in form_slots
-            if answers[slot_id] == NOT_SURE
-        },
+        answers={}, description={field_id: description[field_id] for field_id in fields}
     )
+    for slot_id in form_slots:
+        intake = apply_answer(
+            schema, intake, slot_id, answers[slot_id], not_sure.get(slot_id)
+        )
     for slot_id, entry in intake.not_sure.items():
         logger.info(
             "not sure answer on the form slot=%s reason=%s", slot_id, entry.reason
         )
     return ask_next(intake, write)
+
+
+def apply_answer(
+    schema: Schema, intake: Intake, slot_id: str, value: str, not_sure: NotSure | None
+) -> Intake:
+    """Sets the value of the slot with the reason and the note of a "not sure" answer, and removes the answers, the reasons and the notes of the slots that are no longer relevant (INTAKE-1, INTAKE-6)."""
+    answers = {**intake.answers, slot_id: value}
+    # A condition names only earlier slots, so one pass in schema order also follows a chain.
+    for slot in schema.follow_up_slots:
+        if not is_relevant(slot, answers):
+            answers.pop(slot.id, None)
+    # A later answer about a slot replaces its reason and its note, and a removed answer takes
+    # them along.
+    entries = {**intake.not_sure, slot_id: not_sure or NotSure()}
+    return intake.model_copy(
+        update={
+            "answers": answers,
+            "not_sure": {
+                slot: entries[slot] for slot in entries if answers.get(slot) == NOT_SURE
+            },
+        }
+    )
 
 
 def ask_next(intake: Intake, write: Writer) -> Intake:
@@ -226,32 +256,58 @@ def record_answer(
         raise IntakeError("invalid_value", "not_sure")
     if question <= len(intake.replies):
         return intake
-    answers = {**intake.answers, asked.slot: value}
-    # A condition names only earlier slots, so one pass in schema order also follows a chain.
-    for slot in schema.follow_up_slots:
-        if not is_relevant(slot, answers):
-            answers.pop(slot.id, None)
-    entry = not_sure or NotSure()
     if value == NOT_SURE:
         logger.info(
             "not sure answer to question %d slot=%s reason=%s",
             question,
             asked.slot,
-            entry.reason,
+            (not_sure or NotSure()).reason,
         )
-    # A later answer about a slot replaces its reason and its note, and a removed answer takes
-    # them along.
-    entries = {**intake.not_sure, asked.slot: entry}
-    update = {
-        "answers": answers,
-        "not_sure": {
-            slot_id: entries[slot_id]
-            for slot_id in entries
-            if answers.get(slot_id) == NOT_SURE
-        },
-        "replies": [*intake.replies, value],
+    intake = apply_answer(schema, intake, asked.slot, value, not_sure)
+    return ask_next(
+        intake.model_copy(update={"replies": [*intake.replies, value]}), write
+    )
+
+
+def change_answer(
+    schema: Schema, intake: Intake, slot_id: str, value: str, not_sure: NotSure | None
+) -> Intake:
+    """Records a change on the screen of the answers, or an answer to an open slot there, with no question and no model call (INTAKE-5). The slot must be relevant and the intake ended. A change of a value, a reason or a note ends the confirmation and removes the texts; a change that alters nothing keeps both."""
+    if waiting(intake) is not None:
+        raise IntakeError("not_ended")
+    slot = next(
+        (
+            slot
+            for slot in [*schema.slots, *schema.follow_up_slots]
+            if slot.id == slot_id
+        ),
+        None,
+    )
+    if slot is None or not is_relevant(slot, intake.answers):
+        raise IntakeError("invalid_slot", "slot")
+    if value not in [item.id for item in slot.values]:
+        raise IntakeError("invalid_value", "value")
+    if not_sure is not None and value != NOT_SURE:
+        raise IntakeError("invalid_value", "not_sure")
+    changed = apply_answer(schema, intake, slot_id, value, not_sure)
+    if (changed.answers, changed.not_sure) == (intake.answers, intake.not_sure):
+        return intake
+    if value == NOT_SURE:
+        logger.info(
+            "not sure answer on the screen of the answers slot=%s reason=%s",
+            slot_id,
+            (not_sure or NotSure()).reason,
+        )
+    return changed.model_copy(update={"confirmed": False, "texts": None})
+
+
+def last_questions(schema: Schema, intake: Intake) -> dict[str, Question]:
+    """The last question asked about each relevant slot, or its default question when none was asked, by slot id in schema order (INTAKE-5)."""
+    return {
+        slot.id: (asked_before(intake, slot) or [default_question(slot)])[-1]
+        for slot in [*schema.slots, *schema.follow_up_slots]
+        if is_relevant(slot, intake.answers)
     }
-    return ask_next(intake.model_copy(update=update), write)
 
 
 def open_slots(schema: Schema, intake: Intake) -> list[str]:
