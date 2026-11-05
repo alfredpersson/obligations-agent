@@ -521,6 +521,42 @@ def test_a_second_confirmation_and_a_request_that_alters_nothing_keep_the_texts_
     assert len(requests) == calls
 
 
+# From the review of pull request #55: the texts depend on the reasons and the notes too.
+@pytest.mark.parametrize(
+    "changed",
+    [
+        pytest.param(
+            {"reason": "unknown", "note": "Asked the client."}, id="another note"
+        ),
+        pytest.param(
+            {"reason": "unclear", "note": "Depends on the contract."},
+            id="another reason",
+        ),
+    ],
+)
+def test_another_reason_or_note_removes_the_texts_until_the_next_confirmation(
+    changed: dict[str, str],
+) -> None:
+    requests: list[httpx2.Request] = []
+    intake = ended(
+        {**ALL_YES, "processes_for_customer": "not_sure"},
+        {"processes_for_customer": NotSure.model_validate(NOTE)},
+    )
+    client = service(recording(requests), intake)
+    client.post("/intakes/one/texts")
+
+    response = client.put(
+        "/intakes/one/answers/processes_for_customer",
+        json={"value": "not_sure", "not_sure": changed},
+    )
+
+    assert response.json()["confirmed"] is False
+    assert response.json()["texts"] is None
+    assert client.post("/intakes/one/texts").json() == {
+        "error": {"code": "not_confirmed"}
+    }
+
+
 def test_a_note_written_on_the_screen_of_the_answers_reaches_the_writer_only_in_the_user_message(
     caplog: pytest.LogCaptureFixture,
 ) -> None:

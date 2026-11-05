@@ -35,7 +35,7 @@ export default function AnswersScreen() {
   const shown = data !== null;
   useEffect(() => {
     if (!shown || change !== null || location.hash.length < 2) return;
-    screen.current?.querySelector(`#${CSS.escape(decodeURIComponent(location.hash.slice(1)))}`)?.scrollIntoView();
+    screen.current?.querySelector(`#${CSS.escape(location.hash.slice(1))}`)?.scrollIntoView();
   }, [shown, change]);
 
   const status = <LoadingStatus message={data === null && message === null ? "Loading the answers." : null} />;

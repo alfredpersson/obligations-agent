@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { Activity } from "react";
 import { afterEach, expect, test, vi } from "vitest";
 import type { Intake, Question, Texts } from "../../service";
@@ -302,4 +302,57 @@ test("a page that is hidden and shown again loads the intake again, and shows no
   intake.resolve(Response.json(endedWith(later)));
   expect(await screen.findByText("Order the sign.")).toBeTruthy();
   expect(screen.queryByText("Draft the notice.")).toBeNull();
+});
+
+// From the review of pull request #55: a request for the texts that ends after its page was hidden.
+test("the texts of a request that ends after its page was hidden do not show on the page shown again", async () => {
+  const first = Promise.withResolvers<Response>();
+  vi.stubGlobal(
+    "fetch",
+    vi.fn<typeof fetch>(async (input) => {
+      if (String(input) === TEXTS_URL) return first.promise;
+      return String(input) === INTAKE_URL ? Response.json(endedWith({})) : Response.json(testSchema);
+    }),
+  );
+  const { rerender } = render(
+    <Activity mode="visible">
+      <IntakeScreen />
+    </Activity>,
+  );
+  expect(await screen.findAllByText(PLACEHOLDER)).toHaveLength(2);
+  rerender(
+    <Activity mode="hidden">
+      <IntakeScreen />
+    </Activity>,
+  );
+  // The answers changed and were confirmed again: the page shown again sends its own request.
+  const second = Promise.withResolvers<Response>();
+  vi.stubGlobal(
+    "fetch",
+    vi.fn<typeof fetch>(async (input) => {
+      if (String(input) === TEXTS_URL) return second.promise;
+      return String(input) === INTAKE_URL ? Response.json(endedWith({})) : Response.json(testSchema);
+    }),
+  );
+  rerender(
+    <Activity mode="visible">
+      <IntakeScreen />
+    </Activity>,
+  );
+  expect(await screen.findAllByText(PLACEHOLDER)).toHaveLength(2);
+
+  // The first request ends now, with the texts of the earlier answers.
+  await act(async () => {
+    first.resolve(Response.json({ texts: TEXTS }));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  });
+
+  expect(screen.queryByText("Draft the notice.")).toBeNull();
+  expect(screen.getAllByText(PLACEHOLDER)).toHaveLength(2);
+  const later: Texts = {
+    "storage:rule:art5(1)": { meaning: "You must delete video after a week.", action: "Shorten the retention." },
+    "storage:rule:art6(1)": { meaning: "If you share video, show a sign.", action: "Order the sign." },
+  };
+  second.resolve(Response.json({ texts: later }));
+  expect(await screen.findByText("Order the sign.")).toBeTruthy();
 });

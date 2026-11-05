@@ -35,13 +35,17 @@ export default function IntakeScreen() {
     (data.intake.result?.gates.some((outcome) => outcome.rows.length > 0) ?? false);
   useEffect(() => {
     if (!pending) return;
+    // A response that ends after the page was hidden changes nothing: the page shown again sends its
+    // own request.
+    let current = true;
     fetch(`/api/intakes/${id}/texts`, { method: "POST" })
       .then(async (response) => {
         if (!response.ok) throw new Error();
         return ((await response.json()) as { texts: Texts }).texts;
       })
       .catch(() => "failed" as const)
-      .then((texts) =>
+      .then((texts) => {
+        if (!current) return;
         setData(
           (old) =>
             old && {
@@ -57,8 +61,11 @@ export default function IntakeScreen() {
                     : texts,
               },
             },
-        ),
-      );
+        );
+      });
+    return () => {
+      current = false;
+    };
   }, [pending, id, setData]);
 
   // One status for the screen, first in each of its views, so that React keeps its element and

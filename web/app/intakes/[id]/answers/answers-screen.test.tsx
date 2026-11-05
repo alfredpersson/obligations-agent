@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { Activity } from "react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { Asked, Intake } from "../../../service";
@@ -244,7 +244,7 @@ test("Save the answer sends the change, and the list shows the intake of the res
   rerender(<AnswersScreen />);
   await screen.findByRole("heading", { level: 1, name: "Check your answers" });
   expect(facts("Your answers")).toContainEqual(["Video storage", "No", "Change"]);
-  expect(scrolled.map((element) => element.id)).toEqual(["stores_video"]);
+  await waitFor(() => expect(scrolled.map((element) => element.id)).toEqual(["stores_video"]));
 });
 
 test("a not sure answer is sent only with a reason, and with its note when one is written", async () => {
@@ -343,7 +343,7 @@ test("the screen scrolls to the fact in the address once the answers show", asyn
   render(<AnswersScreen />);
 
   await screen.findByRole("heading", { level: 1, name: "Check your answers" });
-  expect(scrolled.map((element) => element.id)).toEqual(["shares_video"]);
+  await waitFor(() => expect(scrolled.map((element) => element.id)).toEqual(["shares_video"]));
 });
 
 // Next.js keeps a visited page and shows it again with Activity, for example on Back from the
@@ -378,4 +378,89 @@ test("a page that is hidden and shown again loads the answers again, and does no
   later.resolve(Response.json(changed));
   await screen.findByRole("heading", { level: 1, name: "Check your answers" });
   expect(facts("Your answers")).toContainEqual(["Video storage", "No", "Change"]);
+});
+
+// From the review of pull request #55: an anchor that cannot be decoded, and loads that end after
+// their page was hidden.
+test("an address with an anchor that is no slot id shows the list and scrolls nowhere", async () => {
+  history.replaceState(null, "", `${SCREEN}#%`);
+  stubIntake();
+  render(<AnswersScreen />);
+
+  await screen.findByRole("heading", { level: 1, name: "Check your answers" });
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  });
+  expect(screen.getByRole("heading", { level: 1, name: "Check your answers" })).toBeTruthy();
+  expect(scrolled).toEqual([]);
+});
+
+// The loads of the intake, one after another: each waits until the test lets it end.
+function heldLoads() {
+  const loads: PromiseWithResolvers<Response>[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn<typeof fetch>(async (input) => {
+      if (input !== INTAKE_URL) return Response.json(testSchema);
+      const load = Promise.withResolvers<Response>();
+      loads.push(load);
+      return load.promise;
+    }),
+  );
+  return loads;
+}
+
+// Shows the screen, hides it while its first load waits, and shows it again, which starts a second
+// load.
+function hiddenWhileLoading() {
+  const { rerender } = render(
+    <Activity mode="visible">
+      <AnswersScreen />
+    </Activity>,
+  );
+  rerender(
+    <Activity mode="hidden">
+      <AnswersScreen />
+    </Activity>,
+  );
+  rerender(
+    <Activity mode="visible">
+      <AnswersScreen />
+    </Activity>,
+  );
+}
+
+async function end(load: PromiseWithResolvers<Response>, response: Response) {
+  await act(async () => {
+    load.resolve(response);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  });
+}
+
+test("a load that ends after its page was hidden does not show its answers on the page shown again", async () => {
+  const loads = heldLoads();
+  hiddenWhileLoading();
+  await waitFor(() => expect(loads).toHaveLength(2));
+
+  await end(loads[0], Response.json(intake));
+
+  expect(screen.queryByRole("heading", { name: "Check your answers" })).toBeNull();
+  expect(screen.getByRole("status").textContent).toBe("Loading the answers.");
+  await end(loads[1], Response.json(changed));
+  await screen.findByRole("heading", { level: 1, name: "Check your answers" });
+  expect(facts("Your answers")).toContainEqual(["Video storage", "No", "Change"]);
+});
+
+test("a load that ends after its page was hidden does not move the screen", async () => {
+  const loads = heldLoads();
+  hiddenWhileLoading();
+  await waitFor(() => expect(loads).toHaveLength(2));
+
+  // The first load found a question waiting, the second the intake as it is now.
+  await end(loads[0], Response.json({ ...intake, step: { type: "question", number: 2, ...STORAGE } }));
+
+  expect(router.replace).not.toHaveBeenCalled();
+  await end(loads[1], Response.json(intake));
+  await screen.findByRole("heading", { level: 1, name: "Check your answers" });
+  expect(router.replace).not.toHaveBeenCalled();
 });
