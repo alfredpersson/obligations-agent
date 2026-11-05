@@ -1,7 +1,11 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
+import { EXAMPLE } from "../app/example";
 
 // The whole flow at the width of a phone, so that every control is used at that width.
 test.use({ viewport: { width: 390, height: 844 } });
+
+// The heading of the start page.
+const START = "Which parts of the AI Act and the GDPR apply to your AI product?";
 
 // The start of each description question in schema.yaml, and the text to fill in.
 const DESCRIPTION = [
@@ -35,14 +39,15 @@ const FORM_NOTE =
   "We have not decided whose brand goes on the product. See brand_decision_for_the_support_assistant_in_the_online_store.";
 const FOLLOW_UP_NOTE = "Does a chat window on the shop's website count?";
 
-// Every screen has the header with the product name, which links to the start page, and its heading
-// in the main content, and nothing on it scrolls sideways.
+// Every screen has the header with the product name, which links to the start page, its heading in
+// the main content, and the footer with the line on legal advice, and nothing on it scrolls
+// sideways.
 async function expectScreen(page: Page, heading: string) {
-  await expect(page.getByRole("banner").getByRole("link", { name: "obligations-agent" })).toHaveAttribute(
-    "href",
-    "/",
-  );
+  await expect(page.getByRole("banner").getByRole("link", { name: "Dutymap" })).toHaveAttribute("href", "/");
   await expect(page.getByRole("main").getByRole("heading", { level: 1, name: heading })).toBeVisible();
+  await expect(page.getByRole("contentinfo")).toContainText(
+    "The result maps your answers to articles of the AI Act and the GDPR. It is not legal advice.",
+  );
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth),
   ).toBe(0);
@@ -68,11 +73,15 @@ test("a filled-in form and the answered follow-up questions lead to the result, 
   page,
 }) => {
   await page.goto("/");
-  await expect(page.getByRole("textbox", { name: DESCRIPTION[0][0] })).toBeVisible();
-  await expectScreen(page, "obligations-agent");
+  await expectScreen(page, START);
   // The first stop of the keyboard is the product name in the header.
   await page.keyboard.press("Tab");
-  await expectOutline(page.getByRole("banner").getByRole("link", { name: "obligations-agent" }));
+  await expectOutline(page.getByRole("banner").getByRole("link", { name: "Dutymap" }));
+  // The start page holds each choice twice, at the top and at the end.
+  await page.getByRole("link", { name: "Start with your own product" }).first().click();
+  await expect(page).toHaveURL(/\/new$/);
+  await expect(page.getByRole("textbox", { name: DESCRIPTION[0][0] })).toBeVisible();
+  await expectScreen(page, "Describe your product");
   await page
     .getByRole("group", { name: "Does the product process personal data?" })
     .getByRole("radio", { name: "Yes" })
@@ -171,4 +180,45 @@ test("a filled-in form and the answered follow-up questions lead to the result, 
     ],
     { useInnerText: true },
   );
+
+  // The next intake starts on an empty form, although Next.js keeps the form's page with its state.
+  await page.getByRole("banner").getByRole("link", { name: "Dutymap" }).click();
+  await expectScreen(page, START);
+  await page.getByRole("link", { name: "Start with your own product" }).first().click();
+  await expectScreen(page, "Describe your product");
+  for (const [question] of DESCRIPTION) {
+    await expect(page.getByRole("textbox", { name: question })).toHaveValue("");
+  }
+  await expect(page.getByRole("radio", { checked: true })).toHaveCount(0);
+});
+
+// Only this test opens the form with the example on the schema of the service, so it shows that the
+// example's ids are the ids of schema.yaml.
+test("the example product opens the form with its three texts and its three answers", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("link", { name: "Use the example product" }).first().click();
+  await expect(page).toHaveURL(/\/example$/);
+  await expectScreen(page, "Example product");
+  const texts = [
+    [DESCRIPTION[0][0], EXAMPLE.description.what_it_does],
+    [DESCRIPTION[1][0], EXAMPLE.description.who_uses_it],
+    [DESCRIPTION[2][0], EXAMPLE.description.data_it_handles],
+  ];
+  for (const [question, text] of texts) {
+    await expect(page.getByRole("textbox", { name: question })).toHaveValue(text);
+  }
+  // The question of each form fact in schema.yaml, and the label of the example's answer.
+  const answers = [
+    ["Does the product process personal data?", "Yes"],
+    ["Do you place the product on the market or put it into service under your own name or trademark?", "Yes"],
+    [
+      "Which of these areas is the product intended to be used in?",
+      "Employment, workers' management and access to self-employment",
+    ],
+  ];
+  for (const [question, label] of answers) {
+    await expect(
+      page.getByRole("group", { name: question }).getByRole("radio", { checked: true }),
+    ).toHaveAccessibleName(label);
+  }
 });

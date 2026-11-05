@@ -24,17 +24,19 @@
   --color-error: #b42318;
   --color-disabled: #e6dfd6;
   --color-disabled-text: #574f47;
-  /* The result of a gate: its status label, and the square before its title. The words of the
-     label carry the meaning, and the color only repeats it. */
-  --color-applies: #e6f4ea;
-  --color-applies-text: #14532d;
-  --color-applies-mark: #16a34a;
-  --color-does-not-apply: #eef0f2;
-  --color-does-not-apply-text: #3d4650;
-  --color-does-not-apply-mark: #9ca3af;
-  --color-conditional: #fff4d6;
-  --color-conditional-text: #713f00;
-  --color-conditional-mark: #d97706;
+  /* The result of a gate: its status label, and the square before its title. The colors follow the
+     AI Act's risk levels as the user meets them: orange where obligations apply, yellow where the
+     result depends on an answer, green where nothing applies; red stays free for a prohibited
+     practice. The words of the label carry the meaning, and the color only repeats it. */
+  --color-applies: #ffedd5;
+  --color-applies-text: #9a3412;
+  --color-applies-mark: #ea580c;
+  --color-does-not-apply: #e6f4ea;
+  --color-does-not-apply-text: #14532d;
+  --color-does-not-apply-mark: #16a34a;
+  --color-conditional: #fef9c3;
+  --color-conditional-text: #713f12;
+  --color-conditional-mark: #ca8a04;
   /* The page behind a dialog. */
   --color-backdrop: rgb(26 23 20 / 0.45);
 
@@ -59,6 +61,8 @@
   --space-8: 2rem;
   --gutter: 1.5rem;
   --column: 42.5rem;
+  /* The width of the header, the footer and the start page. */
+  --page: 72rem;
   /* The space inside a card: a group of options, or a group of examples. */
   --card-padding: var(--space-4) var(--space-6);
 
@@ -206,10 +210,12 @@ label:has(> textarea) {
   font-weight: 600;
 }
 
+/* A text field grows with its text, so that a filled-in text shows whole. */
 textarea {
   display: block;
   width: 100%;
   min-height: 6rem;
+  field-sizing: content;
   margin: var(--space-2) 0 var(--space-6);
   padding: var(--space-2) var(--space-3);
   font: inherit;
