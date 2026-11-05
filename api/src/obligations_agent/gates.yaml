@@ -360,6 +360,19 @@ units:
       (k) systems and procedures for record-keeping of all relevant documentation and information;
       (l) resource management, including security-of-supply related measures;
       (m) an accountability framework setting out the responsibilities of the management and other staff with regard to all the aspects listed in this paragraph.
+  - id: "aia:art43(1)"
+    citation: AI Act Article 43(1), first and second subparagraphs
+    document: "32024R1689"
+    anchor: "043.001"
+    quote: |-
+      For high-risk AI systems listed in point 1 of Annex III, where, in demonstrating the compliance of a high-risk AI system with the requirements set out in Section 2, the provider has applied harmonised standards referred to in Article 40, or, where applicable, common specifications referred to in Article 41, the provider shall opt for one of the following conformity assessment procedures based on:
+      (a) the internal control referred to in Annex VI; or
+      (b) the assessment of the quality management system and the assessment of the technical documentation, with the involvement of a notified body, referred to in Annex VII.
+      In demonstrating the compliance of a high-risk AI system with the requirements set out in Section 2, the provider shall follow the conformity assessment procedure set out in Annex VII where:
+      (a) harmonised standards referred to in Article 40 do not exist, and common specifications referred to in Article 41 are not available;
+      (b) the provider has not applied, or has applied only part of, the harmonised standard;
+      (c) the common specifications referred to in point (a) exist, but the provider has not applied them;
+      (d) one or more of the harmonised standards referred to in point (a) has been published with a restriction, and only on the part of the standard that was restricted.
   - id: "aia:art43(2)"
     citation: AI Act Article 43(2)
     document: "32024R1689"
@@ -372,6 +385,12 @@ units:
     anchor: "049.001"
     quote: |-
       Before placing on the market or putting into service a high-risk AI system listed in Annex III, with the exception of high-risk AI systems referred to in point 2 of Annex III, the provider or, where applicable, the authorised representative shall register themselves and their system in the EU database referred to in Article 71.
+  - id: "aia:art49(5)"
+    citation: AI Act Article 49(5)
+    document: "32024R1689"
+    anchor: "049.005"
+    quote: |-
+      High-risk AI systems referred to in point 2 of Annex III shall be registered at national level.
   - id: "aia:art72(1)"
     citation: AI Act Article 72(1)
     document: "32024R1689"
@@ -502,8 +521,9 @@ not_checked:
 # from 2 December 2027 for a system under Annex III (point (c)); the rows of Articles 43, 49, 72 and
 # 73 show the same date, since Article 6, in Section 1, classifies no system under Annex III as
 # high-risk before it. Article 111(2), as replaced, covers a system placed on the market or put into
-# service before that date only if its design changes significantly from that date: a condition that
-# the user decides, quoted with the rows of that date.
+# service before that date only if its design changes significantly from that date, and one intended
+# to be used by public authorities by 2 August 2030 in any case: a condition that the user decides,
+# quoted with the rows of that date.
 dates:
   - { id: gdpr, date: "2018-05-25", unit: "gdpr:art99(2)" }
   - { id: chapter_i, date: "2025-02-02", unit: "aia:art113" }
@@ -511,9 +531,11 @@ dates:
   - { id: annex_iii, date: "2027-12-02", unit: "aia:art113", condition: "aia:art111(2)" }
 
 # The rows of the obligations of each result (MEMO-5, MEMO-6), in the order shown. A row needs, besides
-# its result, the result of another gate or the answer "yes" of a slot. A row marked drafting needs
-# legal drafting, such as a contract, a notice or a policy, and its action says so ("What it is" in
-# docs/brief.md).
+# its result, the result of another gate or the answer "yes" of a slot. A row with values holds only
+# for those answers of its gate's slot: the conformity assessment and the registration depend on the
+# point of Annex III, Article 43(1) for point 1 and 43(2) for points 2 to 8, Article 49(1) for every
+# point but point 2 and 49(5) for point 2. A row marked drafting needs legal drafting, such as a
+# contract, a notice or a policy, and its action says so ("What it is" in docs/brief.md).
 obligations:
   - { gate: controller, unit: "gdpr:art6(1)", label: "A legal basis for each purpose", date: gdpr }
   - { gate: controller, unit: "gdpr:art12(2)", label: "Support for the rights of the people whose data it is", date: gdpr }
@@ -540,7 +562,9 @@ obligations:
   - { gate: high_risk_annex_iii, unit: "aia:art14(1)", label: "Human oversight", date: annex_iii, needs: { gate: provider } }
   - { gate: high_risk_annex_iii, unit: "aia:art15(1)", label: "Accuracy, robustness and cybersecurity", date: annex_iii, needs: { gate: provider } }
   - { gate: high_risk_annex_iii, unit: "aia:art17(1)", label: "A quality management system", date: annex_iii, needs: { gate: provider }, drafting: true }
-  - { gate: high_risk_annex_iii, unit: "aia:art43(2)", label: "Conformity assessment", date: annex_iii, needs: { gate: provider } }
-  - { gate: high_risk_annex_iii, unit: "aia:art49(1)", label: "Registration in the EU database", date: annex_iii, needs: { gate: provider } }
+  - { gate: high_risk_annex_iii, unit: "aia:art43(1)", label: "Conformity assessment for biometrics", date: annex_iii, needs: { gate: provider }, values: [biometrics] }
+  - { gate: high_risk_annex_iii, unit: "aia:art43(2)", label: "Conformity assessment", date: annex_iii, needs: { gate: provider }, values: [critical_infrastructure, education, employment, essential_services, law_enforcement, migration, justice] }
+  - { gate: high_risk_annex_iii, unit: "aia:art49(1)", label: "Registration in the EU database", date: annex_iii, needs: { gate: provider }, values: [biometrics, education, employment, essential_services, law_enforcement, migration, justice] }
+  - { gate: high_risk_annex_iii, unit: "aia:art49(5)", label: "Registration at national level", date: annex_iii, needs: { gate: provider }, values: [critical_infrastructure] }
   - { gate: high_risk_annex_iii, unit: "aia:art72(1)", label: "Post-market monitoring", date: annex_iii, needs: { gate: provider } }
   - { gate: high_risk_annex_iii, unit: "aia:art73(1)", label: "Reports of serious incidents", date: annex_iii, needs: { gate: provider } }

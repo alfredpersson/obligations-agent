@@ -584,6 +584,9 @@ STATEMENT = {
     "text": "The product is offered or used in the EU.",
     "links": ["gdpr:art3"],
 }
+# A second gate of the same regulation, for a row under a gate that does not decide whether its
+# regulation applies.
+ROLE = {**GATE, "id": "controller", "label": "Controller", "slot": "decides_purposes"}
 # A regulation without a gate, so that a file without the gate gdpr_applies is valid too.
 REGULATION = {"id": "gdpr", "name": "GDPR"}
 START = {"id": "gdpr", "date": "2018-05-25", "unit": "gdpr:art3"}
@@ -1085,6 +1088,43 @@ def test_a_row_that_needs_a_conditional_result_is_conditional_under_a_result_tha
     assert row.needs == Need(gate="provider", status="conditional")
 
 
+# The conformity assessment and the registration depend on the point of Annex III, which the answer
+# about the area gives. AI Act Article 43(1) is for point 1, Article 43(2) for points 2 to 8, Article
+# 49(1) for every point but point 2, and Article 49(5) for point 2, in the words of each quote.
+AREA_WORDS = {
+    "aia:art43(1)": "For high-risk AI systems listed in point 1 of Annex III",
+    "aia:art43(2)": "For high-risk AI systems referred to in points 2 to 8 of Annex III",
+    "aia:art49(1)": "with the exception of high-risk AI systems referred to in point 2 of Annex III",
+    "aia:art49(5)": "High-risk AI systems referred to in point 2 of Annex III shall be registered at national level.",
+}
+
+
+@pytest.mark.parametrize(
+    ("area", "units"),
+    [
+        ("biometrics", ["aia:art43(1)", "aia:art49(1)"]),
+        ("critical_infrastructure", ["aia:art43(2)", "aia:art49(5)"]),
+        ("employment", ["aia:art43(2)", "aia:art49(1)"]),
+        # While the area is open, each row of a point that it may be.
+        ("not_sure", list(AREA_WORDS)),
+    ],
+    ids=["point_1", "point_2", "point_4", "open"],
+)
+def test_the_conformity_assessment_and_the_registration_follow_the_point_of_annex_iii(
+    area: str, units: list[str]
+) -> None:
+    not_sure = {"use_case_area": NotSure()} if area == "not_sure" else {}
+    result = result_of({**ALL_YES, "use_case_area": area}, not_sure)
+
+    shown = rows_of(result)["high_risk_annex_iii"]
+    assert [unit for unit in shown if unit in AREA_WORDS] == units
+    for unit in units:
+        row = row_of(result, "high_risk_annex_iii", unit)
+        assert row is not None and row.unit.quote is not None
+        assert normalized(AREA_WORDS[unit]) in normalized(row.unit.quote)
+        assert row.date == date_of("high_risk_annex_iii", unit)
+
+
 # The dates (MEMO-5): the sentence that sets each one, in a stored copy. GDPR Article 99(2); AI Act
 # Article 113, second paragraph; and Article 113, third paragraph, points (a) and (c)(i), as replaced
 # by Regulation (EU) 2026/1744, Article 1, point (40).
@@ -1272,15 +1312,16 @@ def test_the_result_groups_its_results_under_the_regulation_of_the_unit_that_def
 def test_a_valid_file_with_a_row_is_read() -> None:
     gates = parse_gates(
         gates_text(
+            [GATE, ROLE],
             regulations=[{**REGULATION, "gate": "gdpr_applies"}],
-            obligations=[OBLIGATION],
+            obligations=[{**OBLIGATION, "gate": "controller", "values": ["yes"]}],
         ),
         SCHEMA,
     )
 
-    assert [(row.gate, row.unit, row.date) for row in gates.obligations] == [
-        ("gdpr_applies", "gdpr:art2(1)", "gdpr")
-    ]
+    assert [
+        (row.gate, row.unit, row.date, row.values) for row in gates.obligations
+    ] == [("controller", "gdpr:art2(1)", "gdpr", ["yes"])]
     assert [(item.id, item.gate) for item in gates.regulations] == [
         ("gdpr", "gdpr_applies")
     ]
@@ -1300,6 +1341,9 @@ def test_a_valid_file_with_a_row_is_read() -> None:
         ({**OBLIGATION, "needs": {}}, "needs"),
         ({**OBLIGATION, "needs": {"gate": "not_a_gate"}}, "needs"),
         ({**OBLIGATION, "needs": {"slot": "not_a_slot"}}, "needs"),
+        # A row needs the answer "yes" of a slot, which the area does not have.
+        ({**OBLIGATION, "needs": {"slot": "use_case_area"}}, "needs"),
+        ({**OBLIGATION, "values": ["not_a_value"]}, "values"),
     ],
     ids=[
         "unknown_gate",
@@ -1310,6 +1354,8 @@ def test_a_valid_file_with_a_row_is_read() -> None:
         "needs_neither",
         "needs_unknown_gate",
         "needs_unknown_slot",
+        "needs_slot_without_yes",
+        "unknown_value",
     ],
 )
 def test_a_row_that_names_what_the_file_does_not_have_is_refused_with_the_row(
@@ -1317,6 +1363,29 @@ def test_a_row_that_names_what_the_file_does_not_have_is_refused_with_the_row(
 ) -> None:
     with pytest.raises(GatesError, match=rf"(?s)\bobligation\b.*{name}"):
         parse_gates(gates_text(obligations=[obligation]), SCHEMA)
+
+
+# Two rows with the same gate and unit would have the same id, and one would lose its texts.
+def test_a_row_in_the_file_twice_is_refused_with_the_row() -> None:
+    with pytest.raises(
+        GatesError, match=r"\bobligation gdpr_applies gdpr:art2\(1\).*\btwice\b"
+    ):
+        parse_gates(gates_text(obligations=[OBLIGATION, OBLIGATION]), SCHEMA)
+
+
+# The result shows the gate that decides whether a regulation applies as the regulation's head, with
+# no rows under it, so a row there would never show.
+def test_a_row_under_the_gate_of_a_regulation_is_refused_with_the_row() -> None:
+    with pytest.raises(
+        GatesError, match=r"\bobligation gdpr_applies\b.*\bregulation gdpr\b"
+    ):
+        parse_gates(
+            gates_text(
+                regulations=[{**REGULATION, "gate": "gdpr_applies"}],
+                obligations=[OBLIGATION],
+            ),
+            SCHEMA,
+        )
 
 
 @pytest.mark.parametrize(

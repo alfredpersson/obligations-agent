@@ -238,8 +238,9 @@ function ResultPart({ outcome, ctx }: { outcome: Outcome; ctx: Context }) {
         <div className={styles.condition}>
           <p>
             The rows below apply from {DAY.format(new Date(dated.date))}. For a system placed on the market or put
-            into service before that date, they apply only if its design changes significantly from that date. You
-            decide this.
+            into service before that date, they apply only if its design changes significantly from that date. A
+            system intended to be used by public authorities must meet them by 2 August 2030 in any case. You decide
+            this.
           </p>
           <Clause unit={dated.condition} onOpen={ctx.onOpen} />
         </div>

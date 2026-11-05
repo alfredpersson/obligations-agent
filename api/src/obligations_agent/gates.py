@@ -85,7 +85,7 @@ class Needs(BaseModel):
 
 
 class Obligation(BaseModel):
-    """A row of a result: its unit, its label, the id of its date, what else it needs, and whether its obligation needs legal drafting (MEMO-5)."""
+    """A row of a result: its unit, its label, the id of its date, what else it needs, the answers of its gate's slot for which it holds, if not all, and whether its obligation needs legal drafting (MEMO-5)."""
 
     model_config = TEXT_REQUIRED
 
@@ -94,6 +94,7 @@ class Obligation(BaseModel):
     label: str
     date: str
     needs: Needs | None = None
+    values: list[str] | None = None
     drafting: bool = False
 
 
@@ -276,10 +277,26 @@ def parse_gates(text: str, schema: Schema) -> Gates:
                 f"date {start.id}: the unit {start.condition} has no quote"
             )
     dates = [start.id for start in gates.dates]
+    slot_of = {gate.id: gate.slot for gate in gates.gates}
+    # The result shows a regulation's gate as the regulation's head, with no rows under it.
+    heads = {
+        regulation.gate: regulation.id
+        for regulation in gates.regulations
+        if regulation.gate is not None
+    }
+    seen: set[tuple[str, str]] = set()
     for obligation in gates.obligations:
         name = f"obligation {obligation.gate} {obligation.unit}"
         if obligation.gate not in earlier:
             raise GatesError(f"{name}: the gate is not in gates.yaml")
+        if obligation.gate in heads:
+            raise GatesError(
+                f"{name}: the gate decides whether the regulation {heads[obligation.gate]} applies, and the result shows no rows under it"
+            )
+        # The id of a row is its gate and its unit.
+        if (obligation.gate, obligation.unit) in seen:
+            raise GatesError(f"{name}: the row is in gates.yaml twice")
+        seen.add((obligation.gate, obligation.unit))
         if obligation.unit not in quoted:
             raise GatesError(f"{name}: the unit has no quote")
         if obligation.date not in dates:
@@ -289,8 +306,21 @@ def parse_gates(text: str, schema: Schema) -> Gates:
             (needs.gate is None) == (needs.slot is None)
             or (needs.gate is not None and needs.gate not in earlier)
             or (needs.slot is not None and needs.slot not in slots)
+            or (
+                needs.slot is not None
+                and "yes" not in [value.id for value in slots[needs.slot].values]
+            )
         ):
-            raise GatesError(f"{name}: needs names one gate or one slot that exists")
+            raise GatesError(
+                f"{name}: needs names one gate, or one slot that exists and has the answer yes"
+            )
+        gate_slot = slot_of[obligation.gate]
+        if obligation.values is not None and not set(obligation.values) <= {
+            value.id for value in slots[gate_slot].values
+        }:
+            raise GatesError(
+                f"{name}: values names an answer that {gate_slot} does not have"
+            )
     return gates
 
 
@@ -421,12 +451,17 @@ def decide(gates: Gates, schema: Schema, intake: Intake) -> Result:
         )
     # The rows of each result that applies or is conditional: a row is conditional when its result is,
     # or when what else it needs is open or conditional, and it is left out when that does not apply
-    # or is "no" (MEMO-5, MEMO-6).
+    # or is "no", or when its gate's slot has an answer for which it does not hold (MEMO-5, MEMO-6).
     starts = {start.id: start for start in gates.dates}
     by_gate = {outcome.gate: outcome for outcome in outcomes}
+    slot_of = {gate.id: gate.slot for gate in gates.gates}
     for obligation in gates.obligations:
         outcome = by_gate.get(obligation.gate)
         if outcome is None or outcome.status == "does_not_apply":
+            continue
+        if obligation.values is not None and answers.get(
+            slot_of[obligation.gate]
+        ) not in (None, NOT_SURE, *obligation.values):
             continue
         open_need = False
         need: Need | None = None

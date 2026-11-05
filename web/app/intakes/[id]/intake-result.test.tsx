@@ -342,7 +342,7 @@ test("the condition of the rows' date is quoted once above the rows, folded behi
 
   expect(
     screen.getAllByText(
-      "The rows below apply from 2 December 2027. For a system placed on the market or put into service before that date, they apply only if its design changes significantly from that date. You decide this.",
+      "The rows below apply from 2 December 2027. For a system placed on the market or put into service before that date, they apply only if its design changes significantly from that date. A system intended to be used by public authorities must meet them by 2 August 2030 in any case. You decide this.",
     ),
   ).toHaveLength(1);
   expect(screen.getAllByRole("link", { name: "Rule 111(2)" })).toHaveLength(1);
