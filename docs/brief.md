@@ -10,7 +10,13 @@ The engineer makes the judgment calls about their own product. The system does t
 
 ## Persona
 
-An engineer who builds an AI product, alone or in a small team, with no legal or regulatory background and no lawyer to ask. They know their system in detail: what it does, who uses it and what data it handles. They do not know which articles apply, and the two regulations together are several hundred pages long. A technical product manager who knows the system at this level fits the same persona.
+An engineer who builds an AI product, alone or in a small team, with no legal or regulatory background and no lawyer to ask. They know their system in detail: what it does, who uses it and what data it handles. Without a legal background, they have three problems:
+
+1. They do not know which regulations, and which parts of them, may apply to the product, so they do not know what to look up. The two regulations together are several hundred pages long.
+2. They cannot easily tell from the legal wording whether a paragraph applies to their system.
+3. When a paragraph applies, they do not know what to do to comply with it.
+
+A technical product manager who knows the system at this level fits the same persona.
 
 What they want: a concrete list of what they must do for their product, which they can check against the official text and which they get in one session. What they do not want: a course on the AI Act, a chatbot they have to question, or a general checklist that is the same for every product.
 
