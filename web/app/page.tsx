@@ -1,7 +1,7 @@
 import Link from "next/link";
 import actions from "./actions.module.css";
 import result from "./intakes/[id]/intake-result.module.css";
-import { LISTED_USE, STATUS } from "./intakes/[id]/result-text";
+import { LISTED_USE, PARTS, STATUS } from "./intakes/[id]/result-text";
 import layout from "./layout.module.css";
 import { NOT_LEGAL_ADVICE } from "./not-legal-advice";
 import styles from "./page.module.css";
@@ -21,7 +21,7 @@ const STEPS = [
   ],
   [
     "Read the result",
-    "Which parts apply and the main obligations of each, with the date, what each means for your product and one action.",
+    "What applies, with the main obligations, their dates, what each means for your product and one action. Then the answers left to check, and what they may add.",
   ],
 ];
 
@@ -36,12 +36,10 @@ const CHECKS = [
 ];
 
 // The three gates that the form answers of the example product decide, whatever the follow-up
-// answers are, and the lead-in and point (a) of the unit that its high-risk result quotes.
-const EXCERPT = [
-  ["GDPR", "applies"],
-  ["Provider", "applies"],
-  ["High-risk under Annex III", "conditional"],
-] as const;
+// answers are, by the part of the result where each shows: the GDPR and the provider apply, the
+// question of the listed use is left to check, and high-risk under Annex III may also apply. The
+// lead-in and point (a) of the unit that the high-risk result quotes.
+const APPLIES = ["GDPR", "Provider"];
 const QUOTE = [
   "Employment, workers’ management and access to self-employment:",
   "(a) AI systems intended to be used for the recruitment or selection of natural persons, in particular to place targeted job advertisements, to analyse and filter job applications, and to evaluate candidates;",
@@ -87,18 +85,28 @@ export default function Home() {
           </div>
           <figure className={styles.excerpt}>
             <figcaption>From the result for the example product</figcaption>
+            {/* The labels take the result screen's classes, the squares this page's. */}
+            <p className={styles.partName}>{PARTS[0]}</p>
             <ul>
-              {/* The label takes the result screen's classes, the square this page's. */}
-              {EXCERPT.map(([gate, status]) => (
-                <li key={gate} className={styles[status]}>
+              {APPLIES.map((gate) => (
+                <li key={gate} className={styles.applies}>
                   <span>{gate}</span>{" "}
-                  <strong className={`${result.status} ${result[`badge_${status}`]}`}>{STATUS[status]}</strong>
+                  <strong className={`${result.status} ${result.badge_applies}`}>{STATUS.applies}</strong>
                 </li>
               ))}
             </ul>
-            <p>{LISTED_USE}</p>
-            <p className={result.citation}>AI Act Annex III, point 4</p>
+            <p className={styles.partName}>{PARTS[1]}</p>
+            <p>
+              <strong>Intended use listed under AI Act Annex III, point 4.</strong> {LISTED_USE}
+            </p>
             <blockquote className={result.quote}>{[...QUOTE, "…"].join("\n")}</blockquote>
+            <p className={styles.partName}>{PARTS[2]}</p>
+            <ul>
+              <li className={styles.conditional}>
+                <span>High-risk under Annex III</span>{" "}
+                <strong className={`${result.status} ${result.badge_conditional}`}>{STATUS.conditional}</strong>
+              </li>
+            </ul>
           </figure>
         </section>
       </div>
@@ -119,14 +127,15 @@ export default function Home() {
           <div className={styles.split}>
             <div>
               <p>
-                For each check, the result says “Applies”, “Does not apply” or “Conditional”, with the answers
-                that decided it and the articles that define it, quoted and linked to EUR-Lex. A conditional
-                result says what it depends on and what each answer would give.
+                The result has three parts. {PARTS[0]}: each check that your answers decide, “Applies” or “Does
+                not apply”, with the answers that decided it and the articles that define it, quoted and linked
+                to EUR-Lex, and under each check that applies its main obligations, each with the date from which
+                it applies, the clause quoted and linked, what it means for your product, and one action.
               </p>
               <p>
-                Under each check that applies or depends on your answers, the result lists its main obligations,
-                each with the date from which it applies, the clause quoted and linked, what it means for your
-                product, and one action.
+                {PARTS[1]}: each answer that the result still depends on, with its question, your reason and
+                note, and what each answer would give, the one that decides the most obligations first.{" "}
+                {PARTS[2]}: the obligations that depend on those answers, under the answer that they depend on.
               </p>
               <p>
                 The result assumes that the product is an AI system as the AI Act defines it, offered or used

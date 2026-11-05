@@ -1,5 +1,5 @@
 import { vi } from "vitest";
-import type { Result, Row, Schema } from "./service";
+import type { Asked, Result, Row, Schema } from "./service";
 
 // A schema with two description fields, two form slots and two follow-up slots that are not in
 // schema.yaml, and limits other than 500, so that the tests show that the web app follows the
@@ -58,9 +58,32 @@ export const testSchema = {
 // The fields of a question without an explanation, a meaning, examples and a check line (RESP-6).
 export const PLAIN = { explanation: "", meaning: "", examples: [], check: "" };
 
+// The last question asked about each slot of the test schema, as GET /intakes/{id} returns it
+// (INTAKE-5): texts other than the schema's default questions, so that the tests show which one a
+// screen uses.
+export const testQuestions: Record<string, Asked> = Object.fromEntries(
+  [
+    ["uses_camera", "Does the product record people with a camera?"],
+    ["audience", "Is the product used by your staff or by the public?"],
+    ["stores_video", "Does the product keep the video that it records?"],
+    ["shares_video", "Does the product send video to anyone outside your company?"],
+  ].map(([slot, text]) => [
+    slot,
+    {
+      slot,
+      text,
+      options: [...testSchema.slots, ...testSchema.follow_up_slots]
+        .find((item) => item.id === slot)
+        ?.values.map((value) => ({ value: value.id, label: value.label })) ?? [],
+      ...PLAIN,
+    },
+  ]),
+);
+
 // A result for the test schema (GATE-4): a gate that applies, with a quote of two lines; a gate
 // under it that depends on the open slot of the gate above and on its own slot, which was not
-// asked; a listed use; and an assumption and an item not checked, each with a link. The gates are
+// asked; a listed use, which quotes its point of an Annex III; and an assumption and an item not
+// checked, each with a link. The gates are
 // grouped under two regulations (MEMO-6): the first with a gate that decides whether it applies,
 // last in the list, the second without one. No gate has rows; the tests of the rows add them.
 // A type annotation, not satisfies: the gates differ in their answers, and the tests use them as
@@ -143,7 +166,18 @@ export const testResult: Result = {
       rows: [],
       answers: { uses_camera: "yes", shares_video: "yes" },
       conditions: [],
-      quotes: [],
+      quotes: [
+        {
+          citation: "Listing Rule 6(2)",
+          link: "https://eur-lex.europa.eu/rule#006.002:~:text=A%20listed%20use%20is%20covered.",
+          quote: "A listed use is covered.",
+        },
+        {
+          citation: "Listing Rule Annex III, point 2",
+          link: "https://eur-lex.europa.eu/rule#anx_III.002",
+          quote: "Door cameras:\n(a) cameras at a main door;",
+        },
+      ],
     },
     {
       gate: "camera_law_applies",

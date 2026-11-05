@@ -175,12 +175,23 @@ test("a failed call shows a message", async () => {
   );
 });
 
-// The texts of the rows (issue #41): the result with rows under a result that applies, and the
-// texts that the service writes for them.
+// The texts of the rows (issue #41): the result with two rows that apply under a result that
+// applies, so that both stand in the first part with their actions (issue #51), and the texts that
+// the service writes for them.
 const withRows = {
   ...testResult,
   gates: testResult.gates.map((gate) =>
-    gate.gate === "storage" ? { ...gate, status: "applies" as const, conditions: [], rows: testRows } : gate,
+    gate.gate === "storage"
+      ? {
+          ...gate,
+          status: "applies" as const,
+          conditions: [],
+          rows: [
+            testRows[0],
+            { ...testRows[1], status: "applies" as const, needs: { slot: "shares_video", value: "yes", gate: null, status: null } },
+          ],
+        }
+      : gate,
   ),
 };
 const TEXTS: Texts = {
@@ -240,7 +251,8 @@ test("without the key, the screen sends no request for the texts and shows no pl
   render(<IntakeScreen />);
 
   await expectResult();
-  expect(screen.getAllByRole("rowheader")).toHaveLength(2);
+  expect(screen.getByText("Delete old video")).toBeTruthy();
+  expect(screen.getByText("A notice at the door")).toBeTruthy();
   expect(textRequests(fetchMock)).toHaveLength(0);
   expect(screen.queryByText(PLACEHOLDER)).toBeNull();
 });

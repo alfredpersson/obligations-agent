@@ -86,6 +86,16 @@
   background: var(--color-conditional-mark);
 }
 
+/* The name of a part of the result, above what stands in it. */
+.excerpt .partName {
+  margin: var(--space-4) 0 var(--space-1);
+  font-weight: 700;
+}
+
+.excerpt .partName:first-of-type {
+  margin-top: 0;
+}
+
 /* The citation and the quote, which keeps the line of its lead-in and of its point, follow the
    result screen's rules. */
 .excerpt p,

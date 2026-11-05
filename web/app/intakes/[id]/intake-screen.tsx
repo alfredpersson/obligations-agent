@@ -122,6 +122,8 @@ export default function IntakeScreen() {
         <IntakeResult
           result={intake.result}
           notSure={intake.not_sure}
+          questions={intake.questions}
+          openSlots={intake.open_slots}
           schema={schema}
           texts={intake.texts}
           answers={`/intakes/${id}/answers`}
