@@ -15,12 +15,15 @@ const STEPS = [
     "Answer follow-up questions",
     "At most eight, one at a time. A model chooses each question from your answers so far and writes it for your product. Some questions show examples from official guidance.",
   ],
-  ["Read the result", "Which parts apply, with the answers that decided them and the articles quoted."],
+  [
+    "Read the result",
+    "Which parts apply and the main obligations of each, with the date, what each means for your product and one action.",
+  ],
 ];
 
 // The gates of the result (gates.yaml), each with the units that define it.
 const CHECKS = [
-  ["GDPR applies", "GDPR Article 2(1)"],
+  ["GDPR", "GDPR Article 2(1)"],
   ["Controller", "GDPR Article 4(7)"],
   ["Processor", "GDPR Article 4(8)"],
   ["Provider", "AI Act Article 3(3)"],
@@ -31,7 +34,7 @@ const CHECKS = [
 // The three gates that the form answers of the example product decide, whatever the follow-up
 // answers are, and the lead-in and point (a) of the unit that its high-risk result quotes.
 const EXCERPT = [
-  ["GDPR applies", "applies"],
+  ["GDPR", "applies"],
   ["Provider", "applies"],
   ["High-risk under Annex III", "conditional"],
 ] as const;
@@ -67,7 +70,8 @@ export default function Home() {
               Describe one AI product and answer questions about it. The result shows whether the GDPR applies
               to the product, which roles you have under the GDPR and the AI Act, and whether the product is
               high-risk under the AI Act. Each result quotes the articles that define it from the official
-              text.
+              text, and lists its main obligations, with the date, what each means for your product and one
+              action.
             </p>
             <Choices />
             <p className={styles.note}>
@@ -80,10 +84,11 @@ export default function Home() {
           <figure className={styles.excerpt}>
             <figcaption>From the result for the example product</figcaption>
             <ul>
-              {/* The label's colors come from the result screen's rules, the square from this page's. */}
+              {/* The label takes the result screen's classes, the square this page's. */}
               {EXCERPT.map(([gate, status]) => (
-                <li key={gate} className={`${result[status]} ${styles[status]}`}>
-                  <span>{gate}</span> <strong className={result.status}>{STATUS[status]}</strong>
+                <li key={gate} className={styles[status]}>
+                  <span>{gate}</span>{" "}
+                  <strong className={`${result.status} ${result[`badge_${status}`]}`}>{STATUS[status]}</strong>
                 </li>
               ))}
             </ul>
@@ -113,6 +118,11 @@ export default function Home() {
                 For each check, the result says “Applies”, “Does not apply” or “Conditional”, with the answers
                 that decided it and the articles that define it, quoted and linked to EUR-Lex. A conditional
                 result says what it depends on and what each answer would give.
+              </p>
+              <p>
+                Under each check that applies or depends on your answers, the result lists its main obligations,
+                each with the date from which it applies, the clause quoted and linked, what it means for your
+                product, and one action.
               </p>
               <p>
                 The result assumes that the product is an AI system as the AI Act defines it, offered or used

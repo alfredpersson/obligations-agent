@@ -163,9 +163,271 @@ units:
     document: "32016R0679"
     anchor: "art_2"
 
+  - id: "gdpr:art6(1)"
+    citation: GDPR Article 6(1)
+    document: "32016R0679"
+    anchor: "006.001"
+    quote: |-
+      Processing shall be lawful only if and to the extent that at least one of the following applies:
+      (a) the data subject has given consent to the processing of his or her personal data for one or more specific purposes;
+      (b) processing is necessary for the performance of a contract to which the data subject is party or in order to take steps at the request of the data subject prior to entering into a contract;
+      (c) processing is necessary for compliance with a legal obligation to which the controller is subject;
+      (d) processing is necessary in order to protect the vital interests of the data subject or of another natural person;
+      (e) processing is necessary for the performance of a task carried out in the public interest or in the exercise of official authority vested in the controller;
+      (f) processing is necessary for the purposes of the legitimate interests pursued by the controller or by a third party, except where such interests are overridden by the interests or fundamental rights and freedoms of the data subject which require protection of personal data, in particular where the data subject is a child.
+      Point (f) of the first subparagraph shall not apply to processing carried out by public authorities in the performance of their tasks.
+  - id: "gdpr:art12(2)"
+    citation: GDPR Article 12(2)
+    document: "32016R0679"
+    anchor: "012.002"
+    quote: |-
+      The controller shall facilitate the exercise of data subject rights under Articles 15 to 22. In the cases referred to in Article 11(2), the controller shall not refuse to act on the request of the data subject for exercising his or her rights under Articles 15 to 22, unless the controller demonstrates that it is not in a position to identify the data subject.
+  - id: "gdpr:art13(1)"
+    citation: GDPR Article 13(1)
+    document: "32016R0679"
+    anchor: "013.001"
+    quote: |-
+      Where personal data relating to a data subject are collected from the data subject, the controller shall, at the time when personal data are obtained, provide the data subject with all of the following information:
+      (a) the identity and the contact details of the controller and, where applicable, of the controller's representative;
+      (b) the contact details of the data protection officer, where applicable;
+      (c) the purposes of the processing for which the personal data are intended as well as the legal basis for the processing;
+      (d) where the processing is based on point (f) of Article 6(1), the legitimate interests pursued by the controller or by a third party;
+      (e) the recipients or categories of recipients of the personal data, if any;
+      (f) where applicable, the fact that the controller intends to transfer personal data to a third country or international organisation and the existence or absence of an adequacy decision by the Commission, or in the case of transfers referred to in Article 46 or 47, or the second subparagraph of Article 49(1), reference to the appropriate or suitable safeguards and the means by which to obtain a copy of them or where they have been made available.
+  - id: "gdpr:art14(1)"
+    citation: GDPR Article 14(1)
+    document: "32016R0679"
+    anchor: "014.001"
+    quote: |-
+      Where personal data have not been obtained from the data subject, the controller shall provide the data subject with the following information:
+      (a) the identity and the contact details of the controller and, where applicable, of the controller's representative;
+      (b) the contact details of the data protection officer, where applicable;
+      (c) the purposes of the processing for which the personal data are intended as well as the legal basis for the processing;
+      (d) the categories of personal data concerned;
+      (e) the recipients or categories of recipients of the personal data, if any;
+      (f) where applicable, that the controller intends to transfer personal data to a recipient in a third country or international organisation and the existence or absence of an adequacy decision by the Commission, or in the case of transfers referred to in Article 46 or 47, or the second subparagraph of Article 49(1), reference to the appropriate or suitable safeguards and the means to obtain a copy of them or where they have been made available.
+  - id: "gdpr:art25(1)"
+    citation: GDPR Article 25(1)
+    document: "32016R0679"
+    anchor: "025.001"
+    quote: |-
+      Taking into account the state of the art, the cost of implementation and the nature, scope, context and purposes of processing as well as the risks of varying likelihood and severity for rights and freedoms of natural persons posed by the processing, the controller shall, both at the time of the determination of the means for processing and at the time of the processing itself, implement appropriate technical and organisational measures, such as pseudonymisation, which are designed to implement data-protection principles, such as data minimisation, in an effective manner and to integrate the necessary safeguards into the processing in order to meet the requirements of this Regulation and protect the rights of data subjects.
+  - id: "gdpr:art28(1)"
+    citation: GDPR Article 28(1)
+    document: "32016R0679"
+    anchor: "028.001"
+    quote: |-
+      Where processing is to be carried out on behalf of a controller, the controller shall use only processors providing sufficient guarantees to implement appropriate technical and organisational measures in such a manner that processing will meet the requirements of this Regulation and ensure the protection of the rights of the data subject.
+  - id: "gdpr:art32(1)"
+    citation: GDPR Article 32(1)
+    document: "32016R0679"
+    anchor: "032.001"
+    quote: |-
+      Taking into account the state of the art, the costs of implementation and the nature, scope, context and purposes of processing as well as the risk of varying likelihood and severity for the rights and freedoms of natural persons, the controller and the processor shall implement appropriate technical and organisational measures to ensure a level of security appropriate to the risk, including inter alia as appropriate:
+      (a) the pseudonymisation and encryption of personal data;
+      (b) the ability to ensure the ongoing confidentiality, integrity, availability and resilience of processing systems and services;
+      (c) the ability to restore the availability and access to personal data in a timely manner in the event of a physical or technical incident;
+      (d) a process for regularly testing, assessing and evaluating the effectiveness of technical and organisational measures for ensuring the security of the processing.
+  - id: "gdpr:art33(1)"
+    citation: GDPR Article 33(1)
+    document: "32016R0679"
+    anchor: "033.001"
+    quote: |-
+      In the case of a personal data breach, the controller shall without undue delay and, where feasible, not later than 72 hours after having become aware of it, notify the personal data breach to the supervisory authority competent in accordance with Article 55, unless the personal data breach is unlikely to result in a risk to the rights and freedoms of natural persons. Where the notification to the supervisory authority is not made within 72 hours, it shall be accompanied by reasons for the delay.
+  - id: "gdpr:art35(1)"
+    citation: GDPR Article 35(1)
+    document: "32016R0679"
+    anchor: "035.001"
+    quote: |-
+      Where a type of processing in particular using new technologies, and taking into account the nature, scope, context and purposes of the processing, is likely to result in a high risk to the rights and freedoms of natural persons, the controller shall, prior to the processing, carry out an assessment of the impact of the envisaged processing operations on the protection of personal data. A single assessment may address a set of similar processing operations that present similar high risks.
+  - id: "gdpr:art9(1)"
+    citation: GDPR Article 9(1)
+    document: "32016R0679"
+    anchor: "009.001"
+    quote: |-
+      Processing of personal data revealing racial or ethnic origin, political opinions, religious or philosophical beliefs, or trade union membership, and the processing of genetic data, biometric data for the purpose of uniquely identifying a natural person, data concerning health or data concerning a natural person's sex life or sexual orientation shall be prohibited.
+  - id: "gdpr:art22(1)"
+    citation: GDPR Article 22(1)
+    document: "32016R0679"
+    anchor: "022.001"
+    quote: |-
+      The data subject shall have the right not to be subject to a decision based solely on automated processing, including profiling, which produces legal effects concerning him or her or similarly significantly affects him or her.
+  - id: "gdpr:art28(3)"
+    citation: GDPR Article 28(3)
+    document: "32016R0679"
+    anchor: "028.003"
+    quote: |-
+      Processing by a processor shall be governed by a contract or other legal act under Union or Member State law, that is binding on the processor with regard to the controller and that sets out the subject-matter and duration of the processing, the nature and purpose of the processing, the type of personal data and categories of data subjects and the obligations and rights of the controller. That contract or other legal act shall stipulate, in particular, that the processor:
+      (a) processes the personal data only on documented instructions from the controller, including with regard to transfers of personal data to a third country or an international organisation, unless required to do so by Union or Member State law to which the processor is subject; in such a case, the processor shall inform the controller of that legal requirement before processing, unless that law prohibits such information on important grounds of public interest;
+      (b) ensures that persons authorised to process the personal data have committed themselves to confidentiality or are under an appropriate statutory obligation of confidentiality;
+      (c) takes all measures required pursuant to Article 32;
+      (d) respects the conditions referred to in paragraphs 2 and 4 for engaging another processor;
+      (e) taking into account the nature of the processing, assists the controller by appropriate technical and organisational measures, insofar as this is possible, for the fulfilment of the controller's obligation to respond to requests for exercising the data subject's rights laid down in Chapter III;
+      (f) assists the controller in ensuring compliance with the obligations pursuant to Articles 32 to 36 taking into account the nature of processing and the information available to the processor;
+      (g) at the choice of the controller, deletes or returns all the personal data to the controller after the end of the provision of services relating to processing, and deletes existing copies unless Union or Member State law requires storage of the personal data;
+      (h) makes available to the controller all information necessary to demonstrate compliance with the obligations laid down in this Article and allow for and contribute to audits, including inspections, conducted by the controller or another auditor mandated by the controller.
+      With regard to point (h) of the first subparagraph, the processor shall immediately inform the controller if, in its opinion, an instruction infringes this Regulation or other Union or Member State data protection provisions.
+  - id: "gdpr:art28(2)"
+    citation: GDPR Article 28(2)
+    document: "32016R0679"
+    anchor: "028.002"
+    quote: |-
+      The processor shall not engage another processor without prior specific or general written authorisation of the controller. In the case of general written authorisation, the processor shall inform the controller of any intended changes concerning the addition or replacement of other processors, thereby giving the controller the opportunity to object to such changes.
+  - id: "gdpr:art33(2)"
+    citation: GDPR Article 33(2)
+    document: "32016R0679"
+    anchor: "033.002"
+    quote: |-
+      The processor shall notify the controller without undue delay after becoming aware of a personal data breach.
+  - id: "aia:art4(1)"
+    citation: AI Act Article 4(1), as replaced by Regulation (EU) 2026/1744
+    document: "32026R1744"
+    anchor: "004.001"
+    quote: |-
+      Providers and deployers of AI systems shall take measures to support the development of AI literacy of their staff and other persons dealing with the operation and use of AI systems on their behalf, taking into account their technical knowledge, experience, education and training and the context the AI systems are to be used in, and considering the persons or groups of persons on whom the AI systems are to be used. This obligation does not require providers or deployers to guarantee any specific level of AI literacy of any individual.
+  - id: "aia:art50(5)"
+    citation: AI Act Article 50(5)
+    document: "32024R1689"
+    anchor: "050.005"
+    quote: |-
+      The information referred to in paragraphs 1 to 4 shall be provided to the natural persons concerned in a clear and distinguishable manner at the latest at the time of the first interaction or exposure. The information shall conform to the applicable accessibility requirements.
+  - id: "aia:art9(1)"
+    citation: AI Act Article 9(1)
+    document: "32024R1689"
+    anchor: "009.001"
+    quote: |-
+      A risk management system shall be established, implemented, documented and maintained in relation to high-risk AI systems.
+  - id: "aia:art10(2)"
+    citation: AI Act Article 10(2)
+    document: "32024R1689"
+    anchor: "010.002"
+    quote: |-
+      Training, validation and testing data sets shall be subject to data governance and management practices appropriate for the intended purpose of the high-risk AI system. Those practices shall concern in particular:
+      (a) the relevant design choices;
+      (b) data collection processes and the origin of data, and in the case of personal data, the original purpose of the data collection;
+      (c) relevant data-preparation processing operations, such as annotation, labelling, cleaning, updating, enrichment and aggregation;
+      (d) the formulation of assumptions, in particular with respect to the information that the data are supposed to measure and represent;
+      (e) an assessment of the availability, quantity and suitability of the data sets that are needed;
+      (f) examination in view of possible biases that are likely to affect the health and safety of persons, have a negative impact on fundamental rights or lead to discrimination prohibited under Union law, especially where data outputs influence inputs for future operations;
+      (g) appropriate measures to detect, prevent and mitigate possible biases identified according to point (f);
+      (h) the identification of relevant data gaps or shortcomings that prevent compliance with this Regulation, and how those gaps and shortcomings can be addressed.
+  - id: "aia:art11(1)"
+    citation: AI Act Article 11(1), first subparagraph
+    document: "32024R1689"
+    anchor: "011.001"
+    quote: |-
+      The technical documentation of a high-risk AI system shall be drawn up before that system is placed on the market or put into service and shall be kept up-to date.
+  - id: "aia:art12(1)"
+    citation: AI Act Article 12(1)
+    document: "32024R1689"
+    anchor: "012.001"
+    quote: |-
+      High-risk AI systems shall technically allow for the automatic recording of events (logs) over the lifetime of the system.
+  - id: "aia:art13(1)"
+    citation: AI Act Article 13(1)
+    document: "32024R1689"
+    anchor: "013.001"
+    quote: |-
+      High-risk AI systems shall be designed and developed in such a way as to ensure that their operation is sufficiently transparent to enable deployers to interpret a system’s output and use it appropriately. An appropriate type and degree of transparency shall be ensured with a view to achieving compliance with the relevant obligations of the provider and deployer set out in Section 3.
+  - id: "aia:art14(1)"
+    citation: AI Act Article 14(1)
+    document: "32024R1689"
+    anchor: "014.001"
+    quote: |-
+      High-risk AI systems shall be designed and developed in such a way, including with appropriate human-machine interface tools, that they can be effectively overseen by natural persons during the period in which they are in use.
+  - id: "aia:art15(1)"
+    citation: AI Act Article 15(1)
+    document: "32024R1689"
+    anchor: "015.001"
+    quote: |-
+      High-risk AI systems shall be designed and developed in such a way that they achieve an appropriate level of accuracy, robustness, and cybersecurity, and that they perform consistently in those respects throughout their lifecycle.
+  - id: "aia:art17(1)"
+    citation: AI Act Article 17(1)
+    document: "32024R1689"
+    anchor: "017.001"
+    quote: |-
+      Providers of high-risk AI systems shall put a quality management system in place that ensures compliance with this Regulation. That system shall be documented in a systematic and orderly manner in the form of written policies, procedures and instructions, and shall include at least the following aspects:
+      (a) a strategy for regulatory compliance, including compliance with conformity assessment procedures and procedures for the management of modifications to the high-risk AI system;
+      (b) techniques, procedures and systematic actions to be used for the design, design control and design verification of the high-risk AI system;
+      (c) techniques, procedures and systematic actions to be used for the development, quality control and quality assurance of the high-risk AI system;
+      (d) examination, test and validation procedures to be carried out before, during and after the development of the high-risk AI system, and the frequency with which they have to be carried out;
+      (e) technical specifications, including standards, to be applied and, where the relevant harmonised standards are not applied in full or do not cover all of the relevant requirements set out in Section 2, the means to be used to ensure that the high-risk AI system complies with those requirements;
+      (f) systems and procedures for data management, including data acquisition, data collection, data analysis, data labelling, data storage, data filtration, data mining, data aggregation, data retention and any other operation regarding the data that is performed before and for the purpose of the placing on the market or the putting into service of high-risk AI systems;
+      (g) the risk management system referred to in Article 9;
+      (h) the setting-up, implementation and maintenance of a post-market monitoring system, in accordance with Article 72;
+      (i) procedures related to the reporting of a serious incident in accordance with Article 73;
+      (j) the handling of communication with national competent authorities, other relevant authorities, including those providing or supporting the access to data, notified bodies, other operators, customers or other interested parties;
+      (k) systems and procedures for record-keeping of all relevant documentation and information;
+      (l) resource management, including security-of-supply related measures;
+      (m) an accountability framework setting out the responsibilities of the management and other staff with regard to all the aspects listed in this paragraph.
+  - id: "aia:art43(1)"
+    citation: AI Act Article 43(1), first and second subparagraphs
+    document: "32024R1689"
+    anchor: "043.001"
+    quote: |-
+      For high-risk AI systems listed in point 1 of Annex III, where, in demonstrating the compliance of a high-risk AI system with the requirements set out in Section 2, the provider has applied harmonised standards referred to in Article 40, or, where applicable, common specifications referred to in Article 41, the provider shall opt for one of the following conformity assessment procedures based on:
+      (a) the internal control referred to in Annex VI; or
+      (b) the assessment of the quality management system and the assessment of the technical documentation, with the involvement of a notified body, referred to in Annex VII.
+      In demonstrating the compliance of a high-risk AI system with the requirements set out in Section 2, the provider shall follow the conformity assessment procedure set out in Annex VII where:
+      (a) harmonised standards referred to in Article 40 do not exist, and common specifications referred to in Article 41 are not available;
+      (b) the provider has not applied, or has applied only part of, the harmonised standard;
+      (c) the common specifications referred to in point (a) exist, but the provider has not applied them;
+      (d) one or more of the harmonised standards referred to in point (a) has been published with a restriction, and only on the part of the standard that was restricted.
+  - id: "aia:art43(2)"
+    citation: AI Act Article 43(2)
+    document: "32024R1689"
+    anchor: "043.002"
+    quote: |-
+      For high-risk AI systems referred to in points 2 to 8 of Annex III, providers shall follow the conformity assessment procedure based on internal control as referred to in Annex VI, which does not provide for the involvement of a notified body.
+  - id: "aia:art49(1)"
+    citation: AI Act Article 49(1)
+    document: "32024R1689"
+    anchor: "049.001"
+    quote: |-
+      Before placing on the market or putting into service a high-risk AI system listed in Annex III, with the exception of high-risk AI systems referred to in point 2 of Annex III, the provider or, where applicable, the authorised representative shall register themselves and their system in the EU database referred to in Article 71.
+  - id: "aia:art49(5)"
+    citation: AI Act Article 49(5)
+    document: "32024R1689"
+    anchor: "049.005"
+    quote: |-
+      High-risk AI systems referred to in point 2 of Annex III shall be registered at national level.
+  - id: "aia:art72(1)"
+    citation: AI Act Article 72(1)
+    document: "32024R1689"
+    anchor: "072.001"
+    quote: |-
+      Providers shall establish and document a post-market monitoring system in a manner that is proportionate to the nature of the AI technologies and the risks of the high-risk AI system.
+  - id: "aia:art73(1)"
+    citation: AI Act Article 73(1)
+    document: "32024R1689"
+    anchor: "073.001"
+    quote: |-
+      Providers of high-risk AI systems placed on the Union market shall report any serious incident to the market surveillance authorities of the Member States where that incident occurred.
+  - id: "aia:art111(2)"
+    citation: AI Act Article 111(2), as replaced by Regulation (EU) 2026/1744
+    document: "32026R1744"
+    anchor: "111.002"
+    quote: |-
+      Without prejudice to the application of Article 5 as referred to in Article 113, third paragraph, point (a), this Regulation shall apply to operators of high-risk AI systems, other than the systems referred to in paragraph 1 of this Article, that have been placed on the market or put into service before the date of application of Chapter III referred to in Article 113, only if, as from that date, those systems are subject to significant changes in their designs. In any case, the providers and deployers of high-risk AI systems intended to be used by public authorities shall take the necessary steps to comply with the requirements and obligations laid down in this Regulation by 2 August 2030.
+  - id: "gdpr:art99(2)"
+    citation: GDPR Article 99(2)
+    document: "32016R0679"
+    anchor: "099.002"
+  - id: "aia:art113"
+    citation: AI Act Article 113, as amended by Regulation (EU) 2026/1744
+    document: "02024R1689-20260727"
+    anchor: "art_113"
+
+# The regulations that the result groups its results under (MEMO-6). A regulation's gate decides
+# whether it applies; a regulation without one is assumed to apply, as the result's assumptions say.
+regulations:
+  - { id: gdpr, name: GDPR, gate: gdpr_applies }
+  - { id: ai_act, name: AI Act }
+
 gates:
   - id: gdpr_applies
-    label: GDPR applies
+    label: GDPR
+    regulation: gdpr
     slot: personal_data
     quotes: ["gdpr:art2(1)"]
     rows:
@@ -173,6 +435,7 @@ gates:
       - { values: ["no"], result: does_not_apply }
   - id: controller
     label: Controller
+    regulation: gdpr
     under: gdpr_applies
     slot: decides_purposes
     quotes: ["gdpr:art4(7)"]
@@ -181,6 +444,7 @@ gates:
       - { values: ["no"], result: does_not_apply }
   - id: processor
     label: Processor
+    regulation: gdpr
     under: gdpr_applies
     slot: processes_for_customer
     quotes: ["gdpr:art4(8)"]
@@ -189,6 +453,7 @@ gates:
       - { values: ["no"], result: does_not_apply }
   - id: provider
     label: Provider
+    regulation: ai_act
     slot: under_own_name
     quotes: ["aia:art3(3)"]
     rows:
@@ -196,6 +461,7 @@ gates:
       - { values: ["no"], result: does_not_apply }
   - id: high_risk_annex_iii
     label: High-risk under Annex III
+    regulation: ai_act
     slot: use_case_area
     quotes: ["aia:art6(2)"]
     rows:
@@ -219,6 +485,7 @@ gates:
         - { values: ["no"], result: unless }
   - id: transparency_interaction
     label: "Transparency: people interact with the product"
+    regulation: ai_act
     under: provider
     slot: interacts_with_people
     quotes: ["aia:art50(1)"]
@@ -247,3 +514,57 @@ not_checked:
     links: ["aia:art50(2)"]
   - text: The exclusions from each regulation
     links: ["aia:art2", "gdpr:art2"]
+
+# The date from which the obligations of a row apply: GDPR Article 99(2), and AI Act Article 113 as
+# amended by Regulation (EU) 2026/1744 (MEMO-5). Article 4 is in Chapter I, which applies from
+# 2 February 2025 (point (a)); Article 50 from the general date. Chapter III, Sections 1 to 3, apply
+# from 2 December 2027 for a system under Annex III (point (c)); the rows of Articles 43, 49, 72 and
+# 73 show the same date, since Article 6, in Section 1, classifies no system under Annex III as
+# high-risk before it. Article 111(2), as replaced, covers a system placed on the market or put into
+# service before that date only if its design changes significantly from that date, and one intended
+# to be used by public authorities by 2 August 2030 in any case: a condition that the user decides,
+# quoted with the rows of that date.
+dates:
+  - { id: gdpr, date: "2018-05-25", unit: "gdpr:art99(2)" }
+  - { id: chapter_i, date: "2025-02-02", unit: "aia:art113" }
+  - { id: general, date: "2026-08-02", unit: "aia:art113" }
+  - { id: annex_iii, date: "2027-12-02", unit: "aia:art113", condition: "aia:art111(2)" }
+
+# The rows of the obligations of each result (MEMO-5, MEMO-6), in the order shown. A row needs, besides
+# its result, the result of another gate or the answer "yes" of a slot. A row with values holds only
+# for those answers of its gate's slot: the conformity assessment and the registration depend on the
+# point of Annex III, Article 43(1) for point 1 and 43(2) for points 2 to 8, Article 49(1) for every
+# point but point 2 and 49(5) for point 2. A row marked drafting needs legal drafting, such as a
+# contract, a notice or a policy, and its action says so ("What it is" in docs/brief.md).
+obligations:
+  - { gate: controller, unit: "gdpr:art6(1)", label: "A legal basis for each purpose", date: gdpr }
+  - { gate: controller, unit: "gdpr:art12(2)", label: "Support for the rights of the people whose data it is", date: gdpr }
+  - { gate: controller, unit: "gdpr:art13(1)", label: "Information to people whose data is collected from them", date: gdpr, drafting: true }
+  - { gate: controller, unit: "gdpr:art14(1)", label: "Information to people whose data comes from elsewhere", date: gdpr, drafting: true }
+  - { gate: controller, unit: "gdpr:art25(1)", label: "Data protection by design and by default", date: gdpr }
+  - { gate: controller, unit: "gdpr:art28(1)", label: "Only processors with sufficient guarantees", date: gdpr }
+  - { gate: controller, unit: "gdpr:art32(1)", label: "Security of processing", date: gdpr }
+  - { gate: controller, unit: "gdpr:art33(1)", label: "A breach reported to the supervisory authority", date: gdpr }
+  - { gate: controller, unit: "gdpr:art35(1)", label: "An impact assessment where a high risk is likely", date: gdpr }
+  - { gate: controller, unit: "gdpr:art9(1)", label: "Special categories only under an exception in Article 9(2)", date: gdpr, needs: { slot: special_categories } }
+  - { gate: controller, unit: "gdpr:art22(1)", label: "Solely automated decisions only under Article 22(2)", date: gdpr, needs: { slot: automated_decisions } }
+  - { gate: processor, unit: "gdpr:art28(3)", label: "A contract with the controller (data processing agreement)", date: gdpr, drafting: true }
+  - { gate: processor, unit: "gdpr:art28(2)", label: "Other processors only with the controller's authorisation", date: gdpr, drafting: true }
+  - { gate: processor, unit: "gdpr:art32(1)", label: "Security of processing", date: gdpr }
+  - { gate: processor, unit: "gdpr:art33(2)", label: "A breach reported to the controller", date: gdpr }
+  - { gate: provider, unit: "aia:art4(1)", label: "AI literacy of staff", date: chapter_i }
+  - { gate: transparency_interaction, unit: "aia:art50(5)", label: "Information at the first interaction", date: general }
+  - { gate: high_risk_annex_iii, unit: "aia:art9(1)", label: "A risk management system", date: annex_iii, needs: { gate: provider } }
+  - { gate: high_risk_annex_iii, unit: "aia:art10(2)", label: "Data governance for training, validation and testing data", date: annex_iii, needs: { gate: provider } }
+  - { gate: high_risk_annex_iii, unit: "aia:art11(1)", label: "Technical documentation", date: annex_iii, needs: { gate: provider } }
+  - { gate: high_risk_annex_iii, unit: "aia:art12(1)", label: "Automatic logs", date: annex_iii, needs: { gate: provider } }
+  - { gate: high_risk_annex_iii, unit: "aia:art13(1)", label: "Information for deployers", date: annex_iii, needs: { gate: provider } }
+  - { gate: high_risk_annex_iii, unit: "aia:art14(1)", label: "Human oversight", date: annex_iii, needs: { gate: provider } }
+  - { gate: high_risk_annex_iii, unit: "aia:art15(1)", label: "Accuracy, robustness and cybersecurity", date: annex_iii, needs: { gate: provider } }
+  - { gate: high_risk_annex_iii, unit: "aia:art17(1)", label: "A quality management system", date: annex_iii, needs: { gate: provider }, drafting: true }
+  - { gate: high_risk_annex_iii, unit: "aia:art43(1)", label: "Conformity assessment for biometrics", date: annex_iii, needs: { gate: provider }, values: [biometrics] }
+  - { gate: high_risk_annex_iii, unit: "aia:art43(2)", label: "Conformity assessment", date: annex_iii, needs: { gate: provider }, values: [critical_infrastructure, education, employment, essential_services, law_enforcement, migration, justice] }
+  - { gate: high_risk_annex_iii, unit: "aia:art49(1)", label: "Registration in the EU database", date: annex_iii, needs: { gate: provider }, values: [biometrics, education, employment, essential_services, law_enforcement, migration, justice] }
+  - { gate: high_risk_annex_iii, unit: "aia:art49(5)", label: "Registration at national level", date: annex_iii, needs: { gate: provider }, values: [critical_infrastructure] }
+  - { gate: high_risk_annex_iii, unit: "aia:art72(1)", label: "Post-market monitoring", date: annex_iii, needs: { gate: provider } }
+  - { gate: high_risk_annex_iii, unit: "aia:art73(1)", label: "Reports of serious incidents", date: annex_iii, needs: { gate: provider } }

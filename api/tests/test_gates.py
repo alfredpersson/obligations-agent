@@ -1,4 +1,4 @@
-"""Tests for the gates: reading gates.yaml, each gate table against the regulation text, the result of an intake that has ended, and the quote and the link of each unit (issue #37: GATE-1 to GATE-4, MEMO-6 to MEMO-8, VALID-2)."""
+"""Tests for the gates: reading gates.yaml, each gate table against the regulation text, the result of an intake that has ended, and the quote and the link of each unit (issue #37: GATE-1 to GATE-4, MEMO-6 to MEMO-8, VALID-2), and the rows of the obligations with their dates and the grouping by regulation (issue #41: MEMO-5, MEMO-6)."""
 
 from collections.abc import Sequence
 from functools import cache
@@ -10,9 +10,13 @@ import pytest
 import yaml
 
 from obligations_agent.gates import (
+    EUR_LEX,
     Case,
     Condition,
     GatesError,
+    Need,
+    Needs,
+    ObligationRow,
     Outcome,
     Result,
     Unit,
@@ -28,7 +32,11 @@ SCHEMA = load_schema()
 GATES = load_gates(SCHEMA)
 COPIES = Path(__file__).resolve().parents[2] / "docs" / "regulations"
 # The stored copy of each document that a quote is taken from: the Official Journal text.
-COPY = {"32024R1689": "ai-act.txt", "32016R0679": "gdpr.txt"}
+COPY = {
+    "32024R1689": "ai-act.txt",
+    "32016R0679": "gdpr.txt",
+    "32026R1744": "ai-act-2026-1744.txt",
+}
 # The AI Act as amended by Regulation (EU) 2026/1744, which a link without a quote opens.
 CONSOLIDATED = "02024R1689-20260727"
 DESCRIPTION = {
@@ -496,10 +504,14 @@ def test_every_link_highlights_exactly_its_quote(unit: Unit) -> None:
 
 
 def document_of(unit: Unit) -> str:
-    """The document that a unit links to: the Official Journal text, of which the copies hold the quotes, or for an AI Act unit without a quote the AI Act as amended by Regulation (EU) 2026/1744. No act amends the GDPR."""
+    """The document that a unit links to: the Official Journal text, of which the copies hold the quotes, that of Regulation (EU) 2026/1744 for a unit that it replaced, or for an AI Act unit without a quote the AI Act as amended by that regulation. No act amends the GDPR."""
     if unit.id.startswith("gdpr:"):
         return "32016R0679"
-    return "32024R1689" if unit.quote is not None else CONSOLIDATED
+    if unit.quote is None:
+        return CONSOLIDATED
+    return (
+        "32026R1744" if "Regulation (EU) 2026/1744" in unit.citation else "32024R1689"
+    )
 
 
 def test_a_quote_links_to_the_official_journal_text_and_a_link_without_one_to_the_text_in_force() -> (
@@ -559,7 +571,8 @@ LINKED = {
 }
 GATE = {
     "id": "gdpr_applies",
-    "label": "GDPR applies",
+    "label": "GDPR",
+    "regulation": "gdpr",
     "slot": "personal_data",
     "quotes": ["gdpr:art2(1)"],
     "rows": [
@@ -571,20 +584,38 @@ STATEMENT = {
     "text": "The product is offered or used in the EU.",
     "links": ["gdpr:art3"],
 }
+# A second gate of the same regulation, for a row under a gate that does not decide whether its
+# regulation applies.
+ROLE = {**GATE, "id": "controller", "label": "Controller", "slot": "decides_purposes"}
+# A regulation without a gate, so that a file without the gate gdpr_applies is valid too.
+REGULATION = {"id": "gdpr", "name": "GDPR"}
+START = {"id": "gdpr", "date": "2018-05-25", "unit": "gdpr:art3"}
+OBLIGATION = {
+    "gate": "gdpr_applies",
+    "unit": "gdpr:art2(1)",
+    "label": "A row",
+    "date": "gdpr",
+}
 
 
 def gates_text(
     gates: Sequence[dict[str, Any]] = (GATE,),
     units: Sequence[dict[str, Any]] = (UNIT, LINKED),
     statements: Sequence[dict[str, Any]] = (STATEMENT,),
+    regulations: Sequence[dict[str, Any]] = (REGULATION,),
+    dates: Sequence[dict[str, Any]] = (START,),
+    obligations: Sequence[dict[str, Any]] = (),
 ) -> str:
-    """A gates.yaml text with the given gates, units, assumptions and items not checked."""
+    """A gates.yaml text with the given gates, units, assumptions and items not checked, regulations, dates and rows."""
     return yaml.safe_dump(
         {
             "units": list(units),
+            "regulations": list(regulations),
             "gates": list(gates),
             "assumptions": list(statements),
             "not_checked": list(statements),
+            "dates": list(dates),
+            "obligations": list(obligations),
         }
     )
 
@@ -757,10 +788,23 @@ def test_an_id_used_twice_is_refused_with_the_id(
         ([without(GATE, "id")], [UNIT, LINKED], "gate 1", "id"),
         ([without(GATE, "label")], [UNIT, LINKED], "gate gdpr_applies", "label"),
         ([without(GATE, "rows")], [UNIT, LINKED], "gate gdpr_applies", "rows"),
+        (
+            [without(GATE, "regulation")],
+            [UNIT, LINKED],
+            "gate gdpr_applies",
+            "regulation",
+        ),
         ([GATE], [without(UNIT, "anchor"), LINKED], r"unit gdpr:art2\(1\)", "anchor"),
         ([GATE], [{**UNIT, "quote": ""}, LINKED], r"unit gdpr:art2\(1\)", "quote"),
     ],
-    ids=["gate_id", "gate_label", "gate_rows", "unit_anchor", "empty_quote"],
+    ids=[
+        "gate_id",
+        "gate_label",
+        "gate_rows",
+        "gate_regulation",
+        "unit_anchor",
+        "empty_quote",
+    ],
 )
 def test_an_item_without_a_part_is_refused_with_its_name_and_the_part(
     gates: list[dict[str, Any]], units: list[dict[str, Any]], name: str, part: str
@@ -768,3 +812,620 @@ def test_an_item_without_a_part_is_refused_with_its_name_and_the_part(
     # A name can end with ")", after which a word boundary cannot match.
     with pytest.raises(GatesError, match=rf"(?s)\b{name}.*\b{part}\b"):
         parse_gates(gates_text(gates, units), SCHEMA)
+
+
+# The rows of the obligations under each result (issue #41: MEMO-5, MEMO-6).
+# Every answer "yes", and the area of employment, so that every result with rows applies or is
+# conditional.
+ALL_YES = {
+    "personal_data": "yes",
+    "under_own_name": "yes",
+    "use_case_area": "employment",
+    **{slot.id: "yes" for slot in SCHEMA.follow_up_slots},
+}
+
+# Each result's rows, in the order shown: the unit of each row, and the words of its quote that name
+# whom or what the obligation binds, from the regulation text, so that a row with another unit fails.
+ROWS: dict[str, list[tuple[str, str]]] = {
+    "controller": [
+        ("gdpr:art6(1)", "Processing shall be lawful only if"),
+        (
+            "gdpr:art12(2)",
+            "The controller shall facilitate the exercise of data subject rights",
+        ),
+        ("gdpr:art13(1)", "are collected from the data subject, the controller shall"),
+        (
+            "gdpr:art14(1)",
+            "have not been obtained from the data subject, the controller shall provide",
+        ),
+        (
+            "gdpr:art25(1)",
+            "the controller shall, both at the time of the determination of the means",
+        ),
+        (
+            "gdpr:art28(1)",
+            "the controller shall use only processors providing sufficient guarantees",
+        ),
+        ("gdpr:art32(1)", "the controller and the processor shall implement"),
+        ("gdpr:art33(1)", "the controller shall without undue delay"),
+        (
+            "gdpr:art35(1)",
+            "the controller shall, prior to the processing, carry out an assessment",
+        ),
+        (
+            "gdpr:art9(1)",
+            "data concerning a natural person's sex life or sexual orientation shall be prohibited",
+        ),
+        (
+            "gdpr:art22(1)",
+            "the right not to be subject to a decision based solely on automated processing",
+        ),
+    ],
+    "processor": [
+        ("gdpr:art28(3)", "Processing by a processor shall be governed by a contract"),
+        ("gdpr:art28(2)", "The processor shall not engage another processor"),
+        ("gdpr:art32(1)", "the controller and the processor shall implement"),
+        ("gdpr:art33(2)", "The processor shall notify the controller"),
+    ],
+    "provider": [
+        # Regulation (EU) 2026/1744, Article 1, point (5): the new Article 4(1).
+        (
+            "aia:art4(1)",
+            "Providers and deployers of AI systems shall take measures to support the development of AI literacy",
+        ),
+    ],
+    "transparency_interaction": [
+        (
+            "aia:art50(5)",
+            "The information referred to in paragraphs 1 to 4 shall be provided to the natural persons concerned",
+        ),
+    ],
+    "high_risk_annex_iii": [
+        (
+            "aia:art9(1)",
+            "A risk management system shall be established, implemented, documented and maintained in relation to high-risk AI systems",
+        ),
+        (
+            "aia:art10(2)",
+            "Training, validation and testing data sets shall be subject to data governance",
+        ),
+        (
+            "aia:art11(1)",
+            "The technical documentation of a high-risk AI system shall be drawn up",
+        ),
+        (
+            "aia:art12(1)",
+            "High-risk AI systems shall technically allow for the automatic recording of events",
+        ),
+        (
+            "aia:art13(1)",
+            "High-risk AI systems shall be designed and developed in such a way as to ensure that their operation is sufficiently transparent",
+        ),
+        (
+            "aia:art14(1)",
+            "High-risk AI systems shall be designed and developed in such a way, including with appropriate human-machine interface tools",
+        ),
+        (
+            "aia:art15(1)",
+            "an appropriate level of accuracy, robustness, and cybersecurity",
+        ),
+        (
+            "aia:art17(1)",
+            "Providers of high-risk AI systems shall put a quality management system in place",
+        ),
+        (
+            "aia:art43(2)",
+            "providers shall follow the conformity assessment procedure based on internal control",
+        ),
+        (
+            "aia:art49(1)",
+            "shall register themselves and their system in the EU database",
+        ),
+        (
+            "aia:art72(1)",
+            "Providers shall establish and document a post-market monitoring system",
+        ),
+        (
+            "aia:art73(1)",
+            "Providers of high-risk AI systems placed on the Union market shall report any serious incident",
+        ),
+    ],
+}
+EACH_ROW = [(gate, unit, words) for gate, rows in ROWS.items() for unit, words in rows]
+
+
+def rows_of(result: Result) -> dict[str, list[str]]:
+    """The units of the rows of each result that has rows, in the order shown."""
+    return {
+        item.gate: [row.id.split(":", 1)[1] for row in item.rows]
+        for item in result.gates
+        if item.rows
+    }
+
+
+def row_of(result: Result, gate: str, unit: str) -> ObligationRow | None:
+    """The row of the unit under the result of the gate, or None when it is not shown."""
+    return next(
+        (
+            row
+            for item in result.gates
+            if item.gate == gate
+            for row in item.rows
+            if row.id == f"{gate}:{unit}"
+        ),
+        None,
+    )
+
+
+def test_each_result_that_applies_or_is_conditional_shows_the_rows_of_its_obligations() -> (
+    None
+):
+    assert rows_of(result_of(ALL_YES)) == {
+        gate: [unit for unit, _ in rows] for gate, rows in ROWS.items()
+    }
+
+
+@pytest.mark.parametrize(
+    ("gate", "unit", "words"),
+    EACH_ROW,
+    ids=[f"{gate}-{unit}" for gate, unit, _ in EACH_ROW],
+)
+def test_each_row_quotes_the_unit_that_binds_its_result(
+    gate: str, unit: str, words: str
+) -> None:
+    row = row_of(result_of(ALL_YES), gate, unit)
+
+    assert row is not None and row.unit.quote is not None
+    assert normalized(words) in normalized(row.unit.quote)
+    assert row.label
+
+
+def test_a_result_that_does_not_apply_shows_no_rows() -> None:
+    # The controller and the provider do not apply, and no area of Annex III, so only the processor
+    # has rows; the transparency result is not asked without the provider.
+    result = result_of(
+        {
+            **ALL_YES,
+            "decides_purposes": "no",
+            "under_own_name": "no",
+            "use_case_area": "none",
+        }
+    )
+
+    assert list(rows_of(result)) == ["processor"]
+
+
+def test_the_rows_of_a_conditional_result_are_conditional_and_those_of_a_result_that_applies_are_not() -> (
+    None
+):
+    sure = result_of(ALL_YES)
+    unsure = result_of(
+        {**ALL_YES, "personal_data": "not_sure"}, {"personal_data": NotSure()}
+    )
+
+    for result, status in [(sure, "applies"), (unsure, "conditional")]:
+        controller = next(item for item in result.gates if item.gate == "controller")
+        assert controller.status == status
+        assert {row.status for row in controller.rows} == {status}
+
+
+@pytest.mark.parametrize(
+    ("answer", "status"),
+    [
+        ("yes", "applies"),
+        ("no", None),
+        ("not_sure", "conditional"),
+        (None, "conditional"),
+    ],
+    ids=["yes", "no", "not_sure", "no_answer"],
+)
+@pytest.mark.parametrize(
+    ("slot", "unit"),
+    [("special_categories", "gdpr:art9(1)"), ("automated_decisions", "gdpr:art22(1)")],
+    ids=["article_9", "article_22"],
+)
+def test_a_row_that_needs_the_answer_yes_of_a_fact_is_left_out_on_no_and_conditional_while_it_is_open(
+    slot: str, unit: str, answer: str | None, status: str | None
+) -> None:
+    answers = {key: value for key, value in ALL_YES.items() if key != slot}
+    if answer is not None:
+        answers[slot] = answer
+    not_sure = {slot: NotSure()} if answer == "not_sure" else {}
+
+    row = row_of(result_of(answers, not_sure), "controller", unit)
+
+    assert (row.status if row else None) == status
+    if row is not None:
+        # The answer that decided the row, or none while the fact has no answer (MEMO-5).
+        assert row.needs == Need(slot=slot, value=answer)
+
+
+@pytest.mark.parametrize(
+    ("answer", "shown", "provider"),
+    [("yes", True, "applies"), ("no", False, None), ("not_sure", True, "conditional")],
+    ids=["provider", "not_provider", "provider_open"],
+)
+def test_the_rows_of_high_risk_need_the_provider_result(
+    answer: str, shown: bool, provider: str | None
+) -> None:
+    not_sure = {"under_own_name": NotSure()} if answer == "not_sure" else {}
+    result = result_of({**ALL_YES, "under_own_name": answer}, not_sure)
+
+    rows = rows_of(result).get("high_risk_annex_iii", [])
+    assert len(rows) == (12 if shown else 0)
+    for unit in rows:
+        row = row_of(result, "high_risk_annex_iii", unit)
+        # A use listed in Annex III is for the user to decide, so these rows are always conditional.
+        assert row is not None and row.status == "conditional"
+        assert row.needs == Need(gate="provider", status=provider)
+
+
+def test_a_row_that_needs_a_conditional_result_is_conditional_under_a_result_that_applies() -> (
+    None
+):
+    # In gates.yaml, only the rows of high-risk under Annex III need another result, and they are
+    # conditional by their own result. Here a row of the controller, which applies, needs the
+    # provider, which is open.
+    first = next(item for item in GATES.obligations if item.gate == "controller")
+    obligations = [
+        item.model_copy(update={"needs": Needs(gate="provider")})
+        if item is first
+        else item
+        for item in GATES.obligations
+    ]
+    intake = Intake(
+        answers={**ALL_YES, "under_own_name": "not_sure"},
+        description=DESCRIPTION,
+        not_sure={"under_own_name": NotSure()},
+    )
+
+    result = decide(
+        GATES.model_copy(update={"obligations": obligations}), SCHEMA, intake
+    )
+
+    row = row_of(result, "controller", first.unit)
+    assert row is not None and row.status == "conditional"
+    assert row.needs == Need(gate="provider", status="conditional")
+
+
+# The conformity assessment and the registration depend on the point of Annex III, which the answer
+# about the area gives. AI Act Article 43(1) is for point 1, Article 43(2) for points 2 to 8, Article
+# 49(1) for every point but point 2, and Article 49(5) for point 2, in the words of each quote.
+AREA_WORDS = {
+    "aia:art43(1)": "For high-risk AI systems listed in point 1 of Annex III",
+    "aia:art43(2)": "For high-risk AI systems referred to in points 2 to 8 of Annex III",
+    "aia:art49(1)": "with the exception of high-risk AI systems referred to in point 2 of Annex III",
+    "aia:art49(5)": "High-risk AI systems referred to in point 2 of Annex III shall be registered at national level.",
+}
+
+
+@pytest.mark.parametrize(
+    ("area", "units"),
+    [
+        ("biometrics", ["aia:art43(1)", "aia:art49(1)"]),
+        ("critical_infrastructure", ["aia:art43(2)", "aia:art49(5)"]),
+        ("employment", ["aia:art43(2)", "aia:art49(1)"]),
+        # While the area is open, each row of a point that it may be.
+        ("not_sure", list(AREA_WORDS)),
+    ],
+    ids=["point_1", "point_2", "point_4", "open"],
+)
+def test_the_conformity_assessment_and_the_registration_follow_the_point_of_annex_iii(
+    area: str, units: list[str]
+) -> None:
+    not_sure = {"use_case_area": NotSure()} if area == "not_sure" else {}
+    result = result_of({**ALL_YES, "use_case_area": area}, not_sure)
+
+    shown = rows_of(result)["high_risk_annex_iii"]
+    assert [unit for unit in shown if unit in AREA_WORDS] == units
+    for unit in units:
+        row = row_of(result, "high_risk_annex_iii", unit)
+        assert row is not None and row.unit.quote is not None
+        assert normalized(AREA_WORDS[unit]) in normalized(row.unit.quote)
+        assert row.date == date_of("high_risk_annex_iii", unit)
+
+
+# The dates (MEMO-5): the sentence that sets each one, in a stored copy. GDPR Article 99(2); AI Act
+# Article 113, second paragraph; and Article 113, third paragraph, points (a) and (c)(i), as replaced
+# by Regulation (EU) 2026/1744, Article 1, point (40).
+DATES = {
+    "2018-05-25": ("32016R0679", "It shall apply from 25 May 2018."),
+    "2026-08-02": ("32024R1689", "It shall apply from 2 August 2026."),
+    "2025-02-02": ("32026R1744", "Chapters I and II shall apply from 2 February 2025"),
+    "2027-12-02": (
+        "32026R1744",
+        "2 December 2027 as regards AI systems classified as high-risk pursuant to Article 6(2) and Annex III",
+    ),
+}
+
+
+@cache
+def chapters() -> dict[int, tuple[str, str | None]]:
+    """The chapter and the section of each article of the AI Act, by the headings of the stored copy."""
+    text = (
+        (COPIES / COPY["32024R1689"]).read_text(encoding="utf-8").split("\n---\n", 1)[1]
+    )
+    found: dict[int, tuple[str, str | None]] = {}
+    chapter, section = "", None
+    for line in (normalized(line) for line in text.splitlines()):
+        if line.startswith("CHAPTER "):
+            chapter, section = line.removeprefix("CHAPTER "), None
+        elif line.startswith("SECTION "):
+            section = line.removeprefix("SECTION ")
+        elif line.startswith("Article ") and line.removeprefix("Article ").isdigit():
+            found.setdefault(int(line.removeprefix("Article ")), (chapter, section))
+    return found
+
+
+def date_of(gate: str, unit: str) -> str:
+    """The date from which the obligation of a row applies, from the regulation text."""
+    if unit.startswith("gdpr:"):
+        return "2018-05-25"
+    # The rows of high-risk under Annex III bind only high-risk systems, and a system under Annex III
+    # is classified as high-risk by Article 6, in Chapter III, Section 1, so they apply from the date
+    # of that section for Annex III, also those of Articles 43, 49, 72 and 73 outside it (the issue's
+    # reading of Article 113).
+    article = (
+        6 if gate == "high_risk_annex_iii" else int(unit.split("art")[1].split("(")[0])
+    )
+    chapter, section = chapters()[article]
+    if chapter == "I":
+        return "2025-02-02"
+    if chapter == "III" and section in ("1", "2", "3"):
+        return "2027-12-02"
+    return "2026-08-02"
+
+
+def test_each_date_is_set_by_a_sentence_of_the_regulations() -> None:
+    for document, sentence in DATES.values():
+        text, _ = copy_of(document)
+        assert normalized(sentence) in text
+    assert chapters()[4] == ("I", None)
+    assert chapters()[6] == ("III", "1")
+
+
+@pytest.mark.parametrize(
+    ("gate", "unit", "words"),
+    EACH_ROW,
+    ids=[f"{gate}-{unit}" for gate, unit, _ in EACH_ROW],
+)
+def test_each_row_applies_from_the_date_of_its_unit(
+    gate: str, unit: str, words: str
+) -> None:
+    row = row_of(result_of(ALL_YES), gate, unit)
+
+    assert row is not None
+    assert row.date == date_of(gate, unit)
+
+
+def test_each_date_links_to_the_article_that_sets_it() -> None:
+    for item in result_of(ALL_YES).gates:
+        for row in item.rows:
+            if row.id.split(":", 1)[1].startswith("gdpr:"):
+                assert row.date_unit.citation == "GDPR Article 99(2)"
+                assert row.date_unit.link == f"{EUR_LEX}32016R0679#099.002"
+            else:
+                assert row.date_unit.citation.startswith("AI Act Article 113")
+                assert row.date_unit.link == f"{EUR_LEX}{CONSOLIDATED}#art_113"
+
+
+def test_the_rows_of_high_risk_under_annex_iii_state_article_111_2_as_a_condition_and_no_other_row_does() -> (
+    None
+):
+    # Article 111(2), as replaced by Regulation (EU) 2026/1744, Article 1, point (39): a system placed
+    # on the market or put into service before the date is covered "only if, as from that date, those
+    # systems are subject to significant changes in their designs".
+    for item in result_of(ALL_YES).gates:
+        for row in item.rows:
+            if item.gate == "high_risk_annex_iii":
+                assert row.condition is not None and row.condition.quote is not None
+                assert row.condition.citation.startswith("AI Act Article 111(2)")
+                assert (
+                    "only if, as from that date, those systems are subject to significant changes in their designs"
+                    in normalized(row.condition.quote)
+                )
+                assert row.condition.link.startswith(
+                    f"{EUR_LEX}32026R1744#111.002:~:text="
+                )
+            else:
+                assert row.condition is None
+
+
+def test_ai_literacy_quotes_paragraph_1_of_the_new_article_4_from_the_amending_act() -> (
+    None
+):
+    # Regulation (EU) 2026/1744, Article 1, point (5), replaces Article 4. Its paragraph 1 binds
+    # providers and deployers; paragraphs 2 and 3 bind the Commission, the Member States and the
+    # Board.
+    unit = next(unit for unit in GATES.units if unit.id == "aia:art4(1)")
+
+    assert unit.document == "32026R1744" and unit.anchor == "004.001"
+    assert unit.quote is not None
+    assert "The Commission and the Member States" not in unit.quote
+    assert normalized(unit.quote).endswith(
+        "This obligation does not require providers or deployers to guarantee any specific level of AI literacy of any individual."
+    )
+
+
+# The obligations that need legal drafting ("What it is" in docs/brief.md), by the words of their
+# quotes: information to provide to people, a written authorisation, a contract, written policies.
+DRAFTING = {
+    (
+        "controller",
+        "gdpr:art13(1)",
+    ): "provide the data subject with all of the following information",
+    (
+        "controller",
+        "gdpr:art14(1)",
+    ): "shall provide the data subject with the following information",
+    ("processor", "gdpr:art28(2)"): "written authorisation of the controller",
+    (
+        "processor",
+        "gdpr:art28(3)",
+    ): "shall be governed by a contract or other legal act",
+    (
+        "high_risk_annex_iii",
+        "aia:art17(1)",
+    ): "in the form of written policies, procedures and instructions",
+}
+
+
+def test_the_rows_that_need_legal_drafting_are_marked_and_no_other() -> None:
+    result = result_of(ALL_YES)
+    marked = {
+        (item.gate, row.id.split(":", 1)[1])
+        for item in result.gates
+        for row in item.rows
+        if row.drafting
+    }
+
+    assert marked == set(DRAFTING)
+    for (gate, unit), words in DRAFTING.items():
+        row = row_of(result, gate, unit)
+        assert row is not None and row.unit.quote is not None
+        assert words in normalized(row.unit.quote)
+
+
+# The grouping by regulation (MEMO-6): each result belongs to the regulation of the unit that defines
+# it, and the gate that decides whether the GDPR applies is the GDPR's head.
+def test_the_result_groups_its_results_under_the_regulation_of_the_unit_that_defines_each() -> (
+    None
+):
+    documents = {"32016R0679": "gdpr", "32024R1689": "ai_act"}
+    units = {unit.id: unit for unit in GATES.units}
+    result = result_of(ALL_YES)
+
+    assert [(item.id, item.name, item.gate) for item in result.regulations] == [
+        ("gdpr", "GDPR", "gdpr_applies"),
+        ("ai_act", "AI Act", None),
+    ]
+    for item in result.gates:
+        gate = next(gate for gate in GATES.gates if gate.id == item.gate)
+        assert item.regulation == documents[units[gate.quotes[0]].document]
+    assert (
+        next(item for item in result.gates if item.gate == "gdpr_applies").label
+        == "GDPR"
+    )
+
+
+# Reading the rows, the dates and the regulations of gates.yaml.
+def test_a_valid_file_with_a_row_is_read() -> None:
+    gates = parse_gates(
+        gates_text(
+            [GATE, ROLE],
+            regulations=[{**REGULATION, "gate": "gdpr_applies"}],
+            obligations=[{**OBLIGATION, "gate": "controller", "values": ["yes"]}],
+        ),
+        SCHEMA,
+    )
+
+    assert [
+        (row.gate, row.unit, row.date, row.values) for row in gates.obligations
+    ] == [("controller", "gdpr:art2(1)", "gdpr", ["yes"])]
+    assert [(item.id, item.gate) for item in gates.regulations] == [
+        ("gdpr", "gdpr_applies")
+    ]
+
+
+@pytest.mark.parametrize(
+    ("obligation", "name"),
+    [
+        ({**OBLIGATION, "gate": "not_a_gate"}, "not_a_gate"),
+        ({**OBLIGATION, "unit": "gdpr:art3"}, "gdpr:art3"),
+        ({**OBLIGATION, "unit": "not_a_unit"}, "not_a_unit"),
+        ({**OBLIGATION, "date": "not_a_date"}, "not_a_date"),
+        (
+            {**OBLIGATION, "needs": {"gate": "gdpr_applies", "slot": "personal_data"}},
+            "needs",
+        ),
+        ({**OBLIGATION, "needs": {}}, "needs"),
+        ({**OBLIGATION, "needs": {"gate": "not_a_gate"}}, "needs"),
+        ({**OBLIGATION, "needs": {"slot": "not_a_slot"}}, "needs"),
+        # A row needs the answer "yes" of a slot, which the area does not have.
+        ({**OBLIGATION, "needs": {"slot": "use_case_area"}}, "needs"),
+        ({**OBLIGATION, "values": ["not_a_value"]}, "values"),
+    ],
+    ids=[
+        "unknown_gate",
+        "unit_without_quote",
+        "unknown_unit",
+        "unknown_date",
+        "needs_both",
+        "needs_neither",
+        "needs_unknown_gate",
+        "needs_unknown_slot",
+        "needs_slot_without_yes",
+        "unknown_value",
+    ],
+)
+def test_a_row_that_names_what_the_file_does_not_have_is_refused_with_the_row(
+    obligation: dict[str, Any], name: str
+) -> None:
+    with pytest.raises(GatesError, match=rf"(?s)\bobligation\b.*{name}"):
+        parse_gates(gates_text(obligations=[obligation]), SCHEMA)
+
+
+# Two rows with the same gate and unit would have the same id, and one would lose its texts.
+def test_a_row_in_the_file_twice_is_refused_with_the_row() -> None:
+    with pytest.raises(
+        GatesError, match=r"\bobligation gdpr_applies gdpr:art2\(1\).*\btwice\b"
+    ):
+        parse_gates(gates_text(obligations=[OBLIGATION, OBLIGATION]), SCHEMA)
+
+
+# The result shows the gate that decides whether a regulation applies as the regulation's head, with
+# no rows under it, so a row there would never show.
+def test_a_row_under_the_gate_of_a_regulation_is_refused_with_the_row() -> None:
+    with pytest.raises(
+        GatesError, match=r"\bobligation gdpr_applies\b.*\bregulation gdpr\b"
+    ):
+        parse_gates(
+            gates_text(
+                regulations=[{**REGULATION, "gate": "gdpr_applies"}],
+                obligations=[OBLIGATION],
+            ),
+            SCHEMA,
+        )
+
+
+@pytest.mark.parametrize(
+    ("start", "name"),
+    [
+        ({**START, "unit": "not_a_unit"}, "not_a_unit"),
+        ({**START, "condition": "gdpr:art3"}, "gdpr:art3"),
+    ],
+    ids=["unknown_unit", "condition_without_quote"],
+)
+def test_a_date_that_names_what_the_file_does_not_have_is_refused_with_the_date(
+    start: dict[str, Any], name: str
+) -> None:
+    with pytest.raises(GatesError, match=rf"(?s)\bdate gdpr\b.*{name}"):
+        parse_gates(gates_text(dates=[start]), SCHEMA)
+
+
+def test_a_gate_whose_regulation_is_not_in_the_file_is_refused_with_its_name() -> None:
+    with pytest.raises(
+        GatesError, match=r"\bgate gdpr_applies\b.*\bnot_a_regulation\b"
+    ):
+        parse_gates(gates_text([{**GATE, "regulation": "not_a_regulation"}]), SCHEMA)
+
+
+@pytest.mark.parametrize(
+    ("regulations", "name"),
+    [
+        (
+            [{**REGULATION, "gate": "not_a_gate"}],
+            r"\bregulation gdpr\b.*\bnot_a_gate\b",
+        ),
+        (
+            [REGULATION, {"id": "ai_act", "name": "AI Act", "gate": "gdpr_applies"}],
+            r"\bregulation ai_act\b.*\bgdpr_applies\b",
+        ),
+    ],
+    ids=["unknown_gate", "gate_of_another_regulation"],
+)
+def test_a_regulation_whose_gate_is_not_one_of_its_own_is_refused_with_its_name(
+    regulations: list[dict[str, Any]], name: str
+) -> None:
+    with pytest.raises(GatesError, match=name):
+        parse_gates(gates_text(regulations=regulations), SCHEMA)

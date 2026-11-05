@@ -135,19 +135,35 @@ test("a filled-in form and the answered follow-up questions lead to the result, 
     await page.getByRole("button", { name: "Next" }).click();
   }
 
-  // The result of the gates first, then the recorded answers below it, in their own region, since
-  // the result has list items of its own.
+  // The result of the gates first, grouped by regulation, then the recorded answers below it, in
+  // their own region, since the result has list items of its own.
   await expectScreen(page, "Result");
   await expect(page.getByRole("heading", { level: 2 })).toHaveText([
-    "GDPR applies",
-    "Controller",
-    "Processor",
-    "Provider",
-    "High-risk under Annex III",
-    "Transparency: people interact with the product",
+    "GDPR",
+    "AI Act",
     "Not checked yet",
     "Recorded answers",
   ]);
+  await expect(page.getByRole("region", { name: "GDPR", exact: true }).getByRole("heading", { level: 3 })).toHaveText([
+    "Controller",
+    "Processor",
+  ]);
+  await expect(page.getByRole("region", { name: "AI Act", exact: true }).getByRole("heading", { level: 3 })).toHaveText([
+    "Provider",
+    "High-risk under Annex III",
+    "Transparency: people interact with the product",
+  ]);
+  // The rows of the controller, without the key: no cells for the meaning and the action, and no
+  // placeholder (issue #41). At this width each row stacks, with no header row.
+  const controller = page.getByRole("region", { name: "Controller", exact: true });
+  await expect(controller.getByRole("rowheader")).toHaveCount(9);
+  await expect(controller.getByRole("rowheader").first()).toContainText("A legal basis for each purpose");
+  await expect(controller.getByRole("cell")).toHaveCount(0);
+  await expect(page.getByText("Writing what this means for your product")).toHaveCount(0);
+  // At the width of a phone, the list of the results stands in one row above them.
+  await expect(
+    page.getByRole("navigation", { name: "The results, in short" }).getByRole("link", { name: "Controller (9)" }),
+  ).toBeVisible();
   const recorded = page.getByRole("region", { name: "Recorded answers" });
   for (const [, text] of DESCRIPTION) {
     await expect(recorded.getByRole("paragraph").filter({ hasText: text })).toBeVisible();

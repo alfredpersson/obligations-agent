@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from obligations_agent.guidance import Quote, Source
 from obligations_agent.schema import NOT_SURE, Schema, Slot
 
-ErrorCode = Literal["invalid_slot", "invalid_value", "not_found"]
+ErrorCode = Literal["invalid_slot", "invalid_value", "not_found", "not_ended"]
 # Why the model may not ask about a slot (TOOL-1).
 Refusal = Literal["not_askable", "limit_reached"]
 
@@ -71,11 +71,19 @@ class Question(BaseModel):
     check: str = ""
 
 
+class Text(BaseModel):
+    """What the clause of a row means for this product, and one action, as the model wrote them (MEMO-5)."""
+
+    meaning: str
+    action: str
+
+
 class Intake(Form):
-    """A stored intake. The answers hold one current value for each slot, the follow-up answers included, and not_sure the reason and the note of each slot whose current value is "not sure". questions holds each follow-up question, in the order asked, and replies the answer to each question that has one, in the same order."""
+    """A stored intake. The answers hold one current value for each slot, the follow-up answers included, and not_sure the reason and the note of each slot whose current value is "not sure". questions holds each follow-up question, in the order asked, and replies the answer to each question that has one, in the same order. texts holds the meaning and the action of each row by its id, or None for a row whose texts could not be written, once they are written."""
 
     questions: list[Question] = []
     replies: list[str] = []
+    texts: dict[str, Text | None] | None = None
 
 
 Writer = Callable[[Intake], Question | None]

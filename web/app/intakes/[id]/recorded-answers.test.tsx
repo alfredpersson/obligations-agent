@@ -11,6 +11,7 @@ const intake = {
   not_sure: { audience: { reason: "unknown", note: "" } },
   step: { type: "ready_to_confirm" },
   result: null,
+  texts: null,
 } satisfies Intake;
 
 afterEach(cleanup);
