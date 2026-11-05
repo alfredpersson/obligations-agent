@@ -29,7 +29,7 @@ test("the start page says what the tool does, how to use it, what the user gets,
       .getAllByRole("listitem")
       .map((item) => item.textContent),
   ).toEqual([
-    "GDPR applies GDPR Article 2(1)",
+    "GDPR GDPR Article 2(1)",
     "Controller GDPR Article 4(7)",
     "Processor GDPR Article 4(8)",
     "Provider AI Act Article 3(3)",
@@ -61,7 +61,7 @@ test("the excerpt shows the three gates that the example's form answers decide, 
   const excerpt = screen.getByRole("figure");
   expect(excerpt.querySelector("figcaption")?.textContent).toBe("From the result for the example product");
   expect(within(excerpt).getAllByRole("listitem").map((item) => item.textContent)).toEqual([
-    "GDPR applies Applies.",
+    "GDPR Applies.",
     "Provider Applies.",
     "High-risk under Annex III Conditional.",
   ]);
@@ -71,4 +71,18 @@ test("the excerpt shows the three gates that the example's form answers decide, 
   expect(lines.at(-1)).toBe("…");
   expect(lines.slice(0, -1)).toHaveLength(2);
   for (const line of lines.slice(0, -1)) expect(GATES).toContain(`\n      ${line}\n`);
+});
+
+test("the start page names the rows of each result, with their dates, meanings and actions, among what the user gets", () => {
+  render(<Home />);
+
+  const step = screen.getByRole("heading", { level: 3, name: "Read the result" });
+  expect(step.nextElementSibling?.textContent).toBe(
+    "Which parts apply and the main obligations of each, with the date, what each means for your product and one action.",
+  );
+  expect(
+    screen.getByText(
+      "Under each check that applies or depends on your answers, the result lists its main obligations, each with the date from which it applies, the clause quoted and linked, what it means for your product, and one action.",
+    ),
+  ).toBeTruthy();
 });

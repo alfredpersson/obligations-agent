@@ -53,21 +53,54 @@ export type Cited = { citation: string; link: string; quote: string | null };
 // for a gate under another one, where the gate above applies (MEMO-6).
 export type Condition = { slot: string; gate: string; cases: { values: string[]; result: string }[] };
 
-// The result of one gate (GATE-2, GATE-4).
+// A row of a result: its unit quoted and linked, the date from which it applies with the unit that
+// sets it, a condition of that date that the user decides, and what else it needed: the answer of a
+// slot, or null while the slot is open, or the status of another gate (MEMO-5, MEMO-6).
+export type Row = {
+  id: string;
+  label: string;
+  status: "applies" | "conditional";
+  unit: Cited;
+  date: string;
+  date_unit: Cited;
+  condition: Cited | null;
+  needs: { slot: string | null; value: string | null; gate: string | null; status: string | null } | null;
+  drafting: boolean;
+};
+
+// The result of one gate (GATE-2, GATE-4), with the regulation that it belongs to, and its rows.
 export type Outcome = {
   gate: string;
   label: string;
+  regulation: string;
   status: "applies" | "does_not_apply" | "conditional";
   result: "applies" | "does_not_apply" | "listed_use" | null;
   derogation: "always" | "unless" | null;
   answers: Record<string, string>;
   conditions: Condition[];
   quotes: Cited[];
+  rows: Row[];
 };
+
+// What the clause of a row means for this product, and one action, as a model wrote them (MEMO-5).
+export type Text = { meaning: string; action: string };
+
+// The texts of the rows by row id, null for a row whose texts could not be written. The whole map is
+// null when the service has no key, and empty until the texts are written.
+export type Texts = Record<string, Text | null> | null;
 
 export type Statement = { text: string; links: Cited[] };
 
-export type Result = { assumptions: Statement[]; gates: Outcome[]; not_checked: Statement[] };
+// A regulation that the result groups its results under, and the gate that decides whether it
+// applies, or null for a regulation that the result assumes to apply (MEMO-6).
+export type Regulation = { id: string; name: string; gate: string | null };
+
+export type Result = {
+  assumptions: Statement[];
+  regulations: Regulation[];
+  gates: Outcome[];
+  not_checked: Statement[];
+};
 
 export type Intake = {
   description: Record<string, string>;
@@ -77,4 +110,5 @@ export type Intake = {
   step: Step;
   // Null until the intake has ended.
   result: Result | null;
+  texts: Texts;
 };

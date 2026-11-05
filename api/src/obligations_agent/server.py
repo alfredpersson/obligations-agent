@@ -1,4 +1,4 @@
-"""The HTTP API that the web app calls: GET /schema, POST /intakes, GET /intakes/{id} and POST /intakes/{id}/answers."""
+"""The HTTP API that the web app calls: GET /schema, POST /intakes, GET /intakes/{id}, POST /intakes/{id}/answers and POST /intakes/{id}/texts."""
 
 import logging
 import os
@@ -27,6 +27,7 @@ from obligations_agent.intakes import (
     waiting,
 )
 from obligations_agent.schema import Schema, load_schema
+from obligations_agent.writer import write_texts
 
 READY_TO_CONFIRM = {"type": "ready_to_confirm"}
 
@@ -34,6 +35,7 @@ STATUS: dict[ErrorCode, int] = {
     "invalid_slot": 422,
     "invalid_value": 422,
     "not_found": 404,
+    "not_ended": 409,
 }
 
 
@@ -116,6 +118,11 @@ def create_app(
             "result": None
             if waiting(intake) is not None
             else decide(gates, schema, intake).model_dump(),
+            # The meaning and the action of each row: none without the key, and an empty map until
+            # POST /intakes/{id}/texts has written them (MEMO-1).
+            "texts": None
+            if client is None or waiting(intake) is not None
+            else (intake.texts or {}),
         }
 
     @app.post("/intakes/{intake_id}/answers")
@@ -130,6 +137,24 @@ def create_app(
             )
             intakes[intake_id] = intake
         return {"step": step(intake)}
+
+    @app.post("/intakes/{intake_id}/texts")
+    def post_texts(intake_id: str) -> dict[str, Any]:
+        # Under the lock, so that two requests at once write the texts once, and every later request
+        # returns the stored texts.
+        with answering:
+            intake = intakes.get(intake_id)
+            if intake is None:
+                raise IntakeError("not_found")
+            if waiting(intake) is not None:
+                raise IntakeError("not_ended")
+            if client is not None and intake.texts is None:
+                texts = write_texts(
+                    client, schema, intake, decide(gates, schema, intake)
+                )
+                intake = intake.model_copy(update={"texts": texts})
+                intakes[intake_id] = intake
+        return {"texts": intake.texts}
 
     return app
 

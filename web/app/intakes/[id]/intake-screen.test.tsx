@@ -1,13 +1,14 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
-import type { Intake, Question } from "../../service";
-import { PLAIN, stubFetch, testResult, testSchema } from "../../testing";
+import type { Intake, Question, Texts } from "../../service";
+import { PLAIN, stubFetch, testResult, testRows, testSchema } from "../../testing";
 import IntakeScreen from "./intake-screen";
 
 vi.mock("next/navigation", () => ({ useParams: () => ({ id: "kq2V8yZx0bP4mT7nLw3sAg" }) }));
 
 const INTAKE_URL = "/api/intakes/kq2V8yZx0bP4mT7nLw3sAg";
 const ANSWERS_URL = `${INTAKE_URL}/answers`;
+const TEXTS_URL = `${INTAKE_URL}/texts`;
 
 function question(number: number, slot: string, text: string) {
   return {
@@ -36,6 +37,7 @@ const waiting = {
   not_sure: {},
   step: SECOND,
   result: null,
+  texts: null,
 } satisfies Intake;
 const ended = {
   ...waiting,
@@ -197,4 +199,94 @@ test("a failed call shows a message", async () => {
   expect((await screen.findByRole("alert")).textContent).toBe(
     "The answers could not be loaded. Reload the page to try again.",
   );
+});
+
+// The texts of the rows (issue #41): the result with rows under a result that applies, and the
+// texts that the service writes for them.
+const withRows = {
+  ...testResult,
+  gates: testResult.gates.map((gate) =>
+    gate.gate === "storage" ? { ...gate, status: "applies" as const, conditions: [], rows: testRows } : gate,
+  ),
+};
+const TEXTS: Texts = {
+  "storage:rule:art5(1)": { meaning: "You must delete video after a month.", action: "Add a job that deletes old video." },
+  "storage:rule:art6(1)": { meaning: "If you share video, show a notice.", action: "Draft the notice." },
+};
+const PLACEHOLDER = "Writing what this means for your product, and an action.";
+
+function endedWith(texts: Texts) {
+  return { ...ended, result: withRows, texts } satisfies Intake;
+}
+
+function textRequests(fetchMock: ReturnType<typeof stubFetch>) {
+  return fetchMock.mock.calls.filter(([input]) => String(input) === TEXTS_URL);
+}
+
+test("an ended intake with rows sends the request for the texts once, and shows the texts in the rows", async () => {
+  const fetchMock = stubFetch({
+    [INTAKE_URL]: Response.json(endedWith({})),
+    "/api/schema": Response.json(testSchema),
+    [TEXTS_URL]: Response.json({ texts: TEXTS }),
+  });
+  render(<IntakeScreen />);
+
+  expect(await screen.findByText("Add a job that deletes old video.")).toBeTruthy();
+  expect(screen.getByText("Draft the notice.")).toBeTruthy();
+  const requests = textRequests(fetchMock);
+  expect(requests).toHaveLength(1);
+  expect(requests[0][1]?.method).toBe("POST");
+  expect(screen.queryByText(PLACEHOLDER)).toBeNull();
+});
+
+test("while the request for the texts waits, the result and the rows show, each row with its placeholder", async () => {
+  const texts = Promise.withResolvers<Response>();
+  vi.stubGlobal(
+    "fetch",
+    vi.fn<typeof fetch>(async (input) => {
+      if (String(input) === TEXTS_URL) return texts.promise;
+      if (String(input) === INTAKE_URL) return Response.json(endedWith({}));
+      return Response.json(testSchema);
+    }),
+  );
+  render(<IntakeScreen />);
+
+  await expectResultThenAnswers();
+  expect(await screen.findAllByText(PLACEHOLDER)).toHaveLength(2);
+  expect(screen.getByRole("status").textContent).toBe(
+    "Writing what each row means for your product, and an action. This takes a few seconds.",
+  );
+  texts.resolve(Response.json({ texts: TEXTS }));
+  expect(await screen.findByText("Draft the notice.")).toBeTruthy();
+  await waitFor(() => expect(screen.getByRole("status").textContent).toBe(""));
+});
+
+test("without the key, the screen sends no request for the texts and shows no placeholder", async () => {
+  const fetchMock = stubFetch({ [INTAKE_URL]: Response.json(endedWith(null)), "/api/schema": Response.json(testSchema) });
+  render(<IntakeScreen />);
+
+  await expectResultThenAnswers();
+  expect(screen.getAllByRole("rowheader")).toHaveLength(2);
+  expect(textRequests(fetchMock)).toHaveLength(0);
+  expect(screen.queryByText(PLACEHOLDER)).toBeNull();
+});
+
+test("texts that the service has stored show at once, with no request", async () => {
+  const fetchMock = stubFetch({ [INTAKE_URL]: Response.json(endedWith(TEXTS)), "/api/schema": Response.json(testSchema) });
+  render(<IntakeScreen />);
+
+  expect(await screen.findByText("Draft the notice.")).toBeTruthy();
+  expect(textRequests(fetchMock)).toHaveLength(0);
+});
+
+test("a failed request for the texts leaves each row with the line that its texts could not be written", async () => {
+  stubFetch({
+    [INTAKE_URL]: Response.json(endedWith({})),
+    "/api/schema": Response.json(testSchema),
+    [TEXTS_URL]: new Response(null, { status: 500 }),
+  });
+  render(<IntakeScreen />);
+
+  expect(await screen.findAllByText("The meaning and the action of this row could not be written.")).toHaveLength(2);
+  expect(screen.queryByText(PLACEHOLDER)).toBeNull();
 });

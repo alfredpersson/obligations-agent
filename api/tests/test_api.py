@@ -507,6 +507,7 @@ def test_get_intake_returns_the_answers_and_the_open_slots_in_schema_order(
         "step": FIRST_QUESTION,
         # The intake has not ended.
         "result": None,
+        "texts": None,
     }
 
 
@@ -530,7 +531,8 @@ def test_the_result_is_null_while_a_question_waits_and_computed_once_the_intake_
 
     assert intake["result"]["gates"][0] == {
         "gate": "gdpr_applies",
-        "label": "GDPR applies",
+        "label": "GDPR",
+        "regulation": "gdpr",
         "status": "applies",
         "result": "applies",
         "derogation": None,
@@ -545,6 +547,8 @@ def test_the_result_is_null_while_a_question_waits_and_computed_once_the_intake_
                 "quote": "This Regulation applies to the processing of personal data wholly or partly by automated means and to the processing other than by automated means of personal data which form part of a filing system or are intended to form part of a filing system.",
             }
         ],
+        # The head of the GDPR has no rows of its own.
+        "rows": [],
     }
     assert [item["status"] for item in intake["result"]["gates"]] == [
         "applies",
