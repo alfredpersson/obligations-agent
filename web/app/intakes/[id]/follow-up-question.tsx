@@ -2,25 +2,35 @@
 
 import { type SubmitEvent, useId, useState, useTransition } from "react";
 import styles from "../../actions.module.css";
-import LoadingStatus, { WRITING } from "../../loading-status";
+import LoadingStatus from "../../loading-status";
 import NotSureReason from "../../not-sure-reason";
-import { NOT_SURE, type NotSure, type Question, type Step } from "../../service";
+import { type Asked, NOT_SURE, type NotSure } from "../../service";
 import GuidanceExamples from "./guidance-examples";
 
-// One follow-up question with the options of its step, and the button that sends the answer
-// (INTAKE-1). The explanation, the examples and the check line come first, then the question
-// with what each answer means, directly above the options (RESP-6).
-export default function FollowUpQuestion({
-  id,
+// One question about a fact with its options, and the button that sends the answer: a follow-up
+// question (INTAKE-1), or the question of a fact on the screen of the answers, which opens with the
+// current answer chosen (INTAKE-5). The explanation, the examples and the check line come first,
+// then the question with what each answer means, directly above the options (RESP-6).
+export default function FollowUpQuestion<T>({
   question,
-  onStep,
+  request,
+  button,
+  current,
+  waiting,
+  onSent,
 }: {
-  id: string;
-  question: Question;
-  onStep: (step: Step) => void;
+  question: Asked;
+  // Where the answer goes, and what its body holds besides the value and, for "not sure", the
+  // reason and the note.
+  request: { url: string; method: "POST" | "PUT"; body?: Record<string, unknown> };
+  button: string;
+  current?: { value: string; notSure?: NotSure };
+  // The status while the answer is sent: a follow-up answer waits for the next question.
+  waiting?: string;
+  onSent: (response: T) => void;
 }) {
-  const [value, setValue] = useState<string | null>(null);
-  const [notSure, setNotSure] = useState<Partial<NotSure>>({});
+  const [value, setValue] = useState<string | null>(current?.value ?? null);
+  const [notSure, setNotSure] = useState<Partial<NotSure>>(current?.notSure ?? {});
   const [message, setMessage] = useState<string | null>(null);
   const [sending, startTransition] = useTransition();
   const meaning = useId();
@@ -28,25 +38,25 @@ export default function FollowUpQuestion({
   function send(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage(null);
-    // Next stays disabled until the request fails or the next step is shown, so that a second
+    // The button stays disabled until the request fails or what follows is shown, so that a second
     // click sends nothing.
     startTransition(async () => {
       try {
-        const response = await fetch(`/api/intakes/${id}/answers`, {
-          method: "POST",
+        const response = await fetch(request.url, {
+          method: request.method,
           // The service refuses a JSON body without this header.
           headers: { "Content-Type": "application/json" },
           // JSON.stringify leaves out a key whose value is undefined, so another answer is sent
           // without not_sure, which the service refuses with any value but not_sure.
           body: JSON.stringify({
-            question: question.number,
+            ...request.body,
             value,
             not_sure: value === NOT_SURE ? notSure : undefined,
           }),
         });
         if (!response.ok) throw new Error();
-        const { step } = (await response.json()) as { step: Step };
-        startTransition(() => onStep(step));
+        const sent = (await response.json()) as T;
+        startTransition(() => onSent(sent));
       } catch {
         setMessage("The answer could not be sent. Try again.");
       }
@@ -80,9 +90,9 @@ export default function FollowUpQuestion({
           type="submit"
           disabled={value === null || (value === NOT_SURE && !notSure.reason) || sending}
         >
-          Next
+          {button}
         </button>
-        <LoadingStatus message={sending ? WRITING : null} />
+        <LoadingStatus message={sending ? (waiting ?? null) : null} />
       </div>
     </form>
   );

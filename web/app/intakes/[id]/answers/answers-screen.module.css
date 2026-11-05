@@ -1,0 +1,85 @@
+/* The screen of the answers: the description folded under the heading, then the open facts, each
+   with a bar in the color of a conditional result, then the answered facts, each fact in one line
+   between thin rules on a wide screen: its label, its answer, and the link to its question. */
+.lead {
+  font-size: var(--size-legend);
+}
+
+.description {
+  margin: 0 0 var(--space-6);
+}
+
+.description > summary {
+  color: var(--color-accent);
+  cursor: pointer;
+}
+
+.fixed,
+.count,
+.note {
+  color: var(--color-muted);
+  font-size: var(--size-note);
+}
+
+.fixed {
+  margin: var(--space-3) 0;
+}
+
+/* A rule above the first fact; each fact has the rule of a list of answers under it. */
+.facts {
+  border-top: 1px solid var(--color-rule);
+}
+
+.facts > div {
+  grid-template-columns: minmax(0, 2fr) minmax(0, 2fr) auto;
+  column-gap: var(--space-4);
+  row-gap: 0;
+  align-items: start;
+  padding: var(--space-3) 0;
+  /* Space above a fact that the screen scrolls to. */
+  scroll-margin-top: var(--space-6);
+}
+
+.facts dd {
+  grid-column: 2;
+}
+
+.facts .change {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  align-self: center;
+}
+
+.change a {
+  display: inline-block;
+  padding: var(--space-2) var(--space-4);
+}
+
+.open {
+  padding-left: var(--space-4);
+  border-left: 3px solid var(--color-conditional-mark);
+}
+
+.reason {
+  color: var(--color-muted);
+}
+
+.back {
+  font-size: var(--size-note);
+}
+
+/* On a phone, the label and the answer stand in one column, with the link beside them. */
+@media (max-width: 40rem) {
+  .facts > div {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .facts dd {
+    grid-column: 1;
+  }
+
+  .facts .change {
+    grid-column: 2;
+    grid-row: 1 / span 3;
+  }
+}

@@ -34,7 +34,7 @@ const FOLLOW_UPS = [
 ];
 
 // The notes of the two "Not sure" answers: on the form, and to the last follow-up question. The
-// form's note has a word of 60 characters, which the result and the recorded answers must wrap.
+// form's note has a word of 60 characters, which the screen of the answers and the result must wrap.
 const FORM_NOTE =
   "We have not decided whose brand goes on the product. See brand_decision_for_the_support_assistant_in_the_online_store.";
 const FOLLOW_UP_NOTE = "Does a chat window on the shop's website count?";
@@ -69,7 +69,7 @@ async function expectOutline(element: Locator) {
 
 // After a navigation, Next.js keeps the previous page in the document, hidden. The test finds
 // elements by role, because role queries skip hidden elements.
-test("a filled-in form and the answered follow-up questions lead to the result, with the recorded answers below it", async ({
+test("a filled-in form and the answered follow-up questions lead to the screen of the answers, where a change and a confirmation show the result, and from the result the user answers an open fact and confirms again", async ({
   page,
 }) => {
   await page.goto("/");
@@ -135,15 +135,57 @@ test("a filled-in form and the answered follow-up questions lead to the result, 
     await page.getByRole("button", { name: "Next" }).click();
   }
 
-  // The result of the gates first, grouped by regulation, then the recorded answers below it, in
-  // their own region, since the result has list items of its own.
-  await expectScreen(page, "Result");
-  await expect(page.getByRole("heading", { level: 2 })).toHaveText([
-    "GDPR",
-    "AI Act",
-    "Not checked yet",
-    "Recorded answers",
+  // The screen of the answers in place of the questions (issue #50): the open facts first, then the
+  // answered facts, each with its label and its answer; a "not sure" answer with its reason and its
+  // note, each in a line of its own.
+  await expect(page).toHaveURL(/\/intakes\/[A-Za-z0-9_-]{22}\/answers$/);
+  await expectScreen(page, "Check your answers");
+  const open = page.getByRole("region", { name: "Open answers" });
+  await expect(open.getByRole("term")).toHaveText(["Under own name or trademark", "Interacts with people"]);
+  await expect(open.getByRole("definition")).toHaveText([
+    "Not sure · I don't know this about the product",
+    `Note: ${FORM_NOTE}`,
+    "Answer",
+    "Not sure · I don't understand the question",
+    `Note: ${FOLLOW_UP_NOTE}`,
+    "Answer",
   ]);
+  const answered = page.getByRole("region", { name: "Your answers" });
+  await expect(answered.getByRole("term")).toHaveText([
+    "Personal data",
+    "Use-case area",
+    "Decides why and how personal data is processed",
+    "Processes personal data for a customer",
+    "Special categories of personal data",
+    "Automated decisions about people",
+  ]);
+  await expect(answered.getByRole("definition")).toHaveText(
+    ["Yes", "None of these", "Yes", "No", "No", "No"].flatMap((answer) => [answer, "Change"]),
+  );
+  // The description, folded under its link.
+  await page.getByText("Show your description").click();
+  for (const [, text] of DESCRIPTION) {
+    await expect(page.getByRole("definition").filter({ hasText: text })).toBeVisible();
+  }
+
+  // A change: the fact's question as its own screen, with the current answer chosen.
+  await page.getByRole("link", { name: "Change Processes personal data for a customer" }).click();
+  await expect(page).toHaveURL(/\/answers\?change=processes_for_customer$/);
+  await expectScreen(page, "Processes personal data for a customer");
+  const processes = page.getByRole("group", { name: "Do you process personal data on behalf of a customer," });
+  await expect(processes.getByRole("radio", { name: "No", exact: true })).toBeChecked();
+  await processes.getByRole("radio", { name: "Yes" }).check();
+  await page.getByRole("button", { name: "Save the answer" }).click();
+  await expect(page).toHaveURL(/\/answers#processes_for_customer$/);
+  await expectScreen(page, "Check your answers");
+  await expect(page.locator("#processes_for_customer").getByRole("definition").first()).toHaveText("Yes");
+
+  // The confirmation: the result of the gates, grouped by regulation, with the way back to the
+  // answers in place of the recorded answers.
+  await page.getByRole("button", { name: "Confirm and show the result" }).click();
+  await expect(page).toHaveURL(/\/intakes\/[A-Za-z0-9_-]{22}$/);
+  await expectScreen(page, "Result");
+  await expect(page.getByRole("heading", { level: 2 })).toHaveText(["GDPR", "AI Act", "Not checked yet"]);
   await expect(page.getByRole("region", { name: "GDPR", exact: true }).getByRole("heading", { level: 3 })).toHaveText([
     "Controller",
     "Processor",
@@ -160,42 +202,39 @@ test("a filled-in form and the answered follow-up questions lead to the result, 
   await expect(controller.getByRole("rowheader").first()).toContainText("A legal basis for each purpose");
   await expect(controller.getByRole("cell")).toHaveCount(0);
   await expect(page.getByText("Writing what this means for your product")).toHaveCount(0);
+  // The changed answer: the processor applies, with its rows.
+  const processor = page.getByRole("region", { name: "Processor", exact: true });
+  await expect(processor.getByRole("paragraph").first()).toContainText("Applies.");
+  await expect(processor.getByRole("rowheader")).toHaveCount(4);
   // At the width of a phone, the list of the results stands in one row above them.
   await expect(
     page.getByRole("navigation", { name: "The results, in short" }).getByRole("link", { name: "Controller (9)" }),
   ).toBeVisible();
-  const recorded = page.getByRole("region", { name: "Recorded answers" });
-  for (const [, text] of DESCRIPTION) {
-    await expect(recorded.getByRole("paragraph").filter({ hasText: text })).toBeVisible();
-  }
-  await expect(recorded.getByRole("term")).toHaveText([
-    "Personal data",
-    "Under own name or trademark",
-    "Use-case area",
-    "Decides why and how personal data is processed",
-    "Processes personal data for a customer",
-    "Special categories of personal data",
-    "Automated decisions about people",
-    "Interacts with people",
-  ]);
-  await expect(recorded.getByRole("definition")).toHaveText([
-    "Yes",
-    "Not sure",
-    "None of these",
-    "Yes",
-    "No",
-    "No",
-    "No",
-    "Not sure",
-  ]);
-  // The label, the reason and the note are lines of their own, so the rendered text separates them.
-  await expect(recorded.getByRole("listitem")).toHaveText(
-    [
-      `Under own name or trademark I don't know this about the product Note: ${FORM_NOTE}`,
-      `Interacts with people I don't understand the question Note: ${FOLLOW_UP_NOTE}`,
-    ],
-    { useInnerText: true },
+  // An open fact links to its place on the screen of the answers.
+  await expect(page.getByRole("link", { name: "Interacts with people" }).first()).toHaveAttribute(
+    "href",
+    /\/intakes\/[A-Za-z0-9_-]{22}\/answers#interacts_with_people$/,
   );
+
+  // Back to the answers: the open fact under own name answered, then a second confirmation.
+  await page.getByRole("link", { name: "Check or change the answers" }).click();
+  await expectScreen(page, "Check your answers");
+  await page.getByRole("link", { name: "Answer Under own name or trademark" }).click();
+  await expectScreen(page, "Under own name or trademark");
+  const ownNameAgain = page.getByRole("group", {
+    name: "Do you place the product on the market or put it into service under your own name or trademark?",
+  });
+  await expect(ownNameAgain.getByRole("radio", { name: "Not sure" })).toBeChecked();
+  await expect(ownNameAgain.getByRole("textbox")).toHaveValue(FORM_NOTE);
+  await ownNameAgain.getByRole("radio", { name: "Yes" }).check();
+  await page.getByRole("button", { name: "Save the answer" }).click();
+  await expectScreen(page, "Check your answers");
+  await expect(page.getByRole("region", { name: "Open answers" }).getByRole("term")).toHaveText(["Interacts with people"]);
+  await page.getByRole("button", { name: "Confirm and show the result" }).click();
+  await expectScreen(page, "Result");
+  const provider = page.getByRole("region", { name: "Provider", exact: true });
+  await expect(provider.getByRole("paragraph").first()).toContainText("Applies.");
+  await expect(provider.getByRole("rowheader")).toHaveCount(1);
 
   // The next intake starts on an empty form, although Next.js keeps the form's page with its state.
   await page.getByRole("banner").getByRole("link", { name: "Dutymap" }).click();

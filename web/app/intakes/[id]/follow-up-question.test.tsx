@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
-import type { Question } from "../../service";
+import { WRITING } from "../../loading-status";
+import type { Question, Step } from "../../service";
 import { PLAIN, stubFetch } from "../../testing";
 import FollowUpQuestion from "./follow-up-question";
 
@@ -117,6 +118,20 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+// The question screen's use of the component: the answer to the question's number, the button Next,
+// and the next step for onStep.
+function renderQuestion(shown: Question, onStep: (step: Step) => void = vi.fn()) {
+  return render(
+    <FollowUpQuestion
+      question={shown}
+      request={{ url: `/api/intakes/${ID}/answers`, method: "POST", body: { question: shown.number } }}
+      button="Next"
+      waiting={WRITING}
+      onSent={(sent) => onStep((sent as { step: Step }).step)}
+    />,
+  );
+}
+
 function choice(label: string) {
   const group = screen.getByRole("group", { name: question.text });
   return within(group).getByRole("radio", { name: label }) as HTMLInputElement;
@@ -136,7 +151,7 @@ function note() {
 }
 
 test("the question shows its text and the options of the step, none selected, and Next is disabled until a choice is selected", () => {
-  render(<FollowUpQuestion id={ID} question={question} onStep={vi.fn()} />);
+  renderQuestion(question);
 
   const radios = within(screen.getByRole("group", { name: question.text })).getAllByRole(
     "radio",
@@ -164,7 +179,7 @@ test("a sent answer posts the question number and the value of the choice, and p
   } satisfies Question;
   const fetchMock = stubFetch({ [ANSWERS_URL]: Response.json({ step: next }) });
   const onStep = vi.fn();
-  render(<FollowUpQuestion id={ID} question={question} onStep={onStep} />);
+  renderQuestion(question, onStep);
 
   fireEvent.click(choice("No, it is not kept"));
   fireEvent.click(nextButton());
@@ -182,7 +197,7 @@ test("Next is disabled while the answer is sent, so that a second click sends no
   const { promise, reject } = Promise.withResolvers<Response>();
   const fetchMock = vi.fn<typeof fetch>(() => promise);
   vi.stubGlobal("fetch", fetchMock);
-  render(<FollowUpQuestion id={ID} question={question} onStep={vi.fn()} />);
+  renderQuestion(question);
   fireEvent.click(choice("Yes, it is kept"));
 
   fireEvent.click(nextButton());
@@ -199,7 +214,7 @@ test("Next is disabled while the answer is sent, so that a second click sends no
 test("while the answer is sent, the status after Next says that the next question is being written, and it is empty again after an error", async () => {
   const sent = Promise.withResolvers<Response>();
   vi.stubGlobal("fetch", vi.fn<typeof fetch>(() => sent.promise));
-  render(<FollowUpQuestion id={ID} question={question} onStep={vi.fn()} />);
+  renderQuestion(question);
   // The status is in the page, empty, before the wait, so that screen readers announce its message.
   const status = screen.getByRole("status");
   expect(status.textContent).toBe("");
@@ -225,7 +240,7 @@ test.each([
 ])("when sending fails (%s), a message shows and the choice, the reason and the note stay", async (_, result) => {
   stubFetch({ [ANSWERS_URL]: result });
   const onStep = vi.fn();
-  render(<FollowUpQuestion id={ID} question={question} onStep={onStep} />);
+  renderQuestion(question, onStep);
   fireEvent.click(choice("Not sure"));
   fireEvent.click(reason("I don't understand the question"));
   fireEvent.change(note(), { target: { value: "Which video?" } });
@@ -240,7 +255,7 @@ test.each([
 });
 
 test("the option with the value not_sure, whatever its label, shows the two reasons below the options, none chosen, until another option is chosen", () => {
-  render(<FollowUpQuestion id={ID} question={unsure} onStep={vi.fn()} />);
+  renderQuestion(unsure);
   expect(screen.queryByRole("group", { name: "Why are you not sure?" })).toBeNull();
 
   fireEvent.click(choice("I don't know"));
@@ -261,7 +276,7 @@ test("the option with the value not_sure, whatever its label, shows the two reas
 });
 
 test("a note field of at most 500 characters appears once a reason is chosen, with a label that follows the reason", () => {
-  render(<FollowUpQuestion id={ID} question={unsure} onStep={vi.fn()} />);
+  renderQuestion(unsure);
   fireEvent.click(choice("I don't know"));
   expect(screen.queryByRole("textbox")).toBeNull();
 
@@ -281,7 +296,7 @@ test("a note field of at most 500 characters appears once a reason is chosen, wi
 });
 
 test("Next stays disabled after the option not_sure until a reason is chosen, and the note is optional", () => {
-  render(<FollowUpQuestion id={ID} question={unsure} onStep={vi.fn()} />);
+  renderQuestion(unsure);
   fireEvent.click(choice("I don't know"));
   expect(nextButton().disabled).toBe(true);
 
@@ -294,7 +309,7 @@ test("a not_sure answer posts its reason and its note", async () => {
     [ANSWERS_URL]: Response.json({ step: { type: "ready_to_confirm" } }),
   });
   const onStep = vi.fn();
-  render(<FollowUpQuestion id={ID} question={unsure} onStep={onStep} />);
+  renderQuestion(unsure, onStep);
   fireEvent.click(choice("I don't know"));
   fireEvent.click(reason("I don't understand the question"));
   fireEvent.change(note(), { target: { value: "Which video?" } });
@@ -314,7 +329,7 @@ test("the reason and the note stay while another option is chosen, and another a
     [ANSWERS_URL]: Response.json({ step: { type: "ready_to_confirm" } }),
   });
   const onStep = vi.fn();
-  render(<FollowUpQuestion id={ID} question={unsure} onStep={onStep} />);
+  renderQuestion(unsure, onStep);
   fireEvent.click(choice("I don't know"));
   fireEvent.click(reason("I don't understand the question"));
   fireEvent.change(note(), { target: { value: "Which video?" } });
@@ -331,7 +346,7 @@ test("the reason and the note stay while another option is chosen, and another a
 });
 
 test("the explanation, the examples and the check line come first, then the question with its meaning directly above the options", () => {
-  const { container } = render(<FollowUpQuestion id={ID} question={full} onStep={vi.fn()} />);
+  const { container } = renderQuestion(full);
 
   const form = container.querySelector("form") as HTMLFormElement;
   const group = screen.getByRole("group", { name: full.text });
@@ -354,7 +369,7 @@ test("the explanation, the examples and the check line come first, then the ques
 });
 
 test("a question without an explanation, examples, a check line and a meaning shows only its options and Next", () => {
-  const { container } = render(<FollowUpQuestion id={ID} question={question} onStep={vi.fn()} />);
+  const { container } = renderQuestion(question);
 
   const form = container.querySelector("form") as HTMLFormElement;
   expect([...form.children].map((child) => child.tagName)).toEqual(["FIELDSET", "DIV"]);
@@ -363,7 +378,7 @@ test("a question without an explanation, examples, a check line and a meaning sh
 });
 
 test("the examples show the line of each group once, as a heading above the quotes of all its entries, in the step's order, and no side", () => {
-  render(<FollowUpQuestion id={ID} question={full} onStep={vi.fn()} />);
+  renderQuestion(full);
 
   const region = screen.getByRole("region", { name: EXAMPLES });
   // The lines and the quotes in the order of the document: each line once, above the quotes of all
@@ -383,7 +398,7 @@ test("the examples show the line of each group once, as a heading above the quot
 });
 
 test("each group of examples is one element, from its line to its last source line, so that the screen can show it as a card", () => {
-  render(<FollowUpQuestion id={ID} question={full} onStep={vi.fn()} />);
+  renderQuestion(full);
 
   const region = screen.getByRole("region", { name: EXAMPLES });
   const groups = within(region)
@@ -402,7 +417,7 @@ test("each group of examples is one element, from its line to its last source li
 });
 
 test("inside a group a heading shows once for quotes in a row that share it, also across entries, and again after the source line of another source and in the next group", () => {
-  render(<FollowUpQuestion id={ID} question={full} onStep={vi.fn()} />);
+  renderQuestion(full);
 
   const region = screen.getByRole("region", { name: EXAMPLES });
   const quotes = within(region).getAllByRole("blockquote");
@@ -419,7 +434,7 @@ test("inside a group a heading shows once for quotes in a row that share it, als
 });
 
 test("inside a group the source line shows once, after the quotes of entries in a row from the same source, and the next group shows it again", () => {
-  render(<FollowUpQuestion id={ID} question={full} onStep={vi.fn()} />);
+  renderQuestion(full);
 
   const region = screen.getByRole("region", { name: EXAMPLES });
   const quotes = within(region).getAllByRole("blockquote");
@@ -439,7 +454,7 @@ test("inside a group the source line shows once, after the quotes of entries in 
 });
 
 test("the source line gives the body, the title as a link that opens in a new tab, the note where the source has one, and the date its quotes were checked", () => {
-  render(<FollowUpQuestion id={ID} question={full} onStep={vi.fn()} />);
+  renderQuestion(full);
 
   const region = screen.getByRole("region", { name: EXAMPLES });
   const [camera] = within(region).getAllByRole("link", { name: "Camera guidance" });
@@ -457,12 +472,12 @@ test("the source line gives the body, the title as a link that opens in a new ta
 });
 
 test("the group of the options is named by the question and described by its meaning, and has no description without a meaning", () => {
-  render(<FollowUpQuestion id={ID} question={full} onStep={vi.fn()} />);
+  renderQuestion(full);
 
   expect(screen.getByRole("group", { name: full.text, description: full.meaning })).toBeTruthy();
   cleanup();
 
-  render(<FollowUpQuestion id={ID} question={question} onStep={vi.fn()} />);
+  renderQuestion(question);
 
   expect(screen.getByRole("group", { name: question.text }).hasAttribute("aria-describedby")).toBe(false);
 });

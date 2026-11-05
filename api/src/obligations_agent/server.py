@@ -1,4 +1,4 @@
-"""The HTTP API that the web app calls: GET /schema, POST /intakes, GET /intakes/{id}, POST /intakes/{id}/answers and POST /intakes/{id}/texts."""
+"""The HTTP API that the web app calls: GET /schema, POST /intakes, GET /intakes/{id}, POST /intakes/{id}/answers, PUT /intakes/{id}/answers/{slot}, POST /intakes/{id}/confirm and POST /intakes/{id}/texts."""
 
 import logging
 import os
@@ -16,12 +16,15 @@ from obligations_agent.guidance import Guidance, load_guidance
 from obligations_agent.intake_model import new_client, next_question
 from obligations_agent.intakes import (
     Answer,
+    Change,
     ErrorCode,
     Form,
     Intake,
     IntakeError,
     Question,
+    change_answer,
     create_intake,
+    last_questions,
     open_slots,
     record_answer,
     waiting,
@@ -36,6 +39,7 @@ STATUS: dict[ErrorCode, int] = {
     "invalid_value": 422,
     "not_found": 404,
     "not_ended": 409,
+    "not_confirmed": 409,
 }
 
 
@@ -101,29 +105,35 @@ def create_app(
         intakes[intake_id] = intake
         return {"id": intake_id, "step": step(intake)}
 
-    @app.get("/intakes/{intake_id}")
-    def get_intake(intake_id: str) -> dict[str, Any]:
-        intake = intakes.get(intake_id)
-        if intake is None:
-            raise IntakeError("not_found")
+    def view(intake_id: str, intake: Intake) -> dict[str, Any]:
+        """The intake as GET /intakes/{id} returns it."""
         return {
             "id": intake_id,
             "description": intake.description,
             "answers": intake.answers,
             "open_slots": open_slots(schema, intake),
             "not_sure": intake.not_sure,
+            # The question that the screen of the answers shows for each relevant slot (INTAKE-5).
+            "questions": last_questions(schema, intake),
             "step": step(intake),
-            # The result is computed from the answers each time, once the intake has ended
-            # (GATE-4).
-            "result": None
-            if waiting(intake) is not None
-            else decide(gates, schema, intake).model_dump(),
+            "confirmed": intake.confirmed,
+            # The result is computed from the answers each time, once they are confirmed (GATE-4).
+            "result": decide(gates, schema, intake).model_dump()
+            if intake.confirmed
+            else None,
             # The meaning and the action of each row: none without the key, and an empty map until
             # POST /intakes/{id}/texts has written them (MEMO-1).
-            "texts": None
-            if client is None or waiting(intake) is not None
-            else (intake.texts or {}),
+            "texts": (intake.texts or {})
+            if client is not None and intake.confirmed
+            else None,
         }
+
+    @app.get("/intakes/{intake_id}")
+    def get_intake(intake_id: str) -> dict[str, Any]:
+        intake = intakes.get(intake_id)
+        if intake is None:
+            raise IntakeError("not_found")
+        return view(intake_id, intake)
 
     @app.post("/intakes/{intake_id}/answers")
     def post_answer(intake_id: str, body: Answer) -> dict[str, Any]:
@@ -138,6 +148,29 @@ def create_app(
             intakes[intake_id] = intake
         return {"step": step(intake)}
 
+    @app.put("/intakes/{intake_id}/answers/{slot_id}")
+    def put_answer(intake_id: str, slot_id: str, body: Change) -> dict[str, Any]:
+        with answering:
+            intake = intakes.get(intake_id)
+            if intake is None:
+                raise IntakeError("not_found")
+            intake = change_answer(schema, intake, slot_id, body.value, body.not_sure)
+            intakes[intake_id] = intake
+        return view(intake_id, intake)
+
+    @app.post("/intakes/{intake_id}/confirm")
+    def post_confirm(intake_id: str) -> dict[str, Any]:
+        with answering:
+            intake = intakes.get(intake_id)
+            if intake is None:
+                raise IntakeError("not_found")
+            if waiting(intake) is not None:
+                raise IntakeError("not_ended")
+            # A second confirmation changes nothing, so the texts stay (INTAKE-5).
+            intake = intake.model_copy(update={"confirmed": True})
+            intakes[intake_id] = intake
+        return view(intake_id, intake)
+
     @app.post("/intakes/{intake_id}/texts")
     def post_texts(intake_id: str) -> dict[str, Any]:
         # Under the lock, so that two requests at once write the texts once, and every later request
@@ -146,8 +179,8 @@ def create_app(
             intake = intakes.get(intake_id)
             if intake is None:
                 raise IntakeError("not_found")
-            if waiting(intake) is not None:
-                raise IntakeError("not_ended")
+            if not intake.confirmed:
+                raise IntakeError("not_confirmed")
             if client is not None and intake.texts is None:
                 texts = write_texts(
                     client, schema, intake, decide(gates, schema, intake)

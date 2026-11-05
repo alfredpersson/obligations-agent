@@ -22,6 +22,7 @@ test("the start page says what the tool does, how to use it, what the user gets,
     "Describe the product",
     "Answer the form",
     "Answer follow-up questions",
+    "Check your answers",
     "Read the result",
   ]);
   expect(
@@ -85,4 +86,13 @@ test("the start page names the rows of each result, with their dates, meanings a
       "Under each check that applies or depends on your answers, the result lists its main obligations, each with the date from which it applies, the clause quoted and linked, what it means for your product, and one action.",
     ),
   ).toBeTruthy();
+});
+
+test("the start page names the check of the answers among the steps, with the way back from the result", () => {
+  render(<Home />);
+
+  const step = screen.getByRole("heading", { level: 3, name: "Check your answers" });
+  expect(step.nextElementSibling?.textContent).toBe(
+    "All your answers on one screen: change any of them, and answer the open ones that you can. You can come back to it from the result.",
+  );
 });

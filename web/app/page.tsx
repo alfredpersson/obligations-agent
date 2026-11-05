@@ -16,6 +16,10 @@ const STEPS = [
     "At most eight, one at a time. A model chooses each question from your answers so far and writes it for your product. Some questions show examples from official guidance.",
   ],
   [
+    "Check your answers",
+    "All your answers on one screen: change any of them, and answer the open ones that you can. You can come back to it from the result.",
+  ],
+  [
     "Read the result",
     "Which parts apply and the main obligations of each, with the date, what each means for your product and one action.",
   ],
