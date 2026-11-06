@@ -1,5 +1,5 @@
 import { vi } from "vitest";
-import type { Asked, Result, Row, Schema } from "./service";
+import type { Asked, Intake, Result, Row, Schema } from "./service";
 
 // A schema with two description fields, two form slots and two follow-up slots that are not in
 // schema.yaml, and limits other than 500, so that the tests show that the web app follows the
@@ -243,6 +243,32 @@ export const testRows: Row[] = [
     category: "legal",
   },
 ];
+
+// An intake whose result has a row in each part that holds rows (#53): the storage role applies
+// with the two test rows, the first applies, and the second needs the answer of the fact about
+// sharing video, which has none; the other results as in testResult. The texts of both rows are
+// written.
+export const testIntake: Intake & { result: Result } = {
+  description: { purpose: "Counts *visitors* at [the] door.", people: "Staff watch the screens." },
+  answers: { uses_camera: "yes", audience: "not_sure" },
+  open_slots: ["audience", "stores_video", "shares_video"],
+  not_sure: { audience: { reason: "unknown", note: "We sell to both." } },
+  questions: testQuestions,
+  step: { type: "ready_to_confirm" },
+  confirmed: true,
+  result: {
+    ...testResult,
+    gates: testResult.gates.map((outcome) =>
+      outcome.gate === "storage"
+        ? { ...outcome, status: "applies", result: "applies", conditions: [], rows: testRows }
+        : outcome,
+    ),
+  },
+  texts: {
+    "storage:rule:art5(1)": { meaning: "You must delete video after a month.", action: "Add a job that deletes old video." },
+    "storage:rule:art6(1)": { meaning: "If you share video, show a notice.", action: "Draft the notice." },
+  },
+};
 
 // Replaces fetch in a test. Each URL gets a response, or an error for fetch to throw.
 export function stubFetch(results: Record<string, Response | Error>) {

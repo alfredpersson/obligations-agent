@@ -140,6 +140,10 @@ export default function Home() {
                 {PARTS[2]}: the obligations that depend on those answers, under the answer that they depend on.
               </p>
               <p>
+                Download it as a Markdown or a PDF file, all of it or the obligations of one category, such as the
+                legal ones for a legal representative.
+              </p>
+              <p>
                 The result assumes that the product is an AI system as the AI Act defines it, offered or used
                 in the EU, and it lists what the tool does not check yet.
               </p>

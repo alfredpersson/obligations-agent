@@ -1,0 +1,31 @@
+/* The export (#53): the three groups of choices side by side where they fit, each a card with
+   compact options, then the two controls. */
+.export {
+  margin: 0;
+}
+
+.choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.choices fieldset {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+}
+
+.choices legend {
+  margin-bottom: var(--space-2);
+  font-size: var(--size-text);
+}
+
+.choices label:has(> input[type="radio"]) {
+  padding: var(--space-2);
+}
+
+.note {
+  color: var(--color-muted);
+  font-size: var(--size-note);
+}

@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { EXAMPLE } from "../app/example";
 
@@ -240,6 +241,15 @@ test("a filled-in form and the answered follow-up questions lead to the screen o
   await expect(mayAlso.getByRole("region", { name: "Transparency: people interact with the product" })).toContainText(
     "Each of these also depends on the open answer about Interacts with people.",
   );
+
+  // The result as a Markdown file, which the web app makes in the browser (#53).
+  await page.getByRole("button", { name: "Download the result" }).click();
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("button", { name: "Download Markdown" }).click(),
+  ]);
+  expect(download.suggestedFilename()).toMatch(/^obligations-memo-\d{4}-\d{2}-\d{2}\.md$/);
+  expect(readFileSync(await download.path(), "utf8").split("\n")[0]).toBe("# Obligations memo");
 
   // Back to the answers: the open fact under own name answered, then a second confirmation.
   await page.getByRole("link", { name: "Check or change the answers" }).click();
