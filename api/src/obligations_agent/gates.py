@@ -77,6 +77,11 @@ class Statement(BaseModel):
     links: list[str]
 
 
+# Who carries out the action of a row: a legal representative, the people who build the product, or
+# the company (MEMO-5).
+Category = Literal["legal", "technical", "organisation"]
+
+
 class Needs(BaseModel):
     """What a row needs besides its result: the result of another gate, or the answer "yes" of a slot."""
 
@@ -85,13 +90,14 @@ class Needs(BaseModel):
 
 
 class Obligation(BaseModel):
-    """A row of a result: its unit, its label, the id of its date, what else it needs, the answers of its gate's slot for which it holds, if not all, and whether its obligation needs legal drafting (MEMO-5)."""
+    """A row of a result: its unit, its label, its category, the id of its date, what else it needs, the answers of its gate's slot for which it holds, if not all, and whether its obligation needs legal drafting (MEMO-5)."""
 
     model_config = TEXT_REQUIRED
 
     gate: str
     unit: str
     label: str
+    category: Category
     date: str
     needs: Needs | None = None
     values: list[str] | None = None
@@ -148,10 +154,11 @@ class Need(BaseModel):
 
 
 class ObligationRow(BaseModel):
-    """A row as the result shows it: its label, its status, its unit quoted and linked, the date from which it applies with the unit that sets it, the condition of that date, what else it needed, and whether it needs legal drafting (MEMO-5, MEMO-6)."""
+    """A row as the result shows it: its label, its category, its status, its unit quoted and linked, the date from which it applies with the unit that sets it, the condition of that date, what else it needed, and whether it needs legal drafting (MEMO-5, MEMO-6)."""
 
     id: str
     label: str
+    category: Category
     status: Literal["applies", "conditional"]
     unit: Cited
     date: str
@@ -301,6 +308,8 @@ def parse_gates(text: str, schema: Schema) -> Gates:
             raise GatesError(f"{name}: the unit has no quote")
         if obligation.date not in dates:
             raise GatesError(f"{name}: the date {obligation.date} is not in gates.yaml")
+        if obligation.drafting and obligation.category != "legal":
+            raise GatesError(f"{name}: a row that needs legal drafting is legal")
         needs = obligation.needs
         if needs is not None and (
             (needs.gate is None) == (needs.slot is None)
@@ -486,6 +495,7 @@ def decide(gates: Gates, schema: Schema, intake: Intake) -> Result:
             ObligationRow(
                 id=f"{obligation.gate}:{obligation.unit}",
                 label=obligation.label,
+                category=obligation.category,
                 status=row_status,
                 unit=cited([obligation.unit])[0],
                 date=start.date,

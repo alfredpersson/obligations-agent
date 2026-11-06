@@ -49,6 +49,10 @@ test.each([
   ["applies-text", "applies", 4.5],
   ["does-not-apply-text", "does-not-apply", 4.5],
   ["conditional-text", "conditional", 4.5],
+  // The tag of each category of a row (issue #52): the accent's light text on each fill.
+  ["accent-text", "legal", 4.5],
+  ["accent-text", "technical", 4.5],
+  ["accent-text", "organisation", 4.5],
   ["border", "page", 3],
   ["border", "surface", 3],
   // The focus outline and the button's fill on the page and on a text field are links' colors
