@@ -180,40 +180,63 @@ test("a filled-in form and the answered follow-up questions lead to the screen o
   await expectScreen(page, "Check your answers");
   await expect(page.locator("#processes_for_customer").getByRole("definition").first()).toHaveText("Yes");
 
-  // The confirmation: the result of the gates, grouped by regulation, with the way back to the
-  // answers in place of the recorded answers.
+  // The confirmation: the result in three parts (issue #51), with the way back to the answers in
+  // place of the recorded answers.
   await page.getByRole("button", { name: "Confirm and show the result" }).click();
   await expect(page).toHaveURL(/\/intakes\/[A-Za-z0-9_-]{22}$/);
   await expectScreen(page, "Result");
-  await expect(page.getByRole("heading", { level: 2 })).toHaveText(["GDPR", "AI Act", "Not checked yet"]);
-  await expect(page.getByRole("region", { name: "GDPR", exact: true }).getByRole("heading", { level: 3 })).toHaveText([
+  await expect(page.getByRole("heading", { level: 2 })).toHaveText([
+    "What applies",
+    "Answers to check",
+    "What may also apply",
+    "Not checked yet",
+  ]);
+  // What applies, grouped by regulation: the provider and the transparency depend on the open
+  // answers, so they stand in the other parts.
+  const applies = page.getByRole("region", { name: "What applies" });
+  await expect(applies.getByRole("region", { name: "GDPR", exact: true }).getByRole("heading", { level: 4 })).toHaveText([
     "Controller",
     "Processor",
   ]);
-  await expect(page.getByRole("region", { name: "AI Act", exact: true }).getByRole("heading", { level: 3 })).toHaveText([
-    "Provider",
+  await expect(applies.getByRole("region", { name: "AI Act", exact: true }).getByRole("heading", { level: 4 })).toHaveText([
     "High-risk under Annex III",
-    "Transparency: people interact with the product",
   ]);
-  // The rows of the controller, without the key: no cells for the meaning and the action, and no
-  // placeholder (issue #41). At this width each row stacks, with no header row.
+  // The rows of the controller, without the key: each row's label and no action, and no
+  // placeholder (issue #41); its clause in its details.
   const controller = page.getByRole("region", { name: "Controller", exact: true });
-  await expect(controller.getByRole("rowheader")).toHaveCount(9);
-  await expect(controller.getByRole("rowheader").first()).toContainText("A legal basis for each purpose");
-  await expect(controller.getByRole("cell")).toHaveCount(0);
+  await expect(controller.getByRole("listitem")).toHaveCount(9);
+  const legalBasis = controller.getByRole("listitem").first();
+  await expect(legalBasis).toContainText("A legal basis for each purpose");
   await expect(page.getByText("Writing what this means for your product")).toHaveCount(0);
+  await expect(legalBasis.getByRole("link", { name: "GDPR Article 6(1)" })).toHaveCount(0);
+  await legalBasis.getByRole("button", { name: "Details" }).click();
+  await expect(legalBasis.getByRole("link", { name: "GDPR Article 6(1)" })).toBeVisible();
   // The changed answer: the processor applies, with its rows.
   const processor = page.getByRole("region", { name: "Processor", exact: true });
   await expect(processor.getByRole("paragraph").first()).toContainText("Applies.");
-  await expect(processor.getByRole("rowheader")).toHaveCount(4);
+  await expect(processor.getByRole("listitem")).toHaveCount(4);
   // At the width of a phone, the list of the results stands in one row above them.
   await expect(
     page.getByRole("navigation", { name: "The results, in short" }).getByRole("link", { name: "Controller (9)" }),
   ).toBeVisible();
-  // An open fact links to its place on the screen of the answers.
-  await expect(page.getByRole("link", { name: "Interacts with people" }).first()).toHaveAttribute(
-    "href",
-    /\/intakes\/[A-Za-z0-9_-]{22}\/answers#interacts_with_people$/,
+  // The answers to check, the one that two rows depend on first, each with its reason and its note,
+  // and a link to its place on the screen of the answers.
+  const check = page.getByRole("region", { name: "Answers to check" });
+  await expect(check.getByRole("heading", { level: 3 })).toHaveText(["Under own name or trademark", "Interacts with people"]);
+  await expect(check.getByRole("region", { name: "Under own name or trademark" })).toContainText(
+    `Not sure · I don't know this about the product`,
+  );
+  await expect(check.getByRole("region", { name: "Under own name or trademark" })).toContainText(`Note: ${FORM_NOTE}`);
+  await expect(check.getByRole("region", { name: "Interacts with people" })).toContainText(`Note: ${FOLLOW_UP_NOTE}`);
+  await expect(
+    check.getByRole("link", { name: "Answer Interacts with people on the screen of the answers" }),
+  ).toHaveAttribute("href", /\/intakes\/[A-Za-z0-9_-]{22}\/answers#interacts_with_people$/);
+  // What may also apply: the provider's row and the row of the transparency under the first answer,
+  // the second naming the other one.
+  const mayAlso = page.getByRole("region", { name: "What may also apply" }).getByRole("region", { name: "Under own name or trademark" });
+  await expect(mayAlso.getByRole("heading", { level: 4 })).toHaveText(["Provider", "Transparency: people interact with the product"]);
+  await expect(mayAlso.getByRole("region", { name: "Transparency: people interact with the product" })).toContainText(
+    "Each of these also depends on the open answer about Interacts with people.",
   );
 
   // Back to the answers: the open fact under own name answered, then a second confirmation.
@@ -232,9 +255,9 @@ test("a filled-in form and the answered follow-up questions lead to the screen o
   await expect(page.getByRole("region", { name: "Open answers" }).getByRole("term")).toHaveText(["Interacts with people"]);
   await page.getByRole("button", { name: "Confirm and show the result" }).click();
   await expectScreen(page, "Result");
-  const provider = page.getByRole("region", { name: "Provider", exact: true });
+  const provider = page.getByRole("region", { name: "What applies" }).getByRole("region", { name: "Provider", exact: true });
   await expect(provider.getByRole("paragraph").first()).toContainText("Applies.");
-  await expect(provider.getByRole("rowheader")).toHaveCount(1);
+  await expect(provider.getByRole("listitem")).toHaveCount(1);
 
   // The next intake starts on an empty form, although Next.js keeps the form's page with its state.
   await page.getByRole("banner").getByRole("link", { name: "Dutymap" }).click();

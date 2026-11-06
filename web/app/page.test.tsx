@@ -55,7 +55,7 @@ test("the first choice opens the form with the example product, and the other on
   }
 });
 
-test("the excerpt shows the three gates that the example's form answers decide, and quotes the stored text word for word", () => {
+test("the excerpt shows the three gates that the example's form answers decide in the parts of the result, and quotes the stored text word for word", () => {
   render(<Home />);
 
   // jsdom's accessible names do not come from a figcaption, so the test reads the caption itself.
@@ -66,6 +66,21 @@ test("the excerpt shows the three gates that the example's form answers decide, 
     "Provider Applies.",
     "High-risk under Annex III Conditional.",
   ]);
+  // The names of the three parts (issue #51), each before what stands in it, and the listed use as
+  // the second part asks it.
+  const names = ["What applies", "Answers to check", "What may also apply"].map((name) => within(excerpt).getByText(name));
+  const [gdpr, , highRisk] = within(excerpt).getAllByRole("listitem");
+  const listed = within(excerpt).getByText(/^Intended use listed under AI Act Annex III, point 4/);
+  for (const [name, next] of [
+    [names[0], gdpr],
+    [names[1], listed],
+    [names[2], highRisk],
+  ]) {
+    expect(name.compareDocumentPosition(next) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  }
+  expect(listed.closest("p")?.textContent).toBe(
+    "Intended use listed under AI Act Annex III, point 4. Is the product's intended use one of the uses listed under this point? You decide this: no answer of the intake holds it.",
+  );
   // The lead-in and point (a) of the quote, each a line of the stored quote; the last line marks
   // what is left out.
   const lines = (excerpt.querySelector("blockquote")?.textContent ?? "").split("\n");
@@ -74,18 +89,20 @@ test("the excerpt shows the three gates that the example's form answers decide, 
   for (const line of lines.slice(0, -1)) expect(GATES).toContain(`\n      ${line}\n`);
 });
 
-test("the start page names the rows of each result, with their dates, meanings and actions, among what the user gets", () => {
+test("the start page names the three parts of the result, with the rows, their dates, meanings and actions, among what the user gets", () => {
   render(<Home />);
 
   const step = screen.getByRole("heading", { level: 3, name: "Read the result" });
   expect(step.nextElementSibling?.textContent).toBe(
-    "Which parts apply and the main obligations of each, with the date, what each means for your product and one action.",
+    "What applies, with the main obligations, their dates, what each means for your product and one action. Then the answers left to check, and what they may add.",
   );
-  expect(
-    screen.getByText(
-      "Under each check that applies or depends on your answers, the result lists its main obligations, each with the date from which it applies, the clause quoted and linked, what it means for your product, and one action.",
-    ),
-  ).toBeTruthy();
+  const get = screen.getByRole("heading", { level: 2, name: "What you get" }).parentElement as HTMLElement;
+  expect(within(get).getByText(/^The result has three parts\./).textContent).toBe(
+    "The result has three parts. What applies: each check that your answers decide, “Applies” or “Does not apply”, with the answers that decided it and the articles that define it, quoted and linked to EUR-Lex, and under each check that applies its main obligations, each with the date from which it applies, the clause quoted and linked, what it means for your product, and one action.",
+  );
+  expect(within(get).getByText(/^Answers to check:/).textContent).toBe(
+    "Answers to check: each answer that the result still depends on, with its question, your reason and note, and what each answer would give, the one that decides the most obligations first. What may also apply: the obligations that depend on those answers, under the answer that they depend on.",
+  );
 });
 
 test("the start page names the check of the answers among the steps, with the way back from the result", () => {
