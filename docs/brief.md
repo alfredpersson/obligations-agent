@@ -36,7 +36,7 @@ Not goals for now: legal advice, regulations other than these two, answering que
 4. Check all the facts on one screen. Correct anything that is wrong, and answer any open question you can. Return to this screen from the memo when you have checked an open fact outside the tool, and confirm again.
 5. Wait for the memo, which takes less than a minute.
 6. Read the rows that matter to you, open the linked clause, and mark rows as confirmed or disputed.
-7. Export the memo as markdown. Do the actions outside the tool.
+7. Export the memo as a Markdown or a PDF file, all of it or the obligations of one category. Do the actions outside the tool.
 
 ## What exists and why this is different
 

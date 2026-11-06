@@ -45,7 +45,7 @@ The prompts therefore implement only part of the specification. A prompt cannot 
 - Roles worked out from the facts, never picked from a list: provider and deployer under the AI Act, controller and processor under the GDPR. The system also records whether the product is built on another company's general-purpose AI model.
 - The full text of both regulations: articles, recitals and annexes.
 - Intake and memo in English.
-- A memo that is shown in the web app.
+- A memo that is shown in the web app, and that the user can download as a Markdown file or a PDF file (MEMO-10).
 
 **SCOPE-2.** The system gives a result in these cases and does not refuse:
 
@@ -162,6 +162,8 @@ Code leaves out an entry id that is not an entry of the slot and an entry named 
 **MEMO-8.** Every row quotes the unit's text word for word from the stored regulation text, so the user can check the row even if the link does not work.
 
 **MEMO-9.** Besides the rows, every memo shows the open slots, in its second part (MEMO-6), the list in SCOPE-3 of what the system does not cover, and one line that says the memo maps obligations to clauses and is not legal advice.
+
+**MEMO-10.** The user can download the memo as a Markdown file and as a PDF file. The web app makes both from the result and the sentences of the screen, so that the files and the screen say the same; nothing is sent from the tool, and no file is stored. The user chooses the rows, all or those of one category, the quotes or only the links, and the meanings or only the actions; every result and every answer to check stays. A file starts with the title "Obligations memo", the day on which it is made, the description and the answers. Then follow the three parts of MEMO-6, each row as a section of its own, with its label as its heading, its result, category, citation as a link, date, status and what it depends on, the quote, the meaning and the action, and then "Not checked yet". It ends with the line on legal advice (MEMO-9), the official texts that its quotes and links come from, and a note that EUR-Lex may open at the top of the page on a first visit. Without the texts of the rows, or without the key, a file has the rows without meanings and actions.
 
 ## 6. Validation
 

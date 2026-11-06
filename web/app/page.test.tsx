@@ -105,6 +105,15 @@ test("the start page names the three parts of the result, with the rows, their d
   );
 });
 
+test("the start page names the download of the result as a Markdown or a PDF file among what the user gets", () => {
+  render(<Home />);
+
+  const get = screen.getByRole("heading", { level: 2, name: "What you get" }).parentElement as HTMLElement;
+  expect(within(get).getByText(/^Download it as/).textContent).toBe(
+    "Download it as a Markdown or a PDF file, all of it or the obligations of one category, such as the legal ones for a legal representative.",
+  );
+});
+
 test("the start page names the check of the answers among the steps, with the way back from the result", () => {
   render(<Home />);
 

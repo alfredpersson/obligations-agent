@@ -35,12 +35,18 @@ const ANSWERS = "/intakes/kq2V8yZx0bP4mT7nLw3sAg/answers";
 function show(gates: Outcome[] = testResult.gates, texts: Texts = null, openSlots: string[] = OPEN) {
   render(
     <IntakeResult
-      result={{ ...testResult, gates }}
-      notSure={notSure}
-      questions={testQuestions}
-      openSlots={openSlots}
+      intake={{
+        description: {},
+        answers: {},
+        open_slots: openSlots,
+        not_sure: notSure,
+        questions: testQuestions,
+        step: { type: "ready_to_confirm" },
+        confirmed: true,
+        result: { ...testResult, gates },
+        texts,
+      }}
       schema={testSchema}
-      texts={texts}
       answers={ANSWERS}
     />,
   );

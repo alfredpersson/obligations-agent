@@ -316,7 +316,8 @@
 }
 
 .detailsButton::before,
-.labelButton > .rowLabel::before {
+.labelButton > .rowLabel::before,
+.exportButton::before {
   content: "▶";
   display: inline-block;
   margin-right: 0.45em;
@@ -325,7 +326,8 @@
 }
 
 .detailsButton[aria-expanded="true"]::before,
-.labelButton[aria-expanded="true"] > .rowLabel::before {
+.labelButton[aria-expanded="true"] > .rowLabel::before,
+.exportButton[aria-expanded="true"]::before {
   transform: rotate(90deg);
 }
 
@@ -520,4 +522,17 @@
 }
 .tag_organisation {
   background: var(--color-organisation);
+}
+
+/* The fold of the export (#53): a button in the look of the way back to the answers, with the arrow
+   of the other folds, and its choices on a card under the row of buttons. */
+.exportButton {
+  border: 0;
+}
+
+.exportPanel {
+  padding: var(--card-padding);
+  margin-bottom: var(--space-6);
+  background: var(--color-surface);
+  border: 1px solid var(--color-rule);
 }
