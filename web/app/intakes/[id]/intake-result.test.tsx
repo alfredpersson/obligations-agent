@@ -3,6 +3,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { Cited, NotSure, Outcome, Row, Texts } from "../../service";
 import { testQuestions, testResult, testRows, testSchema } from "../../testing";
 import IntakeResult from "./intake-result";
+import styles from "./intake-result.module.css";
 
 // The intake ended with "not sure" about the audience, with a reason and a note; the slot
 // stores_video is relevant and was not asked, so it has neither. Its open slots, in schema order.
@@ -512,10 +513,10 @@ test("rows of one result that depend on different other items each name theirs u
   const group = region("Storage role", region("Audience", region(ALSO)));
   expect(group.textContent).not.toContain("Each of these");
   expect(within(group).getByRole("button", { name: /^A notice at the door/ }).textContent).toBe(
-    "A notice at the doorAlso depends on the open answer about Video storage.",
+    "A notice at the door OrganisationAlso depends on the open answer about Video storage.",
   );
   expect(within(group).getByRole("button", { name: /^A sign at the gate/ }).textContent).toBe(
-    "A sign at the gateAlso depends on the open answer about Video storage, and on the open answer about Video sharing.",
+    "A sign at the gate OrganisationAlso depends on the open answer about Video storage, and on the open answer about Video sharing.",
   );
 });
 
@@ -639,7 +640,7 @@ test("a row in the third part shows its label, and its action, its meaning, its 
   show([head, { ...storage, status: "applies", result: "applies", conditions: [], rows: testRows }], TEXTS, ["shares_video"]);
 
   const group = region("Storage role", region("Video sharing", region(ALSO)));
-  const label = within(group).getByRole("button", { name: "A notice at the door" });
+  const label = within(group).getByRole("button", { name: "A notice at the door Legal" });
   const item = label.closest("li") as HTMLElement;
   expect(label.getAttribute("aria-expanded")).toBe("false");
   expect(item.textContent).not.toContain("Draft the notice.");
@@ -652,6 +653,69 @@ test("a row in the third part shows its label, and its action, its meaning, its 
   expect(within(item).getByRole("link", { name: "Rule 6(1)" })).toBeTruthy();
   expect(within(item).getByText("A notice is shown at each door.").tagName).toBe("BLOCKQUOTE");
   expect(item.textContent).toContain("Needs Video sharing: not answered yet.");
+});
+
+// The category of each row (issue #52): a tag that says who carries out the row's action, at the start
+// of the action wherever the action shows, and after the label where it does not.
+test("a row in the first part shows its category as a tag at the start of its action, not with its label", () => {
+  show(applying(), TEXTS, []);
+
+  expect(row("Delete old video").textContent).toContain("Organisation Add a job that deletes old video.");
+  expect(row("A notice at the door").textContent).toContain("Legal Draft the notice.");
+  expect(screen.getByText("Delete old video", { selector: "p" }).textContent).toBe("Delete old video");
+  expect(within(row("Delete old video")).getAllByText("Organisation")).toHaveLength(1);
+  // Each category has its own colour.
+  expect(within(row("Delete old video")).getByText("Organisation").className).toContain(styles.tag_organisation);
+  expect(within(row("A notice at the door")).getByText("Legal").className).toContain(styles.tag_legal);
+});
+
+test("while the texts are written, each row's tag stands beside the placeholder", () => {
+  const encrypt = { ...testRows[0], id: "storage:rule:art8(1)", label: "Encrypt the video", category: "technical" as const };
+  show(applying([testRows[0], encrypt]), {}, []);
+
+  expect(row("Delete old video").textContent).toContain(`Organisation ${PLACEHOLDER}`);
+  expect(row("Encrypt the video").textContent).toContain(`Technical ${PLACEHOLDER}`);
+  expect(within(row("Encrypt the video")).getByText("Technical").className).toContain(styles.tag_technical);
+});
+
+test("a row whose texts could not be written keeps its tag beside the line that says so", () => {
+  show(applying(), { ...TEXTS, "storage:rule:art5(1)": null }, []);
+
+  expect(row("Delete old video").textContent).toContain(
+    "Organisation The meaning and the action of this row could not be written.",
+  );
+});
+
+test("a folded row in the third part shows its tag after its label, and at the start of its action once it is opened", () => {
+  const [, storage, , head] = testResult.gates;
+  show([head, { ...storage, status: "applies", result: "applies", conditions: [], rows: testRows }], TEXTS, ["shares_video"]);
+
+  const label = within(region(ALSO)).getByRole("button", { name: "A notice at the door Legal" });
+  const item = label.closest("li") as HTMLElement;
+  expect(within(item).getAllByText("Legal")).toHaveLength(1);
+
+  fireEvent.click(label);
+
+  expect(label.textContent).toBe("A notice at the door");
+  expect(item.textContent).toContain("Legal Draft the notice.");
+  expect(within(item).getAllByText("Legal")).toHaveLength(1);
+
+  fireEvent.click(label);
+
+  expect(label.textContent).toBe("A notice at the door Legal");
+});
+
+test("without the key a row has no action, so its tag stands after its label in both parts, also when it is opened", () => {
+  const [, storage, , head] = testResult.gates;
+  show([head, { ...storage, status: "applies", result: "applies", conditions: [], rows: testRows }], null, ["shares_video"]);
+
+  expect(screen.getByText("Delete old video", { selector: "p" }).textContent).toBe("Delete old video Organisation");
+  const label = within(region(ALSO)).getByRole("button", { name: "A notice at the door Legal" });
+
+  fireEvent.click(label);
+
+  expect(label.textContent).toBe("A notice at the door Legal");
+  expect(within(label.closest("li") as HTMLElement).getAllByText("Legal")).toHaveLength(1);
 });
 
 test("the date of a result's rows shows once above them when they share it, with the article that sets it", () => {

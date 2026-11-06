@@ -500,3 +500,24 @@
   color: var(--color-accent);
   background: var(--color-page);
 }
+
+/* A row's category as a tag in the category's colour, at the start of its action. */
+.tag {
+  display: inline-block;
+  padding: 0 var(--space-2);
+  font-size: var(--size-note);
+  font-weight: 600;
+  line-height: 1.6;
+  vertical-align: 0.1em;
+  white-space: nowrap;
+  color: var(--color-accent-text);
+}
+.tag_legal {
+  background: var(--color-legal);
+}
+.tag_technical {
+  background: var(--color-technical);
+}
+.tag_organisation {
+  background: var(--color-organisation);
+}

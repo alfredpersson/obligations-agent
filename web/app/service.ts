@@ -69,6 +69,7 @@ export type Row = {
   condition: Cited | null;
   needs: { slot: string | null; value: string | null; gate: string | null; status: string | null } | null;
   drafting: boolean;
+  category: "legal" | "technical" | "organisation";
 };
 
 // The result of one gate (GATE-2, GATE-4), with the regulation that it belongs to, and its rows.

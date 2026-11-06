@@ -126,6 +126,7 @@ def user_message(
                 "quote": row.unit.quote,
                 "status": row.status,
                 "depends_on": depends_on(labels, result, outcome, row),
+                "category": row.category,
                 "legal_drafting": row.drafting,
             }
         ],

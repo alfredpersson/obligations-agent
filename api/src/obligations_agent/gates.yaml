@@ -535,36 +535,41 @@ dates:
 # for those answers of its gate's slot: the conformity assessment and the registration depend on the
 # point of Annex III, Article 43(1) for point 1 and 43(2) for points 2 to 8, Article 49(1) for every
 # point but point 2 and 49(5) for point 2. A row marked drafting needs legal drafting, such as a
-# contract, a notice or a policy, and its action says so ("What it is" in docs/brief.md).
+# contract, a notice or a policy, and its action says so ("What it is" in docs/brief.md). The category
+# of a row says who carries out its action: legal, a legal representative (a contract, a policy, a
+# privacy notice or a legal assessment); technical, the people who build the product (a change to the
+# product, its data, its infrastructure or what it shows its users, or a document about the system);
+# organisation, the company (a procedure, a role, a training, a record or a registration). A row
+# marked drafting is legal.
 obligations:
-  - { gate: controller, unit: "gdpr:art6(1)", label: "A legal basis for each purpose", date: gdpr }
-  - { gate: controller, unit: "gdpr:art12(2)", label: "Support for the rights of the people whose data it is", date: gdpr }
-  - { gate: controller, unit: "gdpr:art13(1)", label: "Information to people whose data is collected from them", date: gdpr, drafting: true }
-  - { gate: controller, unit: "gdpr:art14(1)", label: "Information to people whose data comes from elsewhere", date: gdpr, drafting: true }
-  - { gate: controller, unit: "gdpr:art25(1)", label: "Data protection by design and by default", date: gdpr }
-  - { gate: controller, unit: "gdpr:art28(1)", label: "Only processors with sufficient guarantees", date: gdpr }
-  - { gate: controller, unit: "gdpr:art32(1)", label: "Security of processing", date: gdpr }
-  - { gate: controller, unit: "gdpr:art33(1)", label: "A breach reported to the supervisory authority", date: gdpr }
-  - { gate: controller, unit: "gdpr:art35(1)", label: "An impact assessment where a high risk is likely", date: gdpr }
-  - { gate: controller, unit: "gdpr:art9(1)", label: "Special categories only under an exception in Article 9(2)", date: gdpr, needs: { slot: special_categories } }
-  - { gate: controller, unit: "gdpr:art22(1)", label: "Solely automated decisions only under Article 22(2)", date: gdpr, needs: { slot: automated_decisions } }
-  - { gate: processor, unit: "gdpr:art28(3)", label: "A contract with the controller (data processing agreement)", date: gdpr, drafting: true }
-  - { gate: processor, unit: "gdpr:art28(2)", label: "Other processors only with the controller's authorisation", date: gdpr, drafting: true }
-  - { gate: processor, unit: "gdpr:art32(1)", label: "Security of processing", date: gdpr }
-  - { gate: processor, unit: "gdpr:art33(2)", label: "A breach reported to the controller", date: gdpr }
-  - { gate: provider, unit: "aia:art4(1)", label: "AI literacy of staff", date: chapter_i }
-  - { gate: transparency_interaction, unit: "aia:art50(5)", label: "Information at the first interaction", date: general }
-  - { gate: high_risk_annex_iii, unit: "aia:art9(1)", label: "A risk management system", date: annex_iii, needs: { gate: provider } }
-  - { gate: high_risk_annex_iii, unit: "aia:art10(2)", label: "Data governance for training, validation and testing data", date: annex_iii, needs: { gate: provider } }
-  - { gate: high_risk_annex_iii, unit: "aia:art11(1)", label: "Technical documentation", date: annex_iii, needs: { gate: provider } }
-  - { gate: high_risk_annex_iii, unit: "aia:art12(1)", label: "Automatic logs", date: annex_iii, needs: { gate: provider } }
-  - { gate: high_risk_annex_iii, unit: "aia:art13(1)", label: "Information for deployers", date: annex_iii, needs: { gate: provider } }
-  - { gate: high_risk_annex_iii, unit: "aia:art14(1)", label: "Human oversight", date: annex_iii, needs: { gate: provider } }
-  - { gate: high_risk_annex_iii, unit: "aia:art15(1)", label: "Accuracy, robustness and cybersecurity", date: annex_iii, needs: { gate: provider } }
-  - { gate: high_risk_annex_iii, unit: "aia:art17(1)", label: "A quality management system", date: annex_iii, needs: { gate: provider }, drafting: true }
-  - { gate: high_risk_annex_iii, unit: "aia:art43(1)", label: "Conformity assessment for biometrics", date: annex_iii, needs: { gate: provider }, values: [biometrics] }
-  - { gate: high_risk_annex_iii, unit: "aia:art43(2)", label: "Conformity assessment", date: annex_iii, needs: { gate: provider }, values: [critical_infrastructure, education, employment, essential_services, law_enforcement, migration, justice] }
-  - { gate: high_risk_annex_iii, unit: "aia:art49(1)", label: "Registration in the EU database", date: annex_iii, needs: { gate: provider }, values: [biometrics, education, employment, essential_services, law_enforcement, migration, justice] }
-  - { gate: high_risk_annex_iii, unit: "aia:art49(5)", label: "Registration at national level", date: annex_iii, needs: { gate: provider }, values: [critical_infrastructure] }
-  - { gate: high_risk_annex_iii, unit: "aia:art72(1)", label: "Post-market monitoring", date: annex_iii, needs: { gate: provider } }
-  - { gate: high_risk_annex_iii, unit: "aia:art73(1)", label: "Reports of serious incidents", date: annex_iii, needs: { gate: provider } }
+  - { gate: controller, unit: "gdpr:art6(1)", label: "A legal basis for each purpose", category: legal, date: gdpr }
+  - { gate: controller, unit: "gdpr:art12(2)", label: "Support for the rights of the people whose data it is", category: technical, date: gdpr }
+  - { gate: controller, unit: "gdpr:art13(1)", label: "Information to people whose data is collected from them", category: legal, date: gdpr, drafting: true }
+  - { gate: controller, unit: "gdpr:art14(1)", label: "Information to people whose data comes from elsewhere", category: legal, date: gdpr, drafting: true }
+  - { gate: controller, unit: "gdpr:art25(1)", label: "Data protection by design and by default", category: technical, date: gdpr }
+  - { gate: controller, unit: "gdpr:art28(1)", label: "Only processors with sufficient guarantees", category: organisation, date: gdpr }
+  - { gate: controller, unit: "gdpr:art32(1)", label: "Security of processing", category: technical, date: gdpr }
+  - { gate: controller, unit: "gdpr:art33(1)", label: "A breach reported to the supervisory authority", category: organisation, date: gdpr }
+  - { gate: controller, unit: "gdpr:art35(1)", label: "An impact assessment where a high risk is likely", category: legal, date: gdpr }
+  - { gate: controller, unit: "gdpr:art9(1)", label: "Special categories only under an exception in Article 9(2)", category: legal, date: gdpr, needs: { slot: special_categories } }
+  - { gate: controller, unit: "gdpr:art22(1)", label: "Solely automated decisions only under Article 22(2)", category: legal, date: gdpr, needs: { slot: automated_decisions } }
+  - { gate: processor, unit: "gdpr:art28(3)", label: "A contract with the controller (data processing agreement)", category: legal, date: gdpr, drafting: true }
+  - { gate: processor, unit: "gdpr:art28(2)", label: "Other processors only with the controller's authorisation", category: legal, date: gdpr, drafting: true }
+  - { gate: processor, unit: "gdpr:art32(1)", label: "Security of processing", category: technical, date: gdpr }
+  - { gate: processor, unit: "gdpr:art33(2)", label: "A breach reported to the controller", category: organisation, date: gdpr }
+  - { gate: provider, unit: "aia:art4(1)", label: "AI literacy of staff", category: organisation, date: chapter_i }
+  - { gate: transparency_interaction, unit: "aia:art50(5)", label: "Information at the first interaction", category: technical, date: general }
+  - { gate: high_risk_annex_iii, unit: "aia:art9(1)", label: "A risk management system", category: organisation, date: annex_iii, needs: { gate: provider } }
+  - { gate: high_risk_annex_iii, unit: "aia:art10(2)", label: "Data governance for training, validation and testing data", category: technical, date: annex_iii, needs: { gate: provider } }
+  - { gate: high_risk_annex_iii, unit: "aia:art11(1)", label: "Technical documentation", category: technical, date: annex_iii, needs: { gate: provider } }
+  - { gate: high_risk_annex_iii, unit: "aia:art12(1)", label: "Automatic logs", category: technical, date: annex_iii, needs: { gate: provider } }
+  - { gate: high_risk_annex_iii, unit: "aia:art13(1)", label: "Information for deployers", category: technical, date: annex_iii, needs: { gate: provider } }
+  - { gate: high_risk_annex_iii, unit: "aia:art14(1)", label: "Human oversight", category: technical, date: annex_iii, needs: { gate: provider } }
+  - { gate: high_risk_annex_iii, unit: "aia:art15(1)", label: "Accuracy, robustness and cybersecurity", category: technical, date: annex_iii, needs: { gate: provider } }
+  - { gate: high_risk_annex_iii, unit: "aia:art17(1)", label: "A quality management system", category: legal, date: annex_iii, needs: { gate: provider }, drafting: true }
+  - { gate: high_risk_annex_iii, unit: "aia:art43(1)", label: "Conformity assessment for biometrics", category: organisation, date: annex_iii, needs: { gate: provider }, values: [biometrics] }
+  - { gate: high_risk_annex_iii, unit: "aia:art43(2)", label: "Conformity assessment", category: organisation, date: annex_iii, needs: { gate: provider }, values: [critical_infrastructure, education, employment, essential_services, law_enforcement, migration, justice] }
+  - { gate: high_risk_annex_iii, unit: "aia:art49(1)", label: "Registration in the EU database", category: organisation, date: annex_iii, needs: { gate: provider }, values: [biometrics, education, employment, essential_services, law_enforcement, migration, justice] }
+  - { gate: high_risk_annex_iii, unit: "aia:art49(5)", label: "Registration at national level", category: organisation, date: annex_iii, needs: { gate: provider }, values: [critical_infrastructure] }
+  - { gate: high_risk_annex_iii, unit: "aia:art72(1)", label: "Post-market monitoring", category: organisation, date: annex_iii, needs: { gate: provider } }
+  - { gate: high_risk_annex_iii, unit: "aia:art73(1)", label: "Reports of serious incidents", category: organisation, date: annex_iii, needs: { gate: provider } }

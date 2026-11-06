@@ -98,7 +98,7 @@ test("the start page names the three parts of the result, with the rows, their d
   );
   const get = screen.getByRole("heading", { level: 2, name: "What you get" }).parentElement as HTMLElement;
   expect(within(get).getByText(/^The result has three parts\./).textContent).toBe(
-    "The result has three parts. What applies: each check that your answers decide, “Applies” or “Does not apply”, with the answers that decided it and the articles that define it, quoted and linked to EUR-Lex, and under each check that applies its main obligations, each with the date from which it applies, the clause quoted and linked, what it means for your product, and one action.",
+    "The result has three parts. What applies: each check that your answers decide, “Applies” or “Does not apply”, with the answers that decided it and the articles that define it, quoted and linked to EUR-Lex, and under each check that applies its main obligations, each with the date from which it applies, the clause quoted and linked, what it means for your product, and one action. A tag on each obligation says who carries out its action: a legal representative, the people who build the product, or the company.",
   );
   expect(within(get).getByText(/^Answers to check:/).textContent).toBe(
     "Answers to check: each answer that the result still depends on, with its question, your reason and note, and what each answer would give, the one that decides the most obligations first. What may also apply: the obligations that depend on those answers, under the answer that they depend on.",

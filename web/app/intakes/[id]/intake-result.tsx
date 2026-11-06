@@ -19,6 +19,8 @@ const CASE: Record<string, string> = {
 // What Article 6(3) gives for a listed use while profiling is answered "yes"; "no" gives the
 // conditions of that paragraph, which the listed use names in its case (GATE-4).
 const ALWAYS = "Under Article 6(3), a use listed in Annex III is always high-risk when the product performs profiling.";
+// Who carries out the action of a row (MEMO-5).
+const CATEGORY = { legal: "Legal", technical: "Technical", organisation: "Organisation" };
 // A date of the regulations, such as "2 December 2027".
 const DAY = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
 
@@ -179,6 +181,11 @@ function ResultHead({ outcome, ctx }: { outcome: Outcome; ctx: Context }) {
   );
 }
 
+// A row's category as a tag in the category's colour: who carries out its action (MEMO-5).
+function Category({ category }: { category: Row["category"] }) {
+  return <span className={`${styles.tag} ${styles[`tag_${category}`]}`}>{CATEGORY[category]}</span>;
+}
+
 // The date from which a row applies, with the unit that sets it.
 function From({ row, ctx }: { row: Row; ctx: Context }) {
   return (
@@ -190,16 +197,23 @@ function From({ row, ctx }: { row: Row; ctx: Context }) {
 }
 
 // The action of a row, a placeholder until it is written, or a line that says that it could not be
-// written; nothing without the key (MEMO-5).
+// written, each after the row's tag; nothing without the key (MEMO-5).
 function Action({ row, ctx }: { row: Row; ctx: Context }) {
   if (ctx.texts === null) return null;
   const text = ctx.texts[row.id];
-  if (text) return <p className={styles.action}>{text.action}</p>;
+  if (text)
+    return (
+      <p className={styles.action}>
+        <Category category={row.category} /> {text.action}
+      </p>
+    );
   return text === null ? (
-    <p className={`${loading.status} ${styles.writing}`}>The meaning and the action of this row could not be written.</p>
+    <p className={`${loading.status} ${styles.writing}`}>
+      <Category category={row.category} /> The meaning and the action of this row could not be written.
+    </p>
   ) : (
     <p className={`${loading.status} ${styles.writing}`}>
-      <span className={`${loading.spinner} ${styles.spinner}`} aria-hidden="true" />
+      <Category category={row.category} /> <span className={`${loading.spinner} ${styles.spinner}`} aria-hidden="true" />
       Writing what this means for your product, and an action.
     </p>
   );
@@ -252,6 +266,14 @@ function Obligation({
 }) {
   const [open, setOpen] = useState(false);
   const toggle = () => setOpen(!open);
+  // The tag stands at the start of the action wherever the action shows; after the label without the
+  // key, when the row has no action, and on a folded row of the third part, whose action is hidden.
+  const tag = (ctx.texts === null || (folded && !open)) && (
+    <>
+      {" "}
+      <Category category={row.category} />
+    </>
+  );
   const under = (!dated || also.length > 0) && (
     <span className={styles.when}>
       {!dated && <From row={row} ctx={ctx} />}
@@ -263,13 +285,19 @@ function Obligation({
     <li className={`${styles.row} ${styles[row.status]} ${folded ? "" : styles.todo} ${open ? styles.open : ""}`}>
       {folded ? (
         <button type="button" className={styles.labelButton} aria-expanded={open} onClick={toggle}>
-          <span className={styles.rowLabel}>{row.label}</span>
+          <span className={styles.rowLabel}>
+            {row.label}
+            {tag}
+          </span>
           {under}
         </button>
       ) : (
         <>
           <div className={styles.head}>
-            <p className={styles.rowLabel}>{row.label}</p>
+            <p className={styles.rowLabel}>
+              {row.label}
+              {tag}
+            </p>
             {under}
           </div>
           <div className={styles.todoAction}>

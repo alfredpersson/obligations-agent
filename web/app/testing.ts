@@ -206,8 +206,9 @@ export const testResult: Result = {
   ],
 };
 
-// Two rows of a result (MEMO-5): one that applies from a date that a unit sets; one that is
-// conditional, needs the answer of an open fact, and needs legal drafting.
+// Two rows of a result (MEMO-5): one that applies from a date that a unit sets, a task of the
+// organisation; one that is conditional, needs the answer of an open fact, and needs legal drafting,
+// so its category is legal.
 export const testRows: Row[] = [
   {
     id: "storage:rule:art5(1)",
@@ -223,6 +224,7 @@ export const testRows: Row[] = [
     condition: null,
     needs: null,
     drafting: false,
+    category: "organisation",
   },
   {
     id: "storage:rule:art6(1)",
@@ -238,6 +240,7 @@ export const testRows: Row[] = [
     condition: null,
     needs: { slot: "shares_video", value: null, gate: null, status: null },
     drafting: true,
+    category: "legal",
   },
 ];
 

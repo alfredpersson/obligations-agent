@@ -130,7 +130,9 @@ export default function Home() {
                 The result has three parts. {PARTS[0]}: each check that your answers decide, “Applies” or “Does
                 not apply”, with the answers that decided it and the articles that define it, quoted and linked
                 to EUR-Lex, and under each check that applies its main obligations, each with the date from which
-                it applies, the clause quoted and linked, what it means for your product, and one action.
+                it applies, the clause quoted and linked, what it means for your product, and one action. A tag
+                on each obligation says who carries out its action: a legal representative, the people who build
+                the product, or the company.
               </p>
               <p>
                 {PARTS[1]}: each answer that the result still depends on, with its question, your reason and

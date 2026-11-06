@@ -1,4 +1,4 @@
-"""Tests for the writer of the meaning and the action of each row: acceptance criteria 7, 8 and 11 to 14 of issue #41, and failure cases from its plan; and the texts for each confirmation of the answers, acceptance criterion 7 of issue #50, with the notes written on the screen of the answers. The model client sends each request to a fake transport, so no test calls the provider."""
+"""Tests for the writer of the meaning and the action of each row: acceptance criteria 7, 8 and 11 to 14 of issue #41, and failure cases from its plan; and the texts for each confirmation of the answers, acceptance criterion 7 of issue #50, with the notes written on the screen of the answers; and each row's category in the user message with the meaning of the three categories in the prompt, acceptance criterion 4 of issue #52. The model client sends each request to a fake transport, so no test calls the provider."""
 
 import json
 import logging
@@ -360,6 +360,7 @@ def test_the_user_message_holds_the_description_the_answers_the_notes_and_the_ro
             "depends_on": [
                 "whether the product's intended use is one of the uses listed in AI Act Annex III, point 4"
             ],
+            "category": "organisation",
             "legal_drafting": False,
         }
     ]
@@ -370,6 +371,32 @@ def test_the_user_message_holds_the_description_the_answers_the_notes_and_the_ro
     assert {
         row_id for row_id, item in data.items() if item["rows"][0]["legal_drafting"]
     } == DRAFTING
+
+
+# Each row reaches the writer with its category from gates.yaml (issue #52, RESP-1).
+def test_each_row_reaches_the_writer_with_its_category() -> None:
+    requests: list[httpx2.Request] = []
+
+    service(recording(requests), ended()).post("/intakes/one/texts")
+
+    categories = {f"{row.gate}:{row.unit}": row.category for row in GATES.obligations}
+    sent = {row_of(request)["id"]: row_of(request)["category"] for request in requests}
+    assert len(sent) == ROWS
+    assert sent == {row_id: categories[row_id] for row_id in sent}
+    assert set(sent.values()) == {"legal", "technical", "organisation"}
+
+
+# The prompt gives the meaning of the three categories, in the words of issue #52, and asks for an
+# action of the row's category; a legal row without legal drafting gets a legal assessment.
+def test_the_prompt_gives_the_meaning_of_the_three_categories() -> None:
+    for text in (
+        "category (who carries out the action: legal, technical or organisation)",
+        "Give a task of the row's category.",
+        "legal: a task for a legal representative: a contract, a policy, a privacy notice or a legal assessment. When legal_drafting is false, the task is a legal assessment of this product.",
+        "technical: a task for the people who build the product: a change to the product, its data, its infrastructure or what it shows its users, or a document about the system, such as its technical documentation.",
+        "organisation: a task for the company: a procedure, a role, a training, a record or a registration.",
+    ):
+        assert text in PROMPT
 
 
 def test_each_request_names_the_model_the_prompt_and_the_tool_write() -> None:

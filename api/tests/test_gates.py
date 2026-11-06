@@ -1,5 +1,6 @@
-"""Tests for the gates: reading gates.yaml, each gate table against the regulation text, the result of an intake that has ended, and the quote and the link of each unit (issue #37: GATE-1 to GATE-4, MEMO-6 to MEMO-8, VALID-2), and the rows of the obligations with their dates and the grouping by regulation (issue #41: MEMO-5, MEMO-6)."""
+"""Tests for the gates: reading gates.yaml, each gate table against the regulation text, the result of an intake that has ended, and the quote and the link of each unit (issue #37: GATE-1 to GATE-4, MEMO-6 to MEMO-8, VALID-2), and the rows of the obligations with their dates and the grouping by regulation (issue #41: MEMO-5, MEMO-6), and the category of each row (issue #52: GATE-5, MEMO-5)."""
 
+import re
 from collections.abc import Sequence
 from functools import cache
 from pathlib import Path
@@ -594,6 +595,7 @@ OBLIGATION = {
     "gate": "gdpr_applies",
     "unit": "gdpr:art2(1)",
     "label": "A row",
+    "category": "organisation",
     "date": "gdpr",
 }
 
@@ -1286,6 +1288,67 @@ def test_the_rows_that_need_legal_drafting_are_marked_and_no_other() -> None:
         assert words in normalized(row.unit.quote)
 
 
+# The category of each row (issue #52): who carries out its action, set by hand in gates.yaml as in
+# the issue's table, and organisation for AI Act Articles 43(1) and 49(5), which the table does not
+# have (the plan).
+CATEGORIES: dict[tuple[str, str], str] = {
+    ("controller", "gdpr:art6(1)"): "legal",
+    ("controller", "gdpr:art12(2)"): "technical",
+    ("controller", "gdpr:art13(1)"): "legal",
+    ("controller", "gdpr:art14(1)"): "legal",
+    ("controller", "gdpr:art25(1)"): "technical",
+    ("controller", "gdpr:art28(1)"): "organisation",
+    ("controller", "gdpr:art32(1)"): "technical",
+    ("controller", "gdpr:art33(1)"): "organisation",
+    ("controller", "gdpr:art35(1)"): "legal",
+    ("controller", "gdpr:art9(1)"): "legal",
+    ("controller", "gdpr:art22(1)"): "legal",
+    ("processor", "gdpr:art28(3)"): "legal",
+    ("processor", "gdpr:art28(2)"): "legal",
+    ("processor", "gdpr:art32(1)"): "technical",
+    ("processor", "gdpr:art33(2)"): "organisation",
+    ("provider", "aia:art4(1)"): "organisation",
+    ("transparency_interaction", "aia:art50(5)"): "technical",
+    ("high_risk_annex_iii", "aia:art9(1)"): "organisation",
+    ("high_risk_annex_iii", "aia:art10(2)"): "technical",
+    ("high_risk_annex_iii", "aia:art11(1)"): "technical",
+    ("high_risk_annex_iii", "aia:art12(1)"): "technical",
+    ("high_risk_annex_iii", "aia:art13(1)"): "technical",
+    ("high_risk_annex_iii", "aia:art14(1)"): "technical",
+    ("high_risk_annex_iii", "aia:art15(1)"): "technical",
+    ("high_risk_annex_iii", "aia:art17(1)"): "legal",
+    ("high_risk_annex_iii", "aia:art43(1)"): "organisation",
+    ("high_risk_annex_iii", "aia:art43(2)"): "organisation",
+    ("high_risk_annex_iii", "aia:art49(1)"): "organisation",
+    ("high_risk_annex_iii", "aia:art49(5)"): "organisation",
+    ("high_risk_annex_iii", "aia:art72(1)"): "organisation",
+    ("high_risk_annex_iii", "aia:art73(1)"): "organisation",
+}
+
+
+def test_each_row_has_the_category_of_the_issue() -> None:
+    assert {
+        (row.gate, row.unit): row.category for row in GATES.obligations
+    } == CATEGORIES
+
+
+# A row that needs legal drafting is a task for a legal representative.
+def test_every_row_that_needs_legal_drafting_is_legal() -> None:
+    drafting = [row for row in GATES.obligations if row.drafting]
+
+    assert len(drafting) == len(DRAFTING)
+    assert all(row.category == "legal" for row in drafting)
+
+
+def test_each_row_of_the_result_has_the_category_of_its_row_in_the_file() -> None:
+    result = result_of(ALL_YES)
+    rows = [(item.gate, row) for item in result.gates for row in item.rows]
+
+    assert len(rows) == 29
+    for gate, row in rows:
+        assert row.category == CATEGORIES[(gate, row.id.split(":", 1)[1])]
+
+
 # The grouping by regulation (MEMO-6): each result belongs to the regulation of the unit that defines
 # it, and the gate that decides whether the GDPR applies is the GDPR's head.
 def test_the_result_groups_its_results_under_the_regulation_of_the_unit_that_defines_each() -> (
@@ -1363,6 +1426,51 @@ def test_a_row_that_names_what_the_file_does_not_have_is_refused_with_the_row(
 ) -> None:
     with pytest.raises(GatesError, match=rf"(?s)\bobligation\b.*{name}"):
         parse_gates(gates_text(obligations=[obligation]), SCHEMA)
+
+
+# A row without a category, or with another value, is refused with its position in the list and the
+# part, as a row without a label is (issue #52).
+@pytest.mark.parametrize(
+    ("obligation", "error"),
+    [
+        (
+            without(OBLIGATION, "category"),
+            "Field required",
+        ),
+        (
+            {**OBLIGATION, "category": "tax"},
+            "Input should be 'legal', 'technical' or 'organisation'",
+        ),
+        (
+            {**OBLIGATION, "category": "Legal"},
+            "Input should be 'legal', 'technical' or 'organisation'",
+        ),
+    ],
+    ids=["no_category", "another_value", "another_case"],
+)
+def test_a_row_without_a_category_or_with_another_value_is_refused(
+    obligation: dict[str, Any], error: str
+) -> None:
+    with pytest.raises(
+        GatesError,
+        match=rf"(?s)^obligation 1: 1 validation error for Obligation\ncategory\n\s+{re.escape(error)}",
+    ):
+        parse_gates(gates_text(obligations=[obligation]), SCHEMA)
+
+
+def test_a_row_that_needs_legal_drafting_and_is_not_legal_is_refused_with_the_row() -> (
+    None
+):
+    with pytest.raises(
+        GatesError,
+        match=r"\bobligation gdpr_applies gdpr:art2\(1\): a row that needs legal drafting is legal\b",
+    ):
+        parse_gates(
+            gates_text(
+                obligations=[{**OBLIGATION, "drafting": True, "category": "technical"}]
+            ),
+            SCHEMA,
+        )
 
 
 # Two rows with the same gate and unit would have the same id, and one would lose its texts.

@@ -39,6 +39,11 @@
   --color-conditional-mark: #ca8a04;
   /* The page behind a dialog. */
   --color-backdrop: rgb(26 23 20 / 0.45);
+  /* The fill of the tag of each category of a row (MEMO-5), in a hue outside the status scale, under
+     the accent's light text. */
+  --color-legal: #7b3388;
+  --color-technical: #2a62a6;
+  --color-organisation: #1d7468;
 
   /* The fonts that layout.tsx loads, then fonts of the system. */
   --font-text: var(--font-serif), Georgia, "Times New Roman", serif;

@@ -207,6 +207,8 @@ test("a filled-in form and the answered follow-up questions lead to the screen o
   await expect(controller.getByRole("listitem")).toHaveCount(9);
   const legalBasis = controller.getByRole("listitem").first();
   await expect(legalBasis).toContainText("A legal basis for each purpose");
+  // Its category from gates.yaml, as a tag after the label, since without the key it has no action (#52).
+  await expect(legalBasis.getByText("Legal", { exact: true })).toBeVisible();
   await expect(page.getByText("Writing what this means for your product")).toHaveCount(0);
   await expect(legalBasis.getByRole("link", { name: "GDPR Article 6(1)" })).toHaveCount(0);
   await legalBasis.getByRole("button", { name: "Details" }).click();
