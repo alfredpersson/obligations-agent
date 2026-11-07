@@ -28,9 +28,8 @@ export const DAY = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "lo
 export const NOTHING_OPEN = "Nothing is left to check: the result depends on no open answer.";
 export const ALSO_LINE = "These obligations depend on the answers above.";
 export const NOT_WRITTEN = "The meaning and the action of this row could not be written.";
-// The condition of the rows' date that the user decides (AI Act Article 111(2) for high-risk under
-// Annex III).
-export const BEFORE_THAT_DATE = "For a system already on the market or in service before that date";
+// After the link of a row's unit that its result quotes, which shows the quote once (MEMO-8).
+export const QUOTED_ABOVE = ", quoted above as the article that defines the result";
 // An answer of an open item for a high-risk result: the areas of Annex III as one case, the answer
 // "no" of a fact that a row needs, and a use that is not listed.
 export const AREAS = "one of the areas of Annex III";

@@ -60,6 +60,16 @@ slots:
       - { id: none, label: None of these }
       - { id: not_sure, label: Not sure }
 
+  - id: own_use
+    label: Used under own authority
+    question: Do you use the product yourselves, under your own authority, for your work?
+    relevant: always
+    unit: "aia:art3(4)"
+    values:
+      - { id: "yes", label: "Yes" }
+      - { id: "no", label: "No" }
+      - { id: not_sure, label: Not sure }
+
   - id: decides_purposes
     label: Decides why and how personal data is processed
     question: Do you decide, alone or together with others, what the personal data is used for and how it is processed?
@@ -110,6 +120,17 @@ slots:
     relevant:
       under_own_name: ["yes", not_sure]
     unit: "aia:art50(1)"
+    values:
+      - { id: "yes", label: "Yes" }
+      - { id: "no", label: "No" }
+      - { id: not_sure, label: Not sure }
+
+  - id: generates_content
+    label: Generates synthetic content
+    question: Does the product generate synthetic audio, image, video or text content?
+    relevant:
+      under_own_name: ["yes", not_sure]
+    unit: "aia:art50(2)"
     values:
       - { id: "yes", label: "Yes" }
       - { id: "no", label: "No" }

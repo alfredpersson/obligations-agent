@@ -32,10 +32,12 @@ const FOLLOW_UPS = [
     "No",
   ],
   ["Interacts with people", "Do people interact with the product directly,", "Not sure"],
+  ["Generates synthetic content", "Does the product generate synthetic audio, image, video or text content?", "No"],
 ];
 
-// The notes of the two "Not sure" answers: on the form, and to the last follow-up question. The
-// form's note has a word of 60 characters, which the screen of the answers and the result must wrap.
+// The notes of the two "Not sure" answers: on the form, and to the follow-up question about
+// interacting with people. The form's note has a word of 60 characters, which the screen of the
+// answers and the result must wrap.
 const FORM_NOTE =
   "We have not decided whose brand goes on the product. See brand_decision_for_the_support_assistant_in_the_online_store.";
 const FOLLOW_UP_NOTE = "Does a chat window on the shop's website count?";
@@ -112,6 +114,10 @@ test("a filled-in form and the answered follow-up questions lead to the screen o
     .getByRole("group", { name: "Which of these areas is the product intended to be used in?" })
     .getByRole("radio", { name: "None of these" })
     .check();
+  await page
+    .getByRole("group", { name: "Do you use the product yourselves, under your own authority, for your work?" })
+    .getByRole("radio", { name: "Yes" })
+    .check();
   for (const [question, text] of DESCRIPTION) {
     await page.getByRole("textbox", { name: question }).fill(text);
   }
@@ -170,13 +176,15 @@ test("a filled-in form and the answered follow-up questions lead to the screen o
   await expect(answered.getByRole("term")).toHaveText([
     "Personal data",
     "Use-case area",
+    "Used under own authority",
     "Decides why and how personal data is processed",
     "Processes personal data for a customer",
     "Special categories of personal data",
     "Automated decisions about people",
+    "Generates synthetic content",
   ]);
   await expect(answered.getByRole("definition")).toHaveText(
-    ["Yes", "None of these", "Yes", "No", "No", "No"].flatMap((answer) => [answer, "Change"]),
+    ["Yes", "None of these", "Yes", "Yes", "No", "No", "No", "No"].flatMap((answer) => [answer, "Change"]),
   );
   // The description, folded under its link.
   await page.getByText("Show your description").click();
@@ -207,8 +215,9 @@ test("a filled-in form and the answered follow-up questions lead to the screen o
     "What may also apply",
     "Not checked yet",
   ]);
-  // What applies, grouped by regulation: the provider and the transparency depend on the open
-  // answers, so they stand in the other parts.
+  // What applies, grouped by regulation: the provider and the transparency for interaction depend
+  // on the open answers, so they stand in the other parts; the transparency for generated content
+  // does not apply by its own answer, and the deployer applies (#45).
   const applies = page.getByRole("region", { name: "What applies" });
   await expect(applies.getByRole("region", { name: "GDPR", exact: true }).getByRole("heading", { level: 4 })).toHaveText([
     "Controller",
@@ -223,7 +232,14 @@ test("a filled-in form and the answered follow-up questions lead to the screen o
   await expect(page.getByRole("button", { name: "Download the result" })).toHaveCSS("font-family", SANS);
   await expect(applies.getByRole("region", { name: "AI Act", exact: true }).getByRole("heading", { level: 4 })).toHaveText([
     "High-risk under Annex III",
+    "Transparency: the product generates content",
+    "Deployer",
   ]);
+  // The deployer from the form's fourth answer, with its one row: AI literacy, since the rows of
+  // Article 26 need high-risk under Annex III.
+  const deployer = applies.getByRole("region", { name: "Deployer", exact: true });
+  await expect(deployer.getByRole("paragraph").first()).toContainText("Applies.");
+  await expect(deployer.getByRole("listitem")).toHaveCount(1);
   // The rows of the controller, without the key: each row's label and no action, and no
   // placeholder (issue #41); its clause in its details.
   const controller = page.getByRole("region", { name: "Controller", exact: true });
@@ -306,7 +322,7 @@ test("a filled-in form and the answered follow-up questions lead to the screen o
 
 // Only this test opens the form with the example on the schema of the service, so it shows that the
 // example's ids are the ids of schema.yaml.
-test("the example product opens the form with its three texts and its three answers", async ({ page }) => {
+test("the example product opens the form with its three texts and its four answers", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("link", { name: "Use the example product" }).first().click();
   await expect(page).toHaveURL(/\/example$/);
@@ -327,6 +343,7 @@ test("the example product opens the form with its three texts and its three answ
       "Which of these areas is the product intended to be used in?",
       "Employment, workers' management and access to self-employment",
     ],
+    ["Do you use the product yourselves, under your own authority, for your work?", "Yes"],
   ];
   for (const [question, label] of answers) {
     await expect(

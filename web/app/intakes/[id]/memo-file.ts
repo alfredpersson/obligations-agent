@@ -1,12 +1,23 @@
 import { NOT_LEGAL_ADVICE } from "../../not-legal-advice";
 import { REASONS } from "../../not-sure-reason";
 import type { Cited, Intake, Outcome, Result, Row, Schema } from "../../service";
-import { type Item, alsoRows, applying, onSlot, parts, pointOf, profilingOf, said, summary, titleOf } from "./result-parts";
+import {
+  type Item,
+  alsoRows,
+  applying,
+  onSlot,
+  parts,
+  pointOf,
+  profilingOf,
+  quotedAbove,
+  said,
+  summary,
+  titleOf,
+} from "./result-parts";
 import {
   ALSO_LINE,
   ALWAYS,
   AREAS,
-  BEFORE_THAT_DATE,
   CATEGORY,
   DAY,
   IF_NO,
@@ -15,6 +26,7 @@ import {
   NOT_WRITTEN,
   NOTHING_OPEN,
   PARTS,
+  QUOTED_ABOVE,
   STATUS,
   answered,
   assumed,
@@ -122,6 +134,8 @@ export function memo(intake: Intake & { result: Result }, schema: Schema, choice
     const needs = row.needs;
     const gate = needs?.gate ? result.gates.find((item) => item.gate === needs.gate) : undefined;
     const text = texts?.[row.id];
+    // The file quotes the row's unit with the result above when its result quotes it (MEMO-8).
+    const above = choices.quotes && quotedAbove(outcome, row);
     return [
       heading(5, row.label),
       {
@@ -129,16 +143,16 @@ export function memo(intake: Intake & { result: Result }, schema: Schema, choice
         items: [
           [`Result: ${outcome.label}${regulation && outcome.label !== regulation.name ? ` (${regulation.name})` : ""}`],
           [`Category: ${CATEGORY[row.category]}`],
-          ["Clause: ", link(row.unit)],
+          ["Clause: ", link(row.unit), ...(above ? [QUOTED_ABOVE] : [])],
           [`From ${DAY.format(new Date(row.date))} (`, link(row.date_unit), ")."],
-          ...(row.condition ? [[`${BEFORE_THAT_DATE}: `, link(row.condition), "."]] : []),
+          ...(row.condition ? [[`${row.condition.title}: ${row.condition.text} (`, link(row.condition), ")."]] : []),
           [`Status: ${STATUS[row.status]}`],
           ...(on.length > 0 ? [[`Depends on ${on.map((item) => said(item, ctx)).join(", and on ")}.`]] : []),
           ...(needs?.slot ? [[needsFact(labelOf(needs.slot), needs.value ? valueOf(needs.slot, needs.value) : undefined)]] : []),
           ...(gate ? [[needsResult(gate.label, gate.status)]] : []),
         ],
       },
-      ...(choices.quotes && row.unit.quote ? [{ kind: "quote" as const, text: row.unit.quote }] : []),
+      ...(choices.quotes && row.unit.quote && !above ? [{ kind: "quote" as const, text: row.unit.quote }] : []),
       ...(text && choices.meanings ? [line({ strong: "What it means:" }, ` ${text.meaning}`)] : []),
       ...(text ? [line({ strong: "Action:" }, ` ${text.action}`)] : []),
       ...(text === null ? [line(NOT_WRITTEN)] : []),

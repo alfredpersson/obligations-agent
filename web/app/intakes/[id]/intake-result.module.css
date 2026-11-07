@@ -260,7 +260,7 @@
   font-weight: 700;
 }
 
-.when {
+.dependsOn {
   display: block;
   color: var(--color-muted);
   font-size: var(--size-note);

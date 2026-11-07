@@ -16,6 +16,7 @@ import {
   parts,
   pointOf,
   profilingOf,
+  quotedAbove,
   said,
   summary,
   titleOf,
@@ -24,7 +25,6 @@ import {
   ALSO_LINE,
   ALWAYS,
   AREAS,
-  BEFORE_THAT_DATE,
   CATEGORY,
   DAY,
   IF_NO,
@@ -33,6 +33,7 @@ import {
   NOT_WRITTEN,
   NOTHING_OPEN,
   PARTS,
+  QUOTED_ABOVE,
   STATUS,
   alsoOn,
   answered,
@@ -187,6 +188,8 @@ function Details({ row, ctx }: { row: Row; ctx: Context }) {
   const text = ctx.texts?.[row.id];
   const needs = row.needs;
   const gate = needs?.gate ? result.gates.find((item) => item.gate === needs.gate) : undefined;
+  // A row whose unit its result quotes links it, and the quote shows once, with the result (MEMO-8).
+  const above = result.gates.some((outcome) => outcome.rows.includes(row) && quotedAbove(outcome, row));
   return (
     <>
       {text && (
@@ -196,8 +199,9 @@ function Details({ row, ctx }: { row: Row; ctx: Context }) {
       )}
       <p className={styles.citation}>
         <Links links={[row.unit]} onOpen={onOpen} />
+        {above && QUOTED_ABOVE}
       </p>
-      <blockquote className={styles.quote}>{row.unit.quote}</blockquote>
+      {!above && <blockquote className={styles.quote}>{row.unit.quote}</blockquote>}
       {needs?.slot && (
         <p className={styles.meta}>{needsFact(labelOf(needs.slot), needs.value ? valueOf(needs.slot, needs.value) : undefined)}</p>
       )}
@@ -208,18 +212,15 @@ function Details({ row, ctx }: { row: Row; ctx: Context }) {
 
 // A row: in the first part its label beside its action, with its details behind "Details"; in the
 // third part only its label, which opens its action and its details. An opened row has the tint, so
-// that its details read as part of it. Under the label: the row's date when the rows of its result
-// have different dates, and the other items that it depends on.
+// that its details read as part of it. Under the label: the other items that it depends on.
 function Obligation({
   row,
   also,
-  dated,
   folded,
   ctx,
 }: {
   row: Row;
   also: string[];
-  dated: boolean;
   folded: boolean;
   ctx: Context;
 }) {
@@ -233,13 +234,7 @@ function Obligation({
       <Category category={row.category} />
     </>
   );
-  const under = (!dated || also.length > 0) && (
-    <span className={styles.when}>
-      {!dated && <From row={row} ctx={ctx} />}
-      {!dated && also.length > 0 && " "}
-      {also.length > 0 && alsoOn(also.map((item) => said(item, ctx)))}
-    </span>
-  );
+  const under = also.length > 0 && <span className={styles.dependsOn}>{alsoOn(also.map((item) => said(item, ctx)))}</span>;
   return (
     <li className={`${styles.row} ${styles[row.status]} ${folded ? "" : styles.todo} ${open ? styles.open : ""}`}>
       {folded ? (
@@ -277,40 +272,46 @@ function Obligation({
   );
 }
 
-// The rows of a result: their date once above them when they share it, with the condition of that
-// date that the user decides (Article 111(2) for high-risk under Annex III) folded under it, then the
-// rows (MEMO-5, GATE-5).
+// The rows of a result in their order, in runs of adjacent rows of one date: each run's date once above
+// its rows, with the condition of that date that the user decides (Article 111(2) or 111(4)) folded
+// under it, then the rows (MEMO-5, GATE-5). A date is its day, the article that sets it and its
+// condition.
 function Rows({ rows, folded, ctx }: { rows: { row: Row; also: string[] }[]; folded: boolean; ctx: Context }) {
-  if (rows.length === 0) return null;
-  const first = rows[0].row;
-  const dated = rows.every(({ row }) => row.date === first.date);
-  const condition = rows.find(({ row }) => row.condition)?.row.condition;
+  const runOf = (row: Row) => `${row.date} ${row.date_unit.citation} ${row.condition?.citation ?? ""}`;
+  const runs: { row: Row; also: string[] }[][] = [];
+  for (const entry of rows) {
+    const last = runs.at(-1);
+    if (last && runOf(last[0].row) === runOf(entry.row)) last.push(entry);
+    else runs.push([entry]);
+  }
   return (
     <>
-      {dated && (
-        <p className={styles.dateLine}>
-          <From row={first} ctx={ctx} />
-        </p>
-      )}
-      {dated && condition && (
-        <details className={styles.definition}>
-          <summary>{BEFORE_THAT_DATE}</summary>
-          <p>
-            For a system placed on the market or put into service before that date, these rows apply only if its design
-            changes significantly from that date. A system intended to be used by public authorities must meet them by 2
-            August 2030 in any case. You decide this.
-          </p>
-          <p className={styles.citation}>
-            <Links links={[condition]} onOpen={ctx.onOpen} />
-          </p>
-          <blockquote className={styles.quote}>{condition.quote}</blockquote>
-        </details>
-      )}
-      <ul className={styles.rows}>
-        {rows.map(({ row, also }) => (
-          <Obligation key={row.id} row={row} also={also} dated={dated} folded={folded} ctx={ctx} />
-        ))}
-      </ul>
+      {runs.map((run) => {
+        const first = run[0].row;
+        const condition = first.condition;
+        return (
+          <Fragment key={first.id}>
+            <p className={styles.dateLine}>
+              <From row={first} ctx={ctx} />
+            </p>
+            {condition && (
+              <details className={styles.definition}>
+                <summary>{condition.title}</summary>
+                <p>{condition.text}</p>
+                <p className={styles.citation}>
+                  <Links links={[condition]} onOpen={ctx.onOpen} />
+                </p>
+                <blockquote className={styles.quote}>{condition.quote}</blockquote>
+              </details>
+            )}
+            <ul className={styles.rows}>
+              {run.map(({ row, also }) => (
+                <Obligation key={row.id} row={row} also={also} folded={folded} ctx={ctx} />
+              ))}
+            </ul>
+          </Fragment>
+        );
+      })}
     </>
   );
 }

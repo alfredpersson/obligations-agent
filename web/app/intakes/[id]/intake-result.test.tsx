@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import type { Cited, NotSure, Outcome, Row, Texts } from "../../service";
+import type { NotSure, Outcome, Row, Texts } from "../../service";
 import { testQuestions, testResult, testRows, testSchema } from "../../testing";
 import IntakeResult from "./intake-result";
 import styles from "./intake-result.module.css";
@@ -735,30 +735,83 @@ test("the date of a result's rows shows once above them when they share it, with
   expect(within(line).getByRole("link", { name: "Rule 99(2)" }).getAttribute("href")).toBe("https://eur-lex.europa.eu/rule#099.002");
 });
 
-test("rows of a result with different dates each show their date under their label", () => {
-  show(applying(), null, []);
+// A condition of a date that the user decides, with its title and its sentence (gates.yaml).
+const CONDITION: NonNullable<Row["condition"]> = {
+  citation: "Rule 111(2)",
+  link: "https://eur-lex.europa.eu/rule#111.002:~:text=Older%20cameras%20are%20covered%20only%20after%20a%20change.",
+  quote: "Older cameras are covered only after a change.",
+  title: "For a camera already in use before that date",
+  text: "An older camera must meet it only after a change. You decide this.",
+};
 
-  expect(row("Delete old video").textContent).toContain("From 25 May 2018 (Rule 99(2)).");
-  expect(row("A notice at the door").textContent).toContain("From 2 December 2027 (Rule 113).");
+test("the rows of a result with two dates show each date once above its rows, with the condition of the later date under it", () => {
+  show(applying([testRows[0], { ...testRows[1], status: "applies", needs: null, condition: CONDITION }]), null, []);
+
+  const first = region(APPLIES);
+  const early = within(first).getByText(/From 25 May 2018/);
+  const late = within(first).getByText(/From 2 December 2027/);
+  expect([early.textContent, late.textContent]).toEqual(["From 25 May 2018 (Rule 99(2)).", "From 2 December 2027 (Rule 113)."]);
+  const fold = within(first).getByText(CONDITION.title);
+  const [old, notice] = [row("Delete old video"), row("A notice at the door")];
+  // In the page's order: the first date, its row, the second date, its condition, its row.
+  for (const [before, after] of [
+    [early, old],
+    [old, late],
+    [late, fold],
+    [fold, notice],
+  ]) {
+    expect(before.compareDocumentPosition(after) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  }
+  expect([old.textContent, notice.textContent].some((text) => text?.includes("From "))).toBe(false);
 });
 
-test("the condition of the rows' date that the user decides is folded once above the rows, with its sentence and its quote", () => {
-  const condition: Cited = {
-    citation: "Rule 111(2)",
-    link: "https://eur-lex.europa.eu/rule#111.002:~:text=Older%20cameras%20are%20covered%20only%20after%20a%20change.",
-    quote: "Older cameras are covered only after a change.",
-  };
-  show(applying(testRows.map((item) => ({ ...item, status: "applies", needs: null, date: "2027-12-02", date_unit: testRows[1].date_unit, condition }))), null, []);
+test("the rows of a result keep their order, with a date line above each run of adjacent rows of one date", () => {
+  const later = { ...testRows[0], id: "storage:rule:art7(1)", label: "A log of the deletions" };
+  show(applying([testRows[0], { ...testRows[1], status: "applies", needs: null }, later]), null, []);
 
-  const fold = screen.getByText("For a system already on the market or in service before that date");
+  expect(within(region(APPLIES)).getAllByText(/^From /).map((line) => line.textContent)).toEqual([
+    "From 25 May 2018 (Rule 99(2)).",
+    "From 2 December 2027 (Rule 113).",
+    "From 25 May 2018 (Rule 99(2)).",
+  ]);
+  const [old, notice, log] = ["Delete old video", "A notice at the door", "A log of the deletions"].map(row);
+  expect(old.compareDocumentPosition(notice) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(notice.compareDocumentPosition(log) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+
+test("two dates on the same day that different articles set are two runs, each with its own article", () => {
+  const sameDay = { ...testRows[0], id: "storage:rule:art7(1)", label: "A log of the deletions", date_unit: testRows[1].date_unit };
+  show(applying([testRows[0], sameDay]), null, []);
+
+  const lines = within(region(APPLIES)).getAllByText(/From 25 May 2018/);
+  expect(lines.map((line) => line.textContent)).toEqual(["From 25 May 2018 (Rule 99(2)).", "From 25 May 2018 (Rule 113)."]);
+});
+
+test("the condition of the rows' date that the user decides is folded once above the rows, with its title, its sentence and its quote", () => {
+  show(applying(testRows.map((item) => ({ ...item, status: "applies", needs: null, date: "2027-12-02", date_unit: testRows[1].date_unit, condition: CONDITION }))), null, []);
+
+  const fold = screen.getByText(CONDITION.title);
   expect(fold.tagName).toBe("SUMMARY");
   const folded = fold.closest("details") as HTMLDetailsElement;
   expect(folded.open).toBe(false);
-  expect(folded.textContent).toContain(
-    "For a system placed on the market or put into service before that date, these rows apply only if its design changes significantly from that date. A system intended to be used by public authorities must meet them by 2 August 2030 in any case. You decide this.",
-  );
+  expect(folded.textContent).toContain(CONDITION.text);
   expect(screen.getAllByRole("link", { name: "Rule 111(2)" })).toHaveLength(1);
   expect(within(folded).getByText("Older cameras are covered only after a change.").tagName).toBe("BLOCKQUOTE");
+});
+
+test("a row whose unit its result quotes links it with quoted above, and the quote shows once, with the result", () => {
+  const [storage] = applying([testRows[0]]);
+  show([{ ...storage, quotes: [testRows[0].unit] }], null, []);
+
+  expect(screen.getAllByText("Video is deleted after a month.")).toHaveLength(1);
+  const old = row("Delete old video");
+  fireEvent.click(within(old).getByRole("button", { name: "Details" }));
+
+  expect(within(old).getByRole("link", { name: "Rule 5(1)" }).parentElement?.textContent).toBe(
+    "Rule 5(1), quoted above as the article that defines the result",
+  );
+  expect(within(old).queryByText("Video is deleted after a month.")).toBeNull();
+  expect(screen.getAllByText("Video is deleted after a month.")).toHaveLength(1);
 });
 
 // The summary (criterion 11).
