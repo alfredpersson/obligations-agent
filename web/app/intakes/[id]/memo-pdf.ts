@@ -9,12 +9,12 @@ export type Colors = Record<"text" | "muted" | "accent" | "quote" | "rule", stri
 
 // The static fonts of the two families that the web app shows, in public/fonts/ with their licenses
 // (SIL Open Font License 1.1), as their authors publish them: Source Serif 4 from the TTF folder of
-// github.com/adobe-fonts/source-serif, and JetBrains Mono from the fonts/ttf folder of
-// github.com/JetBrains/JetBrainsMono. The web app's own files are variable fonts in WOFF2, which
-// pdfmake cannot embed.
+// github.com/adobe-fonts/source-serif, and Inter from the extras/ttf folder of release 4.1 of
+// github.com/rsms/inter. The web app's own files are variable fonts in WOFF2, which pdfmake cannot
+// embed.
 export const FONTS = {
   Serif: { normal: "SourceSerif4-Regular.ttf", bold: "SourceSerif4-Bold.ttf" },
-  Mono: { normal: "JetBrainsMono-SemiBold.ttf", bold: "JetBrainsMono-SemiBold.ttf" },
+  Sans: { normal: "Inter-Regular.ttf", bold: "Inter-SemiBold.ttf" },
 };
 
 // The fonts by their address, with the same file for italics, which the PDF does not use.
@@ -42,30 +42,21 @@ function spans(items: Span[], colors: Colors): Content[] {
   );
 }
 
-const SIZE = { 1: 22, 2: 9, 3: 7.5, 4: 12.5, 5: 11 } as const;
+const SIZE = { 1: 22, 2: 16, 3: 13.5, 4: 12.5, 5: 11 } as const;
 
 function content(block: Block, colors: Colors): Content {
   switch (block.kind) {
     case "heading":
-      // The parts and their items are labels in the monospace font, as on the screen; the results
-      // and the rows are serif headings.
-      return block.level === 2 || block.level === 3
-        ? {
-            text: block.text,
-            font: "Mono",
-            fontSize: SIZE[block.level],
-            characterSpacing: 0.5,
-            color: block.level === 3 ? colors.muted : colors.text,
-            margin: block.level === 2 ? [0, 16, 0, 6] : [0, 10, 0, 4],
-            headlineLevel: block.level,
-          }
-        : {
-            text: block.text,
-            fontSize: SIZE[block.level],
-            bold: true,
-            margin: block.level === 1 ? [0, 0, 0, 2] : [0, 8, 0, 3],
-            headlineLevel: block.level,
-          };
+      // Every heading is in the serif, as on the screen: the title, the parts and their items in its
+      // regular weight, the results and the rows in bold.
+      return {
+        text: block.text,
+        font: "Serif",
+        fontSize: SIZE[block.level],
+        bold: block.level >= 4,
+        margin: block.level === 1 ? [0, 0, 0, 2] : block.level === 2 ? [0, 16, 0, 6] : [0, 8, 0, 3],
+        headlineLevel: block.level,
+      };
     case "line":
       return { text: spans(block.spans, colors), margin: [0, 0, 0, 5] };
     case "quote":
@@ -88,19 +79,18 @@ function content(block: Block, colors: Colors): Content {
   }
 }
 
-// The document: A4, the text in the serif, a heading never last on its page, and the page numbers
-// in the footer.
+// The document: A4, the text in the sans-serif, a heading never last on its page, and the page
+// numbers in the footer.
 export function definition(blocks: Block[], colors: Colors): TDocumentDefinitions {
   return {
     info: { title: TITLE },
     pageSize: "A4",
     pageMargins: [56, 52, 56, 56],
-    defaultStyle: { font: "Serif", fontSize: 10, lineHeight: 1.3, color: colors.text },
+    defaultStyle: { font: "Sans", fontSize: 10, lineHeight: 1.3, color: colors.text },
     content: blocks.map((block) => content(block, colors)),
     pageBreakBefore: (node, nodes) => node.headlineLevel !== undefined && nodes.getFollowingNodesOnPage().length === 0,
     footer: (page, pages) => ({
       text: `${page} / ${pages}`,
-      font: "Mono",
       fontSize: 7.5,
       color: colors.muted,
       alignment: "right",

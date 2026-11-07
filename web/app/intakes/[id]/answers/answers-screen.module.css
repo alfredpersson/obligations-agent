@@ -1,6 +1,6 @@
-/* The screen of the answers: the description folded under the heading, then the open facts, each
-   with a bar in the color of a conditional result, then the answered facts, each fact in one line
-   between thin rules on a wide screen: its label, its answer, and the link to its question. */
+/* The screen of the answers: the description folded under the heading, then the open facts and the
+   answered facts, each list on a card, each fact in one line between thin rules on a wide screen:
+   its label, its answer, and the link to its question. */
 .lead {
   font-size: var(--size-legend);
 }
@@ -25,9 +25,17 @@
   margin: var(--space-3) 0;
 }
 
-/* A rule above the first fact; each fact has the rule of a list of answers under it. */
+/* A list of facts is a card; each fact but the last has the rule of a list of answers under it. */
 .facts {
-  border-top: 1px solid var(--color-rule);
+  padding: 0 var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+.facts > div:last-child {
+  border-bottom: 0;
 }
 
 .facts > div {
@@ -53,11 +61,6 @@
 .change a {
   display: inline-block;
   padding: var(--space-2) var(--space-4);
-}
-
-.open {
-  padding-left: var(--space-4);
-  border-left: 3px solid var(--color-conditional-mark);
 }
 
 .reason {

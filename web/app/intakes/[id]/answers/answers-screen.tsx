@@ -103,7 +103,7 @@ export default function AnswersScreen() {
     const value = intake.answers[slot.id];
     const entry = intake.not_sure[slot.id];
     return (
-      <div key={slot.id} id={slot.id} className={open ? styles.open : undefined}>
+      <div key={slot.id} id={slot.id}>
         <dt>{slot.label}</dt>
         <dd>
           {value === undefined ? "Not answered yet" : slot.values.find((item) => item.id === value)?.label}

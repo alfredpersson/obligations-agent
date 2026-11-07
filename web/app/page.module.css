@@ -5,7 +5,8 @@
   /* The band starts right under the header. */
   margin-top: calc(-1 * var(--space-8));
   padding: 4rem 0;
-  background: var(--color-accent-soft);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-rule);
 }
 
 .top {
@@ -37,14 +38,15 @@
   font-size: var(--size-note);
 }
 
-/* The excerpt of the result: a card on the lighter paper, with a square and the status label of
-   the result screen for each gate. */
+/* The excerpt of the result: a card above the band, with a square and the status label of the
+   result screen for each gate. */
 .excerpt {
   margin: 0;
   padding: var(--space-6);
   background: var(--color-surface);
   border: 1px solid var(--color-rule);
-  box-shadow: 0 18px 40px -24px var(--color-backdrop);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-raised);
 }
 
 .excerpt figcaption {
@@ -107,8 +109,8 @@
   margin: 0;
 }
 
-/* The steps in a row, each under a rule in the color of the marks that ends in a head pointing at
-   the next step. On a narrow screen they are one column, without the heads. */
+/* The steps in a row, each under a rule in the accent's color that ends in a head pointing at the
+   next step. On a narrow screen they are one column, without the heads. */
 .steps {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -122,7 +124,7 @@
   position: relative;
   margin: 0;
   padding-top: var(--space-6);
-  border-top: 2px solid var(--color-mark);
+  border-top: 2px solid var(--color-accent);
 }
 
 /* The head: two sides of a square, turned to point at the next step. */
@@ -133,18 +135,18 @@
   right: -1px;
   width: 12px;
   height: 12px;
-  border-top: 2px solid var(--color-mark);
-  border-right: 2px solid var(--color-mark);
+  border-top: 2px solid var(--color-accent);
+  border-right: 2px solid var(--color-accent);
   transform: rotate(45deg);
 }
 
-/* A step's title in the font of the text, not as the label that h3 is elsewhere. */
+/* A step's title in the serif, not as the label that h3 is elsewhere. */
 .steps h3 {
   margin: 0 0 var(--space-2);
   color: var(--color-text);
-  font-family: var(--font-text);
-  font-size: var(--size-legend);
-  font-weight: 700;
+  font-family: var(--font-title);
+  font-size: 1.25rem;
+  font-weight: 500;
   letter-spacing: 0;
   text-transform: none;
 }
@@ -180,21 +182,23 @@
 }
 
 .units {
-  font-family: var(--font-label);
   font-size: var(--size-note);
   color: var(--color-muted);
 }
 
-/* The choices again, at the end, on the tint of the band. */
+/* The choices again, at the end, on a card, after a line in the serif. */
 .sections > .again {
   margin: var(--space-8) 0;
   padding: var(--space-8);
-  background: var(--color-accent-soft);
+  background: var(--color-surface);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
 }
 
 .again > p {
-  font-size: 1.375rem;
-  font-weight: 700;
+  font-family: var(--font-title);
+  font-size: 1.625rem;
   line-height: 1.3;
 }
 

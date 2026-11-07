@@ -1,7 +1,6 @@
 /* The examples from guidance under their section label, one card for each group: the line about the
    user's text is the card's title above a rule, the quotes stand indented under their heading, and
-   the source line is the card's footer below a rule. The line and the quote headings are in the font
-   of the text, and the source lines are labels. */
+   the source line is the card's footer below a rule, in the muted color. */
 .examples {
   margin: 0 0 var(--space-6);
 }
@@ -15,6 +14,8 @@
   padding: var(--card-padding);
   background: var(--color-surface);
   border: 1px solid var(--color-rule);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
 }
 
 .group h3 {
@@ -43,7 +44,6 @@
   margin: var(--space-4) 0 0;
   padding-top: var(--space-3);
   color: var(--color-muted);
-  font-family: var(--font-label);
   border-top: 1px solid var(--color-rule);
 }
 

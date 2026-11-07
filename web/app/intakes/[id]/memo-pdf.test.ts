@@ -1,5 +1,6 @@
 // @vitest-environment node
 import pdfmake from "pdfmake";
+import type { DynamicContent } from "pdfmake/interfaces";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { expect, test } from "vitest";
 import { testIntake, testSchema } from "../../testing";
@@ -68,5 +69,21 @@ test.each<[string, Choices]>([
   expect(pdf.links).toEqual(links(blocks));
   expect(pdf.title).toBe("Obligations memo");
   const raw = Buffer.from(bytes).toString("latin1");
-  for (const font of ["SourceSerif4-Regular", "SourceSerif4-Bold", "JetBrainsMono-SemiBold"]) expect(raw).toContain(font);
+  for (const font of ["SourceSerif4-Regular", "SourceSerif4-Bold", "Inter-Regular", "Inter-SemiBold"]) expect(raw).toContain(font);
+  expect(raw).not.toContain("JetBrainsMono");
+});
+
+test("the PDF's headings are in the serif font, and all its other text is in the sans-serif font", () => {
+  const blocks = memo(testIntake, testSchema, { category: null, quotes: true, meanings: true }, new Date(2026, 10, 6));
+  const document = definition(blocks, COLORS);
+  // The document's nodes as plain data: each heading has its level.
+  const nodes: { font?: string; headlineLevel?: number }[] = JSON.parse(JSON.stringify(document.content));
+  const footer = (document.footer as DynamicContent)(1, 1, { width: 595.28, height: 841.89, orientation: "portrait" });
+
+  expect(document.defaultStyle).toHaveProperty("font", "Sans");
+  expect(nodes.filter((node) => node.headlineLevel !== undefined)).toHaveLength(
+    blocks.filter((block) => block.kind === "heading").length,
+  );
+  for (const node of nodes) expect(node.font).toBe(node.headlineLevel === undefined ? undefined : "Serif");
+  expect(footer).not.toHaveProperty("font");
 });
