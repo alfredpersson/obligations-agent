@@ -10,10 +10,10 @@ import styles from "./page.module.css";
 // questions are written here once.
 const STEPS = [
   ["Describe the product", "Three short fields: what it does, who uses it, and what data it handles."],
-  ["Answer the form", "Three questions with fixed answers. “Not sure” is always one of them."],
+  ["Answer the form", "Four questions with fixed answers. “Not sure” is always one of them."],
   [
     "Answer follow-up questions",
-    "At most eight, one at a time. A model chooses each question from your answers so far and writes it for your product. Some questions show examples from official guidance.",
+    "At most ten, one at a time. A model chooses each question from your answers so far and writes it for your product. Some questions show examples from official guidance.",
   ],
   [
     "Check your answers",
@@ -33,13 +33,15 @@ const CHECKS = [
   ["Provider", "AI Act Article 3(3)"],
   ["High-risk under Annex III", "AI Act Article 6(2) and Annex III"],
   ["Transparency: people interact with the product", "AI Act Article 50(1)"],
+  ["Transparency: the product generates content", "AI Act Article 50(2)"],
+  ["Deployer", "AI Act Article 3(4)"],
 ];
 
-// The three gates that the form answers of the example product decide, whatever the follow-up
-// answers are, by the part of the result where each shows: the GDPR and the provider apply, the
-// question of the listed use is left to check, and high-risk under Annex III may also apply. The
-// lead-in and point (a) of the unit that the high-risk result quotes.
-const APPLIES = ["GDPR", "Provider"];
+// The four gates that the form answers of the example product decide, whatever the follow-up
+// answers are, by the part of the result where each shows: the GDPR, the provider and the deployer
+// apply, the question of the listed use is left to check, and high-risk under Annex III may also
+// apply. The lead-in and point (a) of the unit that the high-risk result quotes.
+const APPLIES = ["GDPR", "Provider", "Deployer"];
 const QUOTE = [
   "Employment, workers’ management and access to self-employment:",
   "(a) AI systems intended to be used for the recruitment or selection of natural persons, in particular to place targeted job advertisements, to analyse and filter job applications, and to evaluate candidates;",

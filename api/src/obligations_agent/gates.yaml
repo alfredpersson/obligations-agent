@@ -29,6 +29,12 @@ units:
     anchor: "art_3"
     quote: |-
       ‘provider’ means a natural or legal person, public authority, agency or other body that develops an AI system or a general-purpose AI model or that has an AI system or a general-purpose AI model developed and places it on the market or puts the AI system into service under its own name or trademark, whether for payment or free of charge;
+  - id: "aia:art3(4)"
+    citation: AI Act Article 3(4)
+    document: "32024R1689"
+    anchor: "art_3"
+    quote: |-
+      ‘deployer’ means a natural or legal person, public authority, agency or other body using an AI system under its authority except where the AI system is used in the course of a personal non-professional activity;
   - id: "aia:art6(2)"
     citation: AI Act Article 6(2)
     document: "32024R1689"
@@ -126,6 +132,12 @@ units:
     anchor: "050.001"
     quote: |-
       Providers shall ensure that AI systems intended to interact directly with natural persons are designed and developed in such a way that the natural persons concerned are informed that they are interacting with an AI system, unless this is obvious from the point of view of a natural person who is reasonably well-informed, observant and circumspect, taking into account the circumstances and the context of use. This obligation shall not apply to AI systems authorised by law to detect, prevent, investigate or prosecute criminal offences, subject to appropriate safeguards for the rights and freedoms of third parties, unless those systems are available for the public to report a criminal offence.
+  - id: "aia:art50(2)"
+    citation: AI Act Article 50(2)
+    document: "32024R1689"
+    anchor: "050.002"
+    quote: |-
+      Providers of AI systems, including general-purpose AI systems, generating synthetic audio, image, video or text content, shall ensure that the outputs of the AI system are marked in a machine-readable format and detectable as artificially generated or manipulated. Providers shall ensure their technical solutions are effective, interoperable, robust and reliable as far as this is technically feasible, taking into account the specificities and limitations of various types of content, the costs of implementation and the generally acknowledged state of the art, as may be reflected in relevant technical standards. This obligation shall not apply to the extent the AI systems perform an assistive function for standard editing or do not substantially alter the input data provided by the deployer or the semantics thereof, or where authorised by law to detect, prevent, investigate or prosecute criminal offences.
   - id: "aia:art3(1)"
     citation: AI Act Article 3(1)
     document: "02024R1689-20260727"
@@ -138,10 +150,6 @@ units:
     citation: GDPR Article 3
     document: "32016R0679"
     anchor: "art_3"
-  - id: "aia:art3(4)"
-    citation: AI Act Article 3(4)
-    document: "02024R1689-20260727"
-    anchor: "art_3"
   - id: "aia:art5"
     citation: AI Act Article 5
     document: "02024R1689-20260727"
@@ -150,8 +158,8 @@ units:
     citation: AI Act Article 6(1)
     document: "02024R1689-20260727"
     anchor: "art_6"
-  - id: "aia:art50(2)"
-    citation: AI Act Article 50(2) to 50(4)
+  - id: "aia:art50(3)"
+    citation: AI Act Article 50(3) and 50(4)
     document: "02024R1689-20260727"
     anchor: "art_50"
   - id: "aia:art2"
@@ -403,12 +411,54 @@ units:
     anchor: "073.001"
     quote: |-
       Providers of high-risk AI systems placed on the Union market shall report any serious incident to the market surveillance authorities of the Member States where that incident occurred.
+  - id: "aia:art26(1)"
+    citation: AI Act Article 26(1)
+    document: "32024R1689"
+    anchor: "026.001"
+    quote: |-
+      Deployers of high-risk AI systems shall take appropriate technical and organisational measures to ensure they use such systems in accordance with the instructions for use accompanying the systems, pursuant to paragraphs 3 and 6.
+  - id: "aia:art26(2)"
+    citation: AI Act Article 26(2)
+    document: "32024R1689"
+    anchor: "026.002"
+    quote: |-
+      Deployers shall assign human oversight to natural persons who have the necessary competence, training and authority, as well as the necessary support.
+  - id: "aia:art26(5)"
+    citation: AI Act Article 26(5), first subparagraph
+    document: "32024R1689"
+    anchor: "026.005"
+    quote: |-
+      Deployers shall monitor the operation of the high-risk AI system on the basis of the instructions for use and, where relevant, inform providers in accordance with Article 72. Where deployers have reason to consider that the use of the high-risk AI system in accordance with the instructions may result in that AI system presenting a risk within the meaning of Article 79(1), they shall, without undue delay, inform the provider or distributor and the relevant market surveillance authority, and shall suspend the use of that system. Where deployers have identified a serious incident, they shall also immediately inform first the provider, and then the importer or distributor and the relevant market surveillance authorities of that incident. If the deployer is not able to reach the provider, Article 73 shall apply mutatis mutandis. This obligation shall not cover sensitive operational data of deployers of AI systems which are law enforcement authorities.
+  - id: "aia:art26(6)"
+    citation: AI Act Article 26(6), first subparagraph
+    document: "32024R1689"
+    anchor: "026.006"
+    quote: |-
+      Deployers of high-risk AI systems shall keep the logs automatically generated by that high-risk AI system to the extent such logs are under their control, for a period appropriate to the intended purpose of the high-risk AI system, of at least six months, unless provided otherwise in applicable Union or national law, in particular in Union law on the protection of personal data.
+  - id: "aia:art26(7)"
+    citation: AI Act Article 26(7)
+    document: "32024R1689"
+    anchor: "026.007"
+    quote: |-
+      Before putting into service or using a high-risk AI system at the workplace, deployers who are employers shall inform workers’ representatives and the affected workers that they will be subject to the use of the high-risk AI system. This information shall be provided, where applicable, in accordance with the rules and procedures laid down in Union and national law and practice on information of workers and their representatives.
+  - id: "aia:art26(11)"
+    citation: AI Act Article 26(11)
+    document: "32024R1689"
+    anchor: "026.011"
+    quote: |-
+      Without prejudice to Article 50 of this Regulation, deployers of high-risk AI systems referred to in Annex III that make decisions or assist in making decisions related to natural persons shall inform the natural persons that they are subject to the use of the high-risk AI system. For high-risk AI systems used for law enforcement purposes Article 13 of Directive (EU) 2016/680 shall apply.
   - id: "aia:art111(2)"
     citation: AI Act Article 111(2), as replaced by Regulation (EU) 2026/1744
     document: "32026R1744"
     anchor: "111.002"
     quote: |-
       Without prejudice to the application of Article 5 as referred to in Article 113, third paragraph, point (a), this Regulation shall apply to operators of high-risk AI systems, other than the systems referred to in paragraph 1 of this Article, that have been placed on the market or put into service before the date of application of Chapter III referred to in Article 113, only if, as from that date, those systems are subject to significant changes in their designs. In any case, the providers and deployers of high-risk AI systems intended to be used by public authorities shall take the necessary steps to comply with the requirements and obligations laid down in this Regulation by 2 August 2030.
+  - id: "aia:art111(4)"
+    citation: AI Act Article 111(4), as added by Regulation (EU) 2026/1744
+    document: "32026R1744"
+    anchor: "111.004"
+    quote: |-
+      Providers of AI systems, including general-purpose AI systems, generating synthetic audio, image, video or text content, that have been placed on the market before 2 August 2026 shall take the necessary steps in order to comply with Article 50(2) by 2 December 2026.
   - id: "gdpr:art99(2)"
     citation: GDPR Article 99(2)
     document: "32016R0679"
@@ -492,6 +542,23 @@ gates:
     rows:
       - { values: ["yes"], result: applies }
       - { values: ["no"], result: does_not_apply }
+  - id: transparency_content
+    label: "Transparency: the product generates content"
+    regulation: ai_act
+    under: provider
+    slot: generates_content
+    quotes: ["aia:art50(2)"]
+    rows:
+      - { values: ["yes"], result: applies }
+      - { values: ["no"], result: does_not_apply }
+  - id: deployer
+    label: Deployer
+    regulation: ai_act
+    slot: own_use
+    quotes: ["aia:art3(4)"]
+    rows:
+      - { values: ["yes"], result: applies }
+      - { values: ["no"], result: does_not_apply }
 
 assumptions:
   - text: The product is an AI system as defined in AI Act Article 3(1).
@@ -500,8 +567,6 @@ assumptions:
     links: ["aia:art2(1)", "gdpr:art3"]
 
 not_checked:
-  - text: Deployer
-    links: ["aia:art3(4)"]
   - text: Prohibited practices
     links: ["aia:art5"]
   - text: High-risk under Annex I
@@ -510,25 +575,44 @@ not_checked:
   # for criminal offences.
   - text: The exceptions in Article 50(1)
     links: ["aia:art50(1)"]
-  - text: "Transparency: synthetic content, emotion recognition and biometric categorisation, deepfakes"
+  # The intake does not ask whether the product only assists standard editing or does not substantially
+  # alter the input data, nor about a system authorised by law for criminal offences.
+  - text: The exceptions in Article 50(2)
     links: ["aia:art50(2)"]
+  - text: "Transparency: emotion recognition and biometric categorisation, deepfakes"
+    links: ["aia:art50(3)"]
   - text: The exclusions from each regulation
     links: ["aia:art2", "gdpr:art2"]
 
 # The date from which the obligations of a row apply: GDPR Article 99(2), and AI Act Article 113 as
 # amended by Regulation (EU) 2026/1744 (MEMO-5). Article 4 is in Chapter I, which applies from
-# 2 February 2025 (point (a)); Article 50 from the general date. Chapter III, Sections 1 to 3, apply
-# from 2 December 2027 for a system under Annex III (point (c)); the rows of Articles 43, 49, 72 and
+# 2 February 2025 (point (a)); Article 50 from the general date. Article 111(4), added by that
+# regulation, gives a system that generates synthetic content and was placed on the market before
+# 2 August 2026 until 2 December 2026 for Article 50(2). Chapter III, Sections 1 to 3, apply from
+# 2 December 2027 for a system under Annex III (point (c)); the rows of Articles 26, 43, 49, 72 and
 # 73 show the same date, since Article 6, in Section 1, classifies no system under Annex III as
 # high-risk before it. Article 111(2), as replaced, covers a system placed on the market or put into
 # service before that date only if its design changes significantly from that date, and one intended
-# to be used by public authorities by 2 August 2030 in any case: a condition that the user decides,
-# quoted with the rows of that date.
+# to be used by public authorities by 2 August 2030 in any case. Each is a condition that the user
+# decides, quoted with the rows of its date, with a title and a sentence that say it in short.
 dates:
   - { id: gdpr, date: "2018-05-25", unit: "gdpr:art99(2)" }
   - { id: chapter_i, date: "2025-02-02", unit: "aia:art113" }
   - { id: general, date: "2026-08-02", unit: "aia:art113" }
-  - { id: annex_iii, date: "2027-12-02", unit: "aia:art113", condition: "aia:art111(2)" }
+  - id: generated_content
+    date: "2026-08-02"
+    unit: "aia:art113"
+    condition:
+      unit: "aia:art111(4)"
+      title: For a system already on the market before that date
+      text: A system placed on the market before that date must meet it by 2 December 2026. You decide this.
+  - id: annex_iii
+    date: "2027-12-02"
+    unit: "aia:art113"
+    condition:
+      unit: "aia:art111(2)"
+      title: For a system already on the market or in service before that date
+      text: For a system placed on the market or put into service before that date, these rows apply only if its design changes significantly from that date. A system intended to be used by public authorities must meet them by 2 August 2030 in any case. You decide this.
 
 # The rows of the obligations of each result (MEMO-5, MEMO-6), in the order shown. A row needs, besides
 # its result, the result of another gate or the answer "yes" of a slot. A row with values holds only
@@ -559,6 +643,7 @@ obligations:
   - { gate: processor, unit: "gdpr:art33(2)", label: "A breach reported to the controller", category: organisation, date: gdpr }
   - { gate: provider, unit: "aia:art4(1)", label: "AI literacy of staff", category: organisation, date: chapter_i }
   - { gate: transparency_interaction, unit: "aia:art50(5)", label: "Information at the first interaction", category: technical, date: general }
+  - { gate: transparency_content, unit: "aia:art50(2)", label: "Machine-readable marking of generated content", category: technical, date: generated_content }
   - { gate: high_risk_annex_iii, unit: "aia:art9(1)", label: "A risk management system", category: organisation, date: annex_iii, needs: { gate: provider } }
   - { gate: high_risk_annex_iii, unit: "aia:art10(2)", label: "Data governance for training, validation and testing data", category: technical, date: annex_iii, needs: { gate: provider } }
   - { gate: high_risk_annex_iii, unit: "aia:art11(1)", label: "Technical documentation", category: technical, date: annex_iii, needs: { gate: provider } }
@@ -573,3 +658,10 @@ obligations:
   - { gate: high_risk_annex_iii, unit: "aia:art49(5)", label: "Registration at national level", category: organisation, date: annex_iii, needs: { gate: provider }, values: [critical_infrastructure] }
   - { gate: high_risk_annex_iii, unit: "aia:art72(1)", label: "Post-market monitoring", category: organisation, date: annex_iii, needs: { gate: provider } }
   - { gate: high_risk_annex_iii, unit: "aia:art73(1)", label: "Reports of serious incidents", category: organisation, date: annex_iii, needs: { gate: provider } }
+  - { gate: deployer, unit: "aia:art4(1)", label: "AI literacy of staff", category: organisation, date: chapter_i }
+  - { gate: deployer, unit: "aia:art26(1)", label: "Use according to the instructions for use", category: organisation, date: annex_iii, needs: { gate: high_risk_annex_iii } }
+  - { gate: deployer, unit: "aia:art26(2)", label: "Human oversight by people with the needed competence", category: organisation, date: annex_iii, needs: { gate: high_risk_annex_iii } }
+  - { gate: deployer, unit: "aia:art26(5)", label: "Monitoring, and informing the provider of risks", category: organisation, date: annex_iii, needs: { gate: high_risk_annex_iii } }
+  - { gate: deployer, unit: "aia:art26(6)", label: "Keeping the logs", category: technical, date: annex_iii, needs: { gate: high_risk_annex_iii } }
+  - { gate: deployer, unit: "aia:art26(7)", label: "Informing workers' representatives and the affected workers", category: organisation, date: annex_iii, needs: { gate: high_risk_annex_iii } }
+  - { gate: deployer, unit: "aia:art26(11)", label: "Informing the people that the system makes decisions about", category: legal, date: annex_iii, needs: { gate: high_risk_annex_iii }, drafting: true }

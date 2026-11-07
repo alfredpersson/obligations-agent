@@ -17,7 +17,7 @@ from fastapi.testclient import TestClient
 from obligations_agent import server
 from obligations_agent.gates import Gates, load_gates
 from obligations_agent.guidance import load_guidance
-from obligations_agent.intake_model import PROMPT_VERSION, new_client
+from obligations_agent.intake_model import PROMPT, PROMPT_VERSION, new_client
 from obligations_agent.schema import Schema, load_schema, parse_schema
 from obligations_agent.server import create_app
 
@@ -31,6 +31,7 @@ FORM = {
         "personal_data": "yes",
         "under_own_name": "not_sure",
         "use_case_area": "none",
+        "own_use": "no",
     },
     "description": {
         "what_it_does": f"Answers questions about orders in an online shop. {MARKER}",
@@ -50,6 +51,7 @@ FOLLOW_UPS = [
     "special_categories",
     "automated_decisions",
     "interacts_with_people",
+    "generates_content",
 ]
 KEY = "sk-ant-test-0123456789"
 
@@ -252,6 +254,7 @@ PERSONAL_DATA_UNCLEAR = {
         "personal_data": "not_sure",
         "under_own_name": "not_sure",
         "use_case_area": "none",
+        "own_use": "no",
     },
     "not_sure": {
         "personal_data": {"reason": "unclear", "note": "Do email addresses count?"},
@@ -572,14 +575,14 @@ def test_without_a_model_client_no_slot_is_asked_a_second_time(
 
     steps = [
         answer(client, created["id"], number, "not_sure", UNCLEAR)
-        for number in range(1, 6)
+        for number in range(1, 7)
     ]
 
     assert steps[-1] == READY_TO_CONFIRM
     open_slots = client.get(f"/intakes/{created['id']}").json()["open_slots"]
     assert open_slots == ["under_own_name", *FOLLOW_UPS]
     assert (
-        f"end after 5 questions model=claude-sonnet-5-5 prompt={PROMPT_VERSION} reason=no_key"
+        f"end after 6 questions model=claude-sonnet-5-5 prompt={PROMPT_VERSION} reason=no_key"
         in caplog.text
     )
 
@@ -675,19 +678,19 @@ def test_when_no_slot_is_queued_a_refused_or_failed_call_ends_the_intake(
 ) -> None:
     caplog.set_level(logging.INFO)
     requests: list[httpx2.Request] = []
-    # The five follow-up slots of FORM, then a call that is not valid while under_own_name is still "not sure".
+    # The six follow-up slots of FORM, then a call that is not valid while under_own_name is still "not sure".
     client = service(scripted(requests, *[asking(slot) for slot in FOLLOW_UPS], reply))
     created = client.post("/intakes", json=FORM).json()
 
-    steps = [answer(client, created["id"], number, "no") for number in range(1, 6)]
+    steps = [answer(client, created["id"], number, "no") for number in range(1, 7)]
 
     assert steps[-1] == READY_TO_CONFIRM
-    assert len(requests) == 6
+    assert len(requests) == 7
     assert client.get(f"/intakes/{created['id']}").json()["open_slots"] == [
         "under_own_name"
     ]
     assert (
-        f"end after 5 questions model=claude-sonnet-5-5 prompt={PROMPT_VERSION} reason={reason}"
+        f"end after 6 questions model=claude-sonnet-5-5 prompt={PROMPT_VERSION} reason={reason}"
         in caplog.text
     )
 
@@ -716,6 +719,7 @@ def test_an_answer_that_makes_slots_no_longer_relevant_removes_their_answers() -
         "personal_data": "not_sure",
         "under_own_name": "no",
         "use_case_area": "none",
+        "own_use": "no",
     }
     client = service(
         scripted(
@@ -833,14 +837,14 @@ def test_each_request_offers_only_the_tool_ask() -> None:
     client = service(recording(requests))
     created = client.post("/intakes", json=FORM).json()
 
-    # The five follow-up slots, then under_own_name once more.
-    steps = [answer(client, created["id"], number, "no") for number in range(1, 7)]
+    # The six follow-up slots, then under_own_name once more.
+    steps = [answer(client, created["id"], number, "no") for number in range(1, 8)]
 
     assert steps[-1] == READY_TO_CONFIRM
     bodies = [json.loads(request.content) for request in requests]
     assert [[tool["name"] for tool in body["tools"]] for body in bodies] == [
         ["ask"]
-    ] * 6
+    ] * 7
 
 
 def test_code_ends_the_intake_without_a_request_when_the_slots_left_are_answered_i_dont_know(
@@ -853,37 +857,37 @@ def test_code_ends_the_intake_without_a_request_when_the_slots_left_are_answered
     # product".
     created = client.post("/intakes", json={**FORM, "not_sure": {}}).json()
 
-    values = ["not_sure", "no", "no", "no", "no"]
+    values = ["not_sure", "no", "no", "no", "no", "no"]
     steps = [
         answer(client, created["id"], number, value)
         for number, value in enumerate(values, start=1)
     ]
 
     assert steps[-1] == READY_TO_CONFIRM
-    assert len(requests) == 5
+    assert len(requests) == 6
     assert client.get(f"/intakes/{created['id']}").json()["open_slots"] == [
         "under_own_name",
         "decides_purposes",
     ]
     assert (
-        f"end after 5 questions model=claude-sonnet-5-5 prompt={PROMPT_VERSION} reason=no_askable_slot"
+        f"end after 6 questions model=claude-sonnet-5-5 prompt={PROMPT_VERSION} reason=no_askable_slot"
         in caplog.text
     )
 
 
-def test_no_request_goes_to_the_model_after_eight_questions() -> None:
+def test_no_request_goes_to_the_model_after_ten_questions() -> None:
     schema = camera_schema(
-        *[(f"q{number}", {"camera": ["yes"]}) for number in range(1, 10)]
+        *[(f"q{number}", {"camera": ["yes"]}) for number in range(1, 12)]
     )
     requests: list[httpx2.Request] = []
     client = service(recording(requests), schema, NO_GATES)
     created = client.post("/intakes", json=camera_form("yes")).json()
 
-    steps = [answer(client, created["id"], number, "no") for number in range(1, 9)]
+    steps = [answer(client, created["id"], number, "no") for number in range(1, 11)]
 
     assert steps[-1] == READY_TO_CONFIRM
-    assert len(requests) == 8
-    assert client.get(f"/intakes/{created['id']}").json()["open_slots"] == ["q9"]
+    assert len(requests) == 10
+    assert client.get(f"/intakes/{created['id']}").json()["open_slots"] == ["q11"]
 
 
 def test_the_request_has_the_prompt_file_the_strict_tool_ask_and_the_description_and_the_note_only_in_the_user_message() -> (
@@ -907,7 +911,7 @@ def test_the_request_has_the_prompt_file_the_strict_tool_ask_and_the_description
     )
     assert first["system"] == prompt
     # The log lines carry the version that the first line of the prompt file names.
-    assert PROMPT_VERSION == "6"
+    assert PROMPT_VERSION == "7"
     assert first["tool_choice"] == {"type": "auto", "disable_parallel_tool_use": True}
     [tool] = first["tools"]
     assert tool["name"] == "ask"
@@ -970,7 +974,7 @@ def test_the_user_message_lists_each_askable_slot_with_its_earlier_questions_and
     answer(client, created["id"], 2, "not_sure")
 
     first, second, third = [user_data(request) for request in requests]
-    assert first["questions_left"] == 8
+    assert first["questions_left"] == 10
     assert [fact["id"] for fact in first["facts"]] == ["under_own_name", *FOLLOW_UPS]
     form_question = "Do you place the product on the market or put it into service under your own name or trademark?"
     assert first["facts"][0] == {
@@ -989,7 +993,7 @@ def test_the_user_message_lists_each_askable_slot_with_its_earlier_questions_and
     assert first["facts"][1]["earlier_questions"] == []
     assert first["facts"][1]["note"] == ""
     assert first["facts"][1]["questions_left"] == 2
-    assert second["questions_left"] == 7
+    assert second["questions_left"] == 9
     [decides] = [fact for fact in second["facts"] if fact["id"] == "decides_purposes"]
     assert decides["earlier_questions"] == [
         {"text": TEXT, "explanation": "", "meaning": ""}
@@ -999,6 +1003,77 @@ def test_the_user_message_lists_each_askable_slot_with_its_earlier_questions_and
     assert "processes_for_customer" not in [fact["id"] for fact in third["facts"]]
     # Compact JSON: the user message holds no line break.
     assert "\n" not in json.loads(requests[0].content)["messages"][0]["content"]
+
+
+def test_the_user_message_offers_the_fact_about_generated_content_with_its_default_question() -> (
+    None
+):
+    requests: list[httpx2.Request] = []
+    service(recording(requests)).post("/intakes", json=FORM)
+
+    [content] = [
+        fact
+        for fact in user_data(requests[0])["facts"]
+        if fact["id"] == "generates_content"
+    ]
+    assert content == {
+        "id": "generates_content",
+        "label": "Generates synthetic content",
+        "default_question": "Does the product generate synthetic audio, image, video or text content?",
+        "values": YES_NO_NOT_SURE,
+        "earlier_questions": [],
+        "note": "",
+        "questions_left": 2,
+        # guidance.yaml has no entries for this fact yet.
+        "guidance": [],
+    }
+
+
+# Issue #45: the legal terms of the two new facts, which the model keeps in their own words, and the
+# two rules of prompt version 7 with which the plan's probe measured its questions.
+def test_the_prompt_keeps_the_terms_of_the_two_new_facts_and_its_rules_on_outputs_and_exceptions() -> (
+    None
+):
+    # The list of the terms that the model keeps in their own words ends with the two terms.
+    assert (
+        '"a legal effect on them or affects them in a similarly significant way", "under your own authority" and "generate synthetic audio, image, video or text content".'
+        in PROMPT
+    )
+    assert "do not give the outputs of this product as examples of that kind" in PROMPT
+    assert (
+        "An exception that the article makes to its obligation is not a part of the term"
+        in PROMPT
+    )
+
+
+@pytest.mark.parametrize(
+    ("reason", "asked"),
+    [("unclear", True), ("unknown", False)],
+    ids=["question_unclear", "fact_unknown"],
+)
+def test_own_use_answered_not_sure_on_the_form_is_asked_once_more_only_when_its_question_is_unclear(
+    reason: str, asked: bool
+) -> None:
+    requests: list[httpx2.Request] = []
+    form = {
+        **FORM,
+        "answers": {**FORM["answers"], "own_use": "not_sure"},
+        "not_sure": {**FORM["not_sure"], "own_use": {"reason": reason, "note": ""}},
+    }
+    service(recording(requests)).post("/intakes", json=form)
+
+    facts = {fact["id"]: fact for fact in user_data(requests[0])["facts"]}
+    assert ("own_use" in facts) is asked
+    if asked:
+        # The form's question is the first question about it.
+        assert facts["own_use"]["earlier_questions"] == [
+            {
+                "text": "Do you use the product yourselves, under your own authority, for your work?",
+                "explanation": "",
+                "meaning": "",
+            }
+        ]
+        assert facts["own_use"]["questions_left"] == 1
 
 
 def test_a_repeated_answer_while_the_model_writes_the_next_question_calls_the_model_once() -> (
@@ -1103,6 +1178,7 @@ def test_no_request_goes_to_the_model_when_the_step_is_ready_to_confirm_or_an_an
         "personal_data": "no",
         "under_own_name": "no",
         "use_case_area": "none",
+        "own_use": "no",
     }
     created = client.post(
         "/intakes", json={**FORM, "answers": no_follow_ups, "not_sure": {}}
@@ -1118,18 +1194,18 @@ def test_no_request_goes_to_the_model_when_the_step_is_ready_to_confirm_or_an_an
         f"/intakes/{created['id']}/answers", json={"question": 1, "value": "yes"}
     )
     assert len(requests) == 2
-    # FORM makes five follow-up slots relevant and leaves under_own_name "not sure": after the
-    # fifth answer the model asks about under_own_name, and after that answer the step is "ready
-    # to confirm".
+    # FORM makes six follow-up slots relevant and leaves under_own_name "not sure": after the sixth
+    # answer the model asks about under_own_name, and after that answer the step is "ready to
+    # confirm".
     steps = [
         client.post(
             f"/intakes/{created['id']}/answers",
             json={"question": number, "value": "no"},
         ).json()["step"]
-        for number in [2, 3, 4, 5, 6]
+        for number in [2, 3, 4, 5, 6, 7]
     ]
     assert steps[-1] == {"type": "ready_to_confirm"}
-    assert len(requests) == 6
+    assert len(requests) == 7
 
 
 def test_the_user_message_gives_each_fact_the_entries_of_its_slot_in_guidance() -> None:
@@ -1145,6 +1221,7 @@ def test_the_user_message_gives_each_fact_the_entries_of_its_slot_in_guidance() 
         "special_categories",
         "automated_decisions",
         "interacts_with_people",
+        "generates_content",
     ]
     for fact in facts:
         assert fact["guidance"] == guidance_of(fact["id"])

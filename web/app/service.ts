@@ -57,8 +57,9 @@ export type Cited = { citation: string; link: string; quote: string | null };
 export type Condition = { slot: string; gate: string; cases: { values: string[]; result: string }[] };
 
 // A row of a result: its unit quoted and linked, the date from which it applies with the unit that
-// sets it, a condition of that date that the user decides, and what else it needed: the answer of a
-// slot, or null while the slot is open, or the status of another gate (MEMO-5, MEMO-6).
+// sets it, a condition of that date that the user decides with its title and its sentence, and what
+// else it needed: the answer of a slot, or null while the slot is open, or the status of another gate
+// (MEMO-5, MEMO-6).
 export type Row = {
   id: string;
   label: string;
@@ -66,7 +67,7 @@ export type Row = {
   unit: Cited;
   date: string;
   date_unit: Cited;
-  condition: Cited | null;
+  condition: (Cited & { title: string; text: string }) | null;
   needs: { slot: string | null; value: string | null; gate: string | null; status: string | null } | null;
   drafting: boolean;
   category: "legal" | "technical" | "organisation";

@@ -104,13 +104,23 @@ class Obligation(BaseModel):
     drafting: bool = False
 
 
+class DateCondition(BaseModel):
+    """A condition of a date that the user decides: the unit that sets it, and the title and the sentence that say it in short."""
+
+    model_config = TEXT_REQUIRED
+
+    unit: str
+    title: str
+    text: str
+
+
 class Start(BaseModel):
-    """A date from which obligations apply, the unit that sets it, and a unit that the user decides as a condition of that date."""
+    """A date from which obligations apply, the unit that sets it, and a condition of that date that the user decides."""
 
     id: str
     date: str
     unit: str
-    condition: str | None = None
+    condition: DateCondition | None = None
 
 
 class Gates(BaseModel):
@@ -129,6 +139,13 @@ class Cited(BaseModel):
     citation: str
     link: str
     quote: str | None = None
+
+
+class CitedCondition(Cited):
+    """A condition of a row's date as the result shows it: its unit quoted and linked, its title and its sentence."""
+
+    title: str
+    text: str
 
 
 class Case(BaseModel):
@@ -163,7 +180,7 @@ class ObligationRow(BaseModel):
     unit: Cited
     date: str
     date_unit: Cited
-    condition: Cited | None = None
+    condition: CitedCondition | None = None
     needs: Need | None = None
     drafting: bool
 
@@ -279,9 +296,9 @@ def parse_gates(text: str, schema: Schema) -> Gates:
             raise GatesError(
                 f"date {start.id}: the unit {start.unit} is not in gates.yaml"
             )
-        if start.condition is not None and start.condition not in quoted:
+        if start.condition is not None and start.condition.unit not in quoted:
             raise GatesError(
-                f"date {start.id}: the unit {start.condition} has no quote"
+                f"date {start.id}: the unit {start.condition.unit} has no quote"
             )
     dates = [start.id for start in gates.dates]
     slot_of = {gate.id: gate.slot for gate in gates.gates}
@@ -488,6 +505,7 @@ def decide(gates: Gates, schema: Schema, intake: Intake) -> Result:
             need = Need(gate=needs.gate, status=other.status)
             open_need = other.status == "conditional"
         start = starts[obligation.date]
+        condition = start.condition
         row_status: Literal["applies", "conditional"] = (
             "conditional" if outcome.status == "conditional" or open_need else "applies"
         )
@@ -500,7 +518,13 @@ def decide(gates: Gates, schema: Schema, intake: Intake) -> Result:
                 unit=cited([obligation.unit])[0],
                 date=start.date,
                 date_unit=cited([start.unit])[0],
-                condition=cited([start.condition])[0] if start.condition else None,
+                condition=CitedCondition(
+                    **cited([condition.unit])[0].model_dump(),
+                    title=condition.title,
+                    text=condition.text,
+                )
+                if condition
+                else None,
                 needs=need,
                 drafting=obligation.drafting,
             )

@@ -1,4 +1,4 @@
-"""Tests for GET /schema, POST /intakes, GET /intakes/{id}, POST /intakes/{id}/answers, PUT /intakes/{id}/answers/{slot} and POST /intakes/{id}/confirm: acceptance criteria 2 to 7 of issue #7, the three description fields of issue #12, acceptance criteria 2 to 7 of issue #16, acceptance criteria 1 and 3 of issue #24, the result in GET /intakes/{id} of issue #37, and acceptance criteria 1 to 6 of issue #50, the screen of the answers and the confirmation."""
+"""Tests for GET /schema, POST /intakes, GET /intakes/{id}, POST /intakes/{id}/answers, PUT /intakes/{id}/answers/{slot} and POST /intakes/{id}/confirm: acceptance criteria 2 to 7 of issue #7, the three description fields of issue #12, acceptance criteria 2 to 7 of issue #16, acceptance criteria 1 and 3 of issue #24, the result in GET /intakes/{id} of issue #37, acceptance criteria 1 to 6 of issue #50, the screen of the answers and the confirmation, and acceptance criteria 1, 2 and 9 of issue #45, the form's fourth question, the follow-up fact about generated content and the limit of ten questions."""
 
 import logging
 import re
@@ -24,12 +24,14 @@ ANSWERS = {
     "personal_data": "yes",
     "under_own_name": "not_sure",
     "use_case_area": "none",
+    "own_use": "no",
 }
 # Answers that make no follow-up slot relevant.
 NO_FOLLOW_UPS = {
     "personal_data": "no",
     "under_own_name": "no",
     "use_case_area": "none",
+    "own_use": "no",
 }
 DESCRIPTION = {
     "what_it_does": "Answers questions about orders in an online shop.",
@@ -37,7 +39,7 @@ DESCRIPTION = {
     "data_it_handles": "Order numbers, and the names and email addresses of customers.",
 }
 
-# The follow-up facts of issue #16, as GET /schema returns them.
+# The follow-up facts of issue #16, and generates_content of issue #45, as GET /schema returns them.
 FOLLOW_UP_SLOTS = [
     {
         "id": "decides_purposes",
@@ -67,6 +69,12 @@ FOLLOW_UP_SLOTS = [
         "id": "interacts_with_people",
         "label": "Interacts with people",
         "question": "Do people interact with the product directly, for example by chatting with it or talking to it?",
+        "values": YES_NO_NOT_SURE,
+    },
+    {
+        "id": "generates_content",
+        "label": "Generates synthetic content",
+        "question": "Does the product generate synthetic audio, image, video or text content?",
         "values": YES_NO_NOT_SURE,
     },
     {
@@ -182,8 +190,8 @@ def answer_each_question(
     """Answers each follow-up question of a new intake with the value given for its slot, or with no, until the step is "ready to confirm". Returns the slots asked, in order."""
     step = created["step"]
     asked: list[str] = []
-    # The limit is eight questions, so the loop stops after nine.
-    while step != READY_TO_CONFIRM and len(asked) <= 8:
+    # The limit is ten questions, so the loop stops after eleven.
+    while step != READY_TO_CONFIRM and len(asked) <= 10:
         asked.append(step["slot"])
         response = client.post(
             f"/intakes/{created['id']}/answers",
@@ -266,6 +274,12 @@ def test_get_schema_returns_the_description_fields_the_form_slots_and_the_follow
                     {"id": "none", "label": "None of these"},
                     {"id": "not_sure", "label": "Not sure"},
                 ],
+            },
+            {
+                "id": "own_use",
+                "label": "Used under own authority",
+                "question": "Do you use the product yourselves, under your own authority, for your work?",
+                "values": YES_NO_NOT_SURE,
             },
         ],
         "follow_up_slots": FOLLOW_UP_SLOTS,
@@ -361,6 +375,12 @@ def test_post_intakes_refuses_a_slot_that_is_not_on_the_form(
             id="form slot without an answer",
         ),
         pytest.param(
+            {key: value for key, value in ANSWERS.items() if key != "own_use"},
+            DESCRIPTION,
+            "own_use",
+            id="the form's fourth slot without an answer",
+        ),
+        pytest.param(
             ANSWERS,
             {"what_it_does": "A chatbot.", "data_it_handles": "Orders."},
             "who_uses_it",
@@ -422,6 +442,7 @@ def test_post_intakes_refuses_an_invalid_value_and_stores_nothing(
                 "personal_data": "maybe",
                 "under_own_name": "no",
                 "use_case_area": "none",
+                "own_use": "no",
                 "uses_biometrics": "yes",
             },
             {**DESCRIPTION, "who_uses_it": ""},
@@ -494,6 +515,7 @@ def test_get_intake_returns_the_answers_and_the_open_slots_in_schema_order(
     client: TestClient,
 ) -> None:
     answers = {
+        "own_use": "not_sure",
         "use_case_area": "not_sure",
         "under_own_name": "no",
         "personal_data": "not_sure",
@@ -515,22 +537,26 @@ def test_get_intake_returns_the_answers_and_the_open_slots_in_schema_order(
             "personal_data": "not_sure",
             "under_own_name": "no",
             "use_case_area": "not_sure",
+            "own_use": "not_sure",
         },
         # The follow-up slots after the first question are not asked yet, so they are not open.
-        "open_slots": ["personal_data", "use_case_area"],
+        "open_slots": ["personal_data", "use_case_area", "own_use"],
         # Without a reason, a "not sure" answer counts as "I don't know this about the product".
         "not_sure": {
             "personal_data": {"reason": "unknown", "note": ""},
             "use_case_area": {"reason": "unknown", "note": ""},
+            "own_use": {"reason": "unknown", "note": ""},
         },
         # The question about each relevant fact that the screen of the answers shows: the default
-        # question of each, since no model asked about any. Interacts with people is not relevant.
+        # question of each, since no model asked about any. Interacts with people and generates
+        # synthetic content are not relevant.
         "questions": {
             slot_id: default_of(slot_id)
             for slot_id in [
                 "personal_data",
                 "under_own_name",
                 "use_case_area",
+                "own_use",
                 "decides_purposes",
                 "processes_for_customer",
                 "special_categories",
@@ -553,6 +579,7 @@ def test_the_result_is_null_while_a_question_waits_and_computed_once_the_answers
         "personal_data": "yes",
         "under_own_name": "yes",
         "use_case_area": "employment",
+        "own_use": "no",
     }
     created = client.post(
         "/intakes", json={"answers": answers, "description": DESCRIPTION}
@@ -587,6 +614,8 @@ def test_the_result_is_null_while_a_question_waits_and_computed_once_the_answers
         # The head of the GDPR has no rows of its own.
         "rows": [],
     }
+    # GDPR, controller, processor, provider, high-risk under Annex III, the two transparency results
+    # and deployer, whose own_use is "no".
     assert [item["status"] for item in intake["result"]["gates"]] == [
         "applies",
         "applies",
@@ -594,6 +623,8 @@ def test_the_result_is_null_while_a_question_waits_and_computed_once_the_answers
         "applies",
         "conditional",
         "applies",
+        "applies",
+        "does_not_apply",
     ]
 
 
@@ -604,6 +635,7 @@ def test_post_intakes_stores_the_reason_and_the_note_of_each_form_slot_answered_
         "personal_data": "not_sure",
         "under_own_name": "not_sure",
         "use_case_area": "not_sure",
+        "own_use": "no",
     }
     # é is one character and two bytes in UTF-8: the limit of 500 counts characters.
     note = "é" * 500
@@ -724,6 +756,7 @@ def test_post_intakes_refuses_an_answer_for_a_follow_up_slot(
                 "special_categories",
                 "automated_decisions",
                 "interacts_with_people",
+                "generates_content",
             ],
             id="yes, not sure, none",
         ),
@@ -732,6 +765,7 @@ def test_post_intakes_refuses_an_answer_for_a_follow_up_slot(
                 "personal_data": "not_sure",
                 "under_own_name": "no",
                 "use_case_area": "employment",
+                "own_use": "no",
             },
             [
                 "decides_purposes",
@@ -747,8 +781,9 @@ def test_post_intakes_refuses_an_answer_for_a_follow_up_slot(
                 "personal_data": "no",
                 "under_own_name": "yes",
                 "use_case_area": "not_sure",
+                "own_use": "no",
             },
-            ["interacts_with_people"],
+            ["interacts_with_people", "generates_content"],
             id="no, yes, not sure",
         ),
         pytest.param(
@@ -756,6 +791,7 @@ def test_post_intakes_refuses_an_answer_for_a_follow_up_slot(
                 "personal_data": "no",
                 "under_own_name": "no",
                 "use_case_area": "employment",
+                "own_use": "no",
             },
             [],
             id="no, no, employment",
@@ -765,6 +801,7 @@ def test_post_intakes_refuses_an_answer_for_a_follow_up_slot(
                 "personal_data": "yes",
                 "under_own_name": "yes",
                 "use_case_area": "biometrics",
+                "own_use": "no",
             },
             [
                 "decides_purposes",
@@ -772,6 +809,7 @@ def test_post_intakes_refuses_an_answer_for_a_follow_up_slot(
                 "special_categories",
                 "automated_decisions",
                 "interacts_with_people",
+                "generates_content",
                 "profiling",
             ],
             id="yes, yes, biometrics",
@@ -871,27 +909,27 @@ def test_an_answer_can_make_a_later_follow_up_slot_relevant(
     assert answer_each_question(client, created, {"a": value_of_a}) == asked
 
 
-def test_the_intake_ends_after_eight_follow_up_questions() -> None:
+def test_the_intake_ends_after_ten_follow_up_questions() -> None:
     client, created = start_test_intake(
-        *[follow_up(f"q{number}", {"camera": ["yes"]}) for number in range(1, 10)]
+        *[follow_up(f"q{number}", {"camera": ["yes"]}) for number in range(1, 12)]
     )
 
     asked = answer_each_question(client, created, {"q3": "not_sure"})
 
-    assert asked == [f"q{number}" for number in range(1, 9)]
+    assert asked == [f"q{number}" for number in range(1, 11)]
     intake = client.get(f"/intakes/{created['id']}").json()
     assert intake["step"] == READY_TO_CONFIRM
-    # q3 was answered "not sure", and q9 is relevant but was not asked (INTAKE-3).
-    assert intake["open_slots"] == ["q3", "q9"]
+    # q3 was answered "not sure", and q11 is relevant but was not asked (INTAKE-3).
+    assert intake["open_slots"] == ["q3", "q11"]
 
 
 def test_repeated_answers_do_not_count_toward_the_limit() -> None:
     client, created = start_test_intake(
-        *[follow_up(f"q{number}", {"camera": ["yes"]}) for number in range(1, 10)]
+        *[follow_up(f"q{number}", {"camera": ["yes"]}) for number in range(1, 12)]
     )
     step = created["step"]
 
-    for number in range(1, 9):
+    for number in range(1, 11):
         assert step.get("number") == number
         body = {"question": number, "value": "no"}
         client.post(f"/intakes/{created['id']}/answers", json=body)
@@ -900,7 +938,7 @@ def test_repeated_answers_do_not_count_toward_the_limit() -> None:
         ]
 
     assert step == READY_TO_CONFIRM
-    assert client.get(f"/intakes/{created['id']}").json()["open_slots"] == ["q9"]
+    assert client.get(f"/intakes/{created['id']}").json()["open_slots"] == ["q11"]
 
 
 @pytest.mark.parametrize(
@@ -1069,6 +1107,7 @@ EXAMPLE = {
     "personal_data": "yes",
     "under_own_name": "yes",
     "use_case_area": "employment",
+    "own_use": "yes",
 }
 
 
@@ -1115,7 +1154,9 @@ ASKED_TWICE = Intake(
         "personal_data": "no",
         "under_own_name": "not_sure",
         "use_case_area": "none",
+        "own_use": "no",
         "interacts_with_people": "not_sure",
+        "generates_content": "no",
     },
     description=DESCRIPTION,
     not_sure={
@@ -1148,7 +1189,9 @@ def test_get_intake_returns_the_last_question_asked_about_each_relevant_fact_or_
         "personal_data": default_of("personal_data"),
         "under_own_name": ASKED_TWICE.questions[0].model_dump(),
         "use_case_area": default_of("use_case_area"),
+        "own_use": default_of("own_use"),
         "interacts_with_people": ASKED_TWICE.questions[2].model_dump(),
+        "generates_content": default_of("generates_content"),
     }
 
 
@@ -1187,7 +1230,9 @@ def test_a_change_removes_the_answers_reasons_notes_and_questions_of_the_facts_t
         "personal_data": "no",
         "under_own_name": "yes",
         "use_case_area": "employment",
+        "own_use": "yes",
         "interacts_with_people": "no",
+        "generates_content": "no",
     }
     assert intake["not_sure"] == {}
     assert intake["open_slots"] == []
@@ -1195,7 +1240,9 @@ def test_a_change_removes_the_answers_reasons_notes_and_questions_of_the_facts_t
         "personal_data",
         "under_own_name",
         "use_case_area",
+        "own_use",
         "interacts_with_people",
+        "generates_content",
     ]
 
 
@@ -1242,10 +1289,11 @@ def test_a_fact_that_becomes_relevant_again_is_open_with_the_last_question_asked
         "/intakes/one/answers/under_own_name", json={"value": "yes"}
     ).json()
 
-    # Its answer, reason and note were removed while it was not relevant.
+    # Its answer, reason and note were removed while it was not relevant, as was the answer of
+    # generates_content.
     assert "interacts_with_people" not in intake["answers"]
     assert "interacts_with_people" not in intake["not_sure"]
-    assert intake["open_slots"] == ["interacts_with_people"]
+    assert intake["open_slots"] == ["interacts_with_people", "generates_content"]
     assert (
         intake["questions"]["interacts_with_people"]
         == ASKED_TWICE.questions[2].model_dump()

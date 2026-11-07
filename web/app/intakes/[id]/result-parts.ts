@@ -92,6 +92,11 @@ function decided(result: Result) {
 // The rows of a result that apply.
 export const applying = (outcome: Outcome) => outcome.rows.filter((row) => row.status === "applies");
 
+// Whether a row's unit is a unit that its result quotes, such as AI Act Article 50(2) for the marking of
+// generated content: the row then links it, and the quote shows once, with the result (MEMO-8).
+export const quotedAbove = (outcome: Outcome, row: Row) =>
+  outcome.quotes.some((unit) => unit.citation === row.unit.citation);
+
 // The rows that apply now, and what the answers to check could add.
 export function summary(rows: Row[], items: number) {
   const applies = rows.filter((row) => row.status === "applies").length;

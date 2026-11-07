@@ -32,14 +32,15 @@ DESCRIPTION = {
     "who_uses_it": "Recruiters at a recruitment agency use it.",
     "data_it_handles": "CVs and profiles of job seekers.",
 }
-# Every answer "yes", and the area of employment: 29 rows.
+# Every answer "yes", and the area of employment: 37 rows.
 ALL_YES = {
     "personal_data": "yes",
     "under_own_name": "yes",
     "use_case_area": "employment",
+    "own_use": "yes",
     **{slot.id: "yes" for slot in SCHEMA.follow_up_slots},
 }
-ROWS = 29
+ROWS = 37
 # The rows whose obligation needs legal drafting (gates.yaml).
 DRAFTING = {
     "controller:gdpr:art13(1)",
@@ -47,6 +48,7 @@ DRAFTING = {
     "processor:gdpr:art28(2)",
     "processor:gdpr:art28(3)",
     "high_risk_annex_iii:aia:art17(1)",
+    "deployer:aia:art26(11)",
 }
 # The row whose call fails in the tests of a failure.
 FAILED = "controller:gdpr:art6(1)"
@@ -430,6 +432,7 @@ def test_the_texts_of_an_intake_whose_question_waits_or_that_does_not_exist_are_
             "personal_data": "yes",
             "under_own_name": "yes",
             "use_case_area": "none",
+            "own_use": "no",
         },
         description=DESCRIPTION,
         questions=[question],

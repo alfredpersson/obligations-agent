@@ -17,7 +17,7 @@ Refusal = Literal["not_askable", "limit_reached"]
 
 # Follow-up questions per intake, and questions per slot, where the form's question is the first
 # question about a slot on the form (INTAKE-3).
-QUESTION_LIMIT = 8
+QUESTION_LIMIT = 10
 SLOT_LIMIT = 2
 
 logger = logging.getLogger(__name__)

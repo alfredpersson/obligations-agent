@@ -7,6 +7,10 @@ afterEach(cleanup);
 
 // The stored text of the regulations that the service quotes (MEMO-8).
 const GATES = readFileSync(`${import.meta.dirname}/../../api/src/obligations_agent/gates.yaml`, "utf8");
+// The fact schema, whose slots that are always relevant are on the form (FACT-3), and the service's
+// limit of follow-up questions (INTAKE-3).
+const SCHEMA = readFileSync(`${import.meta.dirname}/../../api/src/obligations_agent/schema.yaml`, "utf8");
+const INTAKES = readFileSync(`${import.meta.dirname}/../../api/src/obligations_agent/intakes.py`, "utf8");
 
 test("the start page says what the tool does, how to use it, what the user gets, and that the result is not legal advice", () => {
   render(<Home />);
@@ -36,6 +40,8 @@ test("the start page says what the tool does, how to use it, what the user gets,
     "Provider AI Act Article 3(3)",
     "High-risk under Annex III AI Act Article 6(2) and Annex III",
     "Transparency: people interact with the product AI Act Article 50(1)",
+    "Transparency: the product generates content AI Act Article 50(2)",
+    "Deployer AI Act Article 3(4)",
   ]);
   expect(
     screen.getByText("The result maps your answers to articles of the AI Act and the GDPR. It is not legal advice."),
@@ -55,7 +61,7 @@ test("the first choice opens the form with the example product, and the other on
   }
 });
 
-test("the excerpt shows the three gates that the example's form answers decide in the parts of the result, and quotes the stored text word for word", () => {
+test("the excerpt shows the four gates that the example's form answers decide in the parts of the result, and quotes the stored text word for word", () => {
   render(<Home />);
 
   // jsdom's accessible names do not come from a figcaption, so the test reads the caption itself.
@@ -64,12 +70,13 @@ test("the excerpt shows the three gates that the example's form answers decide i
   expect(within(excerpt).getAllByRole("listitem").map((item) => item.textContent)).toEqual([
     "GDPR Applies.",
     "Provider Applies.",
+    "Deployer Applies.",
     "High-risk under Annex III Conditional.",
   ]);
   // The names of the three parts (issue #51), each before what stands in it, and the listed use as
   // the second part asks it.
   const names = ["What applies", "Answers to check", "What may also apply"].map((name) => within(excerpt).getByText(name));
-  const [gdpr, , highRisk] = within(excerpt).getAllByRole("listitem");
+  const [gdpr, , , highRisk] = within(excerpt).getAllByRole("listitem");
   const listed = within(excerpt).getByText(/^Intended use listed under AI Act Annex III, point 4/);
   for (const [name, next] of [
     [names[0], gdpr],
@@ -111,6 +118,18 @@ test("the start page names the download of the result as a Markdown or a PDF fil
   const get = screen.getByRole("heading", { level: 2, name: "What you get" }).parentElement as HTMLElement;
   expect(within(get).getByText(/^Download it as/).textContent).toBe(
     "Download it as a Markdown or a PDF file, all of it or the obligations of one category, such as the legal ones for a legal representative.",
+  );
+});
+
+test("the steps name as many questions on the form as the schema has there, and the limit of follow-up questions", () => {
+  render(<Home />);
+
+  expect((SCHEMA.match(/^ {4}relevant: always$/gm) ?? []).length).toBe(4);
+  expect(INTAKES).toMatch(/^QUESTION_LIMIT = 10$/m);
+  const step = (name: string) => screen.getByRole("heading", { level: 3, name }).nextElementSibling?.textContent;
+  expect(step("Answer the form")).toBe("Four questions with fixed answers. “Not sure” is always one of them.");
+  expect(step("Answer follow-up questions")).toBe(
+    "At most ten, one at a time. A model chooses each question from your answers so far and writes it for your product. Some questions show examples from official guidance.",
   );
 });
 

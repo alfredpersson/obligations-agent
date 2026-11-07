@@ -1,4 +1,4 @@
-"""Tests for the gates: reading gates.yaml, each gate table against the regulation text, the result of an intake that has ended, and the quote and the link of each unit (issue #37: GATE-1 to GATE-4, MEMO-6 to MEMO-8, VALID-2), and the rows of the obligations with their dates and the grouping by regulation (issue #41: MEMO-5, MEMO-6), and the category of each row (issue #52: GATE-5, MEMO-5)."""
+"""Tests for the gates: reading gates.yaml, each gate table against the regulation text, the result of an intake that has ended, and the quote and the link of each unit (issue #37: GATE-1 to GATE-4, MEMO-6 to MEMO-8, VALID-2), and the rows of the obligations with their dates and the grouping by regulation (issue #41: MEMO-5, MEMO-6), the category of each row (issue #52: GATE-5, MEMO-5), and the deployer, the marking of generated content, their rows and the conditions of their dates (issue #45: GATE-4, GATE-5, MEMO-5, MEMO-8)."""
 
 import re
 from collections.abc import Sequence
@@ -147,6 +147,57 @@ def test_a_provider_whose_product_interacts_with_people_must_say_that_it_is_an_a
 
     assert item.status == status
     assert citations(item) == ["AI Act Article 50(1)"]
+
+
+# AI Act Article 3(4): "'deployer' means a natural or legal person, public authority, agency or other
+# body using an AI system under its authority except where the AI system is used in the course of a
+# personal non-professional activity;".
+@pytest.mark.parametrize(
+    ("answer", "status"), [("yes", "applies"), ("no", "does_not_apply")]
+)
+def test_the_deployer_uses_the_product_under_its_own_authority(
+    answer: str, status: str
+) -> None:
+    item = shown("deployer", {"own_use": answer})
+
+    assert item.status == status
+    assert citations(item) == ["AI Act Article 3(4)"]
+
+
+# AI Act Article 50(2): "Providers of AI systems, including general-purpose AI systems, generating
+# synthetic audio, image, video or text content, shall ensure that the outputs of the AI system are
+# marked in a machine-readable format and detectable as artificially generated or manipulated."
+@pytest.mark.parametrize(
+    ("answer", "status"), [("yes", "applies"), ("no", "does_not_apply")]
+)
+def test_a_provider_whose_product_generates_synthetic_content_must_mark_its_outputs(
+    answer: str, status: str
+) -> None:
+    item = shown(
+        "transparency_content", {"under_own_name": "yes", "generates_content": answer}
+    )
+
+    assert item.status == status
+    assert citations(item) == ["AI Act Article 50(2)"]
+
+
+@pytest.mark.parametrize("answer", ["not_sure", None], ids=["not_sure", "no_answer"])
+@pytest.mark.parametrize(
+    ("gate", "slot", "answers"),
+    [
+        ("deployer", "own_use", {}),
+        ("transparency_content", "generates_content", {"under_own_name": "yes"}),
+    ],
+    ids=["deployer", "generated_content"],
+)
+def test_an_open_answer_makes_the_deployer_or_the_marking_of_generated_content_conditional(
+    gate: str, slot: str, answers: dict[str, str], answer: str | None
+) -> None:
+    item = shown(gate, answers if answer is None else {**answers, slot: answer})
+
+    assert item.status == "conditional"
+    assert item.result is None
+    assert item.conditions == [Condition(slot=slot, gate=gate, cases=YES)]
 
 
 # Annex III: "High-risk AI systems pursuant to Article 6(2) are the AI systems listed in any of the
@@ -333,6 +384,12 @@ def test_a_profiling_slot_that_is_open_makes_a_listed_use_conditional_on_it(
             "under_own_name",
             "provider",
         ),
+        (
+            "transparency_content",
+            {"under_own_name": "not_sure", "generates_content": "yes"},
+            "under_own_name",
+            "provider",
+        ),
     ],
 )
 def test_a_result_under_a_conditional_gate_is_conditional_on_the_same_slot(
@@ -381,7 +438,7 @@ def test_a_result_under_a_conditional_gate_with_its_own_slot_open_depends_on_bot
         ({"personal_data": "no", "under_own_name": "yes"}, ["controller", "processor"]),
         (
             {"personal_data": "yes", "under_own_name": "no"},
-            ["transparency_interaction"],
+            ["transparency_interaction", "transparency_content"],
         ),
     ],
 )
@@ -400,11 +457,14 @@ def test_the_result_has_a_gate_for_each_fact_of_the_issue_in_order() -> None:
         "personal_data": "yes",
         "under_own_name": "yes",
         "use_case_area": "none",
+        "own_use": "yes",
         "decides_purposes": "yes",
         "processes_for_customer": "no",
         "interacts_with_people": "no",
+        "generates_content": "no",
     }
 
+    # The provider's results, then the deployer (MEMO-6: by regulation, then by role).
     assert [item.gate for item in result_of(answers).gates] == [
         "gdpr_applies",
         "controller",
@@ -412,6 +472,8 @@ def test_the_result_has_a_gate_for_each_fact_of_the_issue_in_order() -> None:
         "provider",
         "high_risk_annex_iii",
         "transparency_interaction",
+        "transparency_content",
+        "deployer",
     ]
 
 
@@ -439,15 +501,19 @@ def test_the_result_states_two_assumptions_and_six_items_not_checked_each_with_i
         (item.text, [unit.citation for unit in item.links])
         for item in result.not_checked
     ] == [
-        ("Deployer", ["AI Act Article 3(4)"]),
         ("Prohibited practices", ["AI Act Article 5"]),
         ("High-risk under Annex I", ["AI Act Article 6(1)"]),
         # The intake does not ask whether the interaction is obvious, nor about systems authorised by
         # law for criminal offences.
         ("The exceptions in Article 50(1)", ["AI Act Article 50(1)"]),
+        # Article 50(2): "This obligation shall not apply to the extent the AI systems perform an
+        # assistive function for standard editing or do not substantially alter the input data
+        # provided by the deployer or the semantics thereof, or where authorised by law to detect,
+        # prevent, investigate or prosecute criminal offences." The intake asks none of these.
+        ("The exceptions in Article 50(2)", ["AI Act Article 50(2)"]),
         (
-            "Transparency: synthetic content, emotion recognition and biometric categorisation, deepfakes",
-            ["AI Act Article 50(2) to 50(4)"],
+            "Transparency: emotion recognition and biometric categorisation, deepfakes",
+            ["AI Act Article 50(3) and 50(4)"],
         ),
         ("The exclusions from each regulation", ["AI Act Article 2", "GDPR Article 2"]),
     ]
@@ -823,6 +889,7 @@ ALL_YES = {
     "personal_data": "yes",
     "under_own_name": "yes",
     "use_case_area": "employment",
+    "own_use": "yes",
     **{slot.id: "yes" for slot in SCHEMA.follow_up_slots},
 }
 
@@ -880,6 +947,42 @@ ROWS: dict[str, list[tuple[str, str]]] = {
         (
             "aia:art50(5)",
             "The information referred to in paragraphs 1 to 4 shall be provided to the natural persons concerned",
+        ),
+    ],
+    "transparency_content": [
+        (
+            "aia:art50(2)",
+            "shall ensure that the outputs of the AI system are marked in a machine-readable format",
+        ),
+    ],
+    "deployer": [
+        (
+            "aia:art4(1)",
+            "Providers and deployers of AI systems shall take measures to support the development of AI literacy",
+        ),
+        (
+            "aia:art26(1)",
+            "Deployers of high-risk AI systems shall take appropriate technical and organisational measures to ensure they use such systems in accordance with the instructions for use",
+        ),
+        (
+            "aia:art26(2)",
+            "Deployers shall assign human oversight to natural persons who have the necessary competence, training and authority",
+        ),
+        (
+            "aia:art26(5)",
+            "Deployers shall monitor the operation of the high-risk AI system on the basis of the instructions for use",
+        ),
+        (
+            "aia:art26(6)",
+            "Deployers of high-risk AI systems shall keep the logs automatically generated by that high-risk AI system",
+        ),
+        (
+            "aia:art26(7)",
+            "deployers who are employers shall inform workers’ representatives and the affected workers",
+        ),
+        (
+            "aia:art26(11)",
+            "deployers of high-risk AI systems referred to in Annex III that make decisions or assist in making decisions related to natural persons shall inform the natural persons",
         ),
     ],
     "high_risk_annex_iii": [
@@ -983,14 +1086,15 @@ def test_each_row_quotes_the_unit_that_binds_its_result(
 
 
 def test_a_result_that_does_not_apply_shows_no_rows() -> None:
-    # The controller and the provider do not apply, and no area of Annex III, so only the processor
-    # has rows; the transparency result is not asked without the provider.
+    # The controller, the provider and the deployer do not apply, and no area of Annex III, so only
+    # the processor has rows; the transparency results are not asked without the provider.
     result = result_of(
         {
             **ALL_YES,
             "decides_purposes": "no",
             "under_own_name": "no",
             "use_case_area": "none",
+            "own_use": "no",
         }
     )
 
@@ -1060,6 +1164,39 @@ def test_the_rows_of_high_risk_need_the_provider_result(
         # A use listed in Annex III is for the user to decide, so these rows are always conditional.
         assert row is not None and row.status == "conditional"
         assert row.needs == Need(gate="provider", status=provider)
+
+
+# AI Act Article 26 binds "deployers of high-risk AI systems": its rows need high-risk under Annex
+# III, whose listed use the user decides, so they are always conditional, and they are left out
+# without an area of Annex III.
+@pytest.mark.parametrize(("area", "shown"), [("employment", True), ("none", False)])
+def test_the_rows_of_article_26_need_high_risk_under_annex_iii(
+    area: str, shown: bool
+) -> None:
+    result = result_of({**ALL_YES, "use_case_area": area})
+
+    rows = [
+        unit
+        for unit in rows_of(result).get("deployer", [])
+        if unit.startswith("aia:art26")
+    ]
+    assert len(rows) == (6 if shown else 0)
+    for unit in rows:
+        row = row_of(result, "deployer", unit)
+        assert row is not None and row.status == "conditional"
+        assert row.needs == Need(gate="high_risk_annex_iii", status="conditional")
+
+
+# AI Act Article 4(1), as replaced by Regulation (EU) 2026/1744: "Providers and deployers of AI
+# systems shall take measures to support the development of AI literacy of their staff".
+def test_ai_literacy_shows_under_each_role_that_applies() -> None:
+    both = result_of(ALL_YES)
+    deployer_only = result_of({**ALL_YES, "under_own_name": "no"})
+
+    assert row_of(both, "provider", "aia:art4(1)") is not None
+    assert row_of(both, "deployer", "aia:art4(1)") is not None
+    assert row_of(deployer_only, "provider", "aia:art4(1)") is None
+    assert row_of(deployer_only, "deployer", "aia:art4(1)") is not None
 
 
 def test_a_row_that_needs_a_conditional_result_is_conditional_under_a_result_that_applies() -> (
@@ -1211,26 +1348,68 @@ def test_each_date_links_to_the_article_that_sets_it() -> None:
                 assert row.date_unit.link == f"{EUR_LEX}{CONSOLIDATED}#art_113"
 
 
-def test_the_rows_of_high_risk_under_annex_iii_state_article_111_2_as_a_condition_and_no_other_row_does() -> (
+# Article 111(2), as replaced by Regulation (EU) 2026/1744, Article 1, point (39)(a): a high-risk
+# system placed on the market or put into service before the date of application of Chapter III is
+# covered "only if, as from that date, those systems are subject to significant changes in their
+# designs". Article 111(4), added by point (39)(b): providers of systems generating synthetic content
+# "that have been placed on the market before 2 August 2026 shall take the necessary steps in order to
+# comply with Article 50(2) by 2 December 2026". Each is a condition of a date that the user decides.
+CONDITIONS = {
+    "111.002": "only if, as from that date, those systems are subject to significant changes in their designs",
+    "111.004": "that have been placed on the market before 2 August 2026 shall take the necessary steps in order to comply with Article 50(2) by 2 December 2026",
+}
+
+
+def test_the_rows_of_chapter_iii_state_article_111_2_the_row_of_article_50_2_states_article_111_4_and_no_other_row_a_condition() -> (
     None
 ):
-    # Article 111(2), as replaced by Regulation (EU) 2026/1744, Article 1, point (39): a system placed
-    # on the market or put into service before the date is covered "only if, as from that date, those
-    # systems are subject to significant changes in their designs".
     for item in result_of(ALL_YES).gates:
         for row in item.rows:
-            if item.gate == "high_risk_annex_iii":
-                assert row.condition is not None and row.condition.quote is not None
-                assert row.condition.citation.startswith("AI Act Article 111(2)")
-                assert (
-                    "only if, as from that date, those systems are subject to significant changes in their designs"
-                    in normalized(row.condition.quote)
-                )
-                assert row.condition.link.startswith(
-                    f"{EUR_LEX}32026R1744#111.002:~:text="
-                )
-            else:
+            unit = row.id.split(":", 1)[1]
+            anchor = (
+                "111.002"
+                if item.gate == "high_risk_annex_iii" or unit.startswith("aia:art26")
+                else "111.004"
+                if unit == "aia:art50(2)"
+                else None
+            )
+            if anchor is None:
                 assert row.condition is None
+                continue
+            assert row.condition is not None and row.condition.quote is not None
+            assert CONDITIONS[anchor] in normalized(row.condition.quote)
+            assert row.condition.link.startswith(
+                f"{EUR_LEX}32026R1744#{anchor}:~:text="
+            )
+
+
+def test_the_marking_of_generated_content_applies_from_2_august_2026_and_by_2_december_2026_for_a_product_already_on_the_market() -> (
+    None
+):
+    row = row_of(result_of(ALL_YES), "transparency_content", "aia:art50(2)")
+
+    assert row is not None and row.condition is not None
+    assert row.date == "2026-08-02"
+    assert row.condition.title == "For a system already on the market before that date"
+    assert (
+        row.condition.text
+        == "A system placed on the market before that date must meet it by 2 December 2026. You decide this."
+    )
+
+
+def test_the_condition_of_the_date_of_chapter_iii_says_in_short_what_article_111_2_says() -> (
+    None
+):
+    row = row_of(result_of(ALL_YES), "deployer", "aia:art26(1)")
+
+    assert row is not None and row.condition is not None
+    assert (
+        row.condition.title
+        == "For a system already on the market or in service before that date"
+    )
+    assert row.condition.text == (
+        "For a system placed on the market or put into service before that date, these rows apply only if its design changes significantly from that date. A system intended to be used by public authorities must meet them by 2 August 2030 in any case. You decide this."
+    )
 
 
 def test_ai_literacy_quotes_paragraph_1_of_the_new_article_4_from_the_amending_act() -> (
@@ -1269,6 +1448,10 @@ DRAFTING = {
         "high_risk_annex_iii",
         "aia:art17(1)",
     ): "in the form of written policies, procedures and instructions",
+    (
+        "deployer",
+        "aia:art26(11)",
+    ): "shall inform the natural persons that they are subject to the use of the high-risk AI system",
 }
 
 
@@ -1323,6 +1506,15 @@ CATEGORIES: dict[tuple[str, str], str] = {
     ("high_risk_annex_iii", "aia:art49(5)"): "organisation",
     ("high_risk_annex_iii", "aia:art72(1)"): "organisation",
     ("high_risk_annex_iii", "aia:art73(1)"): "organisation",
+    # The table of #45.
+    ("transparency_content", "aia:art50(2)"): "technical",
+    ("deployer", "aia:art4(1)"): "organisation",
+    ("deployer", "aia:art26(1)"): "organisation",
+    ("deployer", "aia:art26(2)"): "organisation",
+    ("deployer", "aia:art26(5)"): "organisation",
+    ("deployer", "aia:art26(6)"): "technical",
+    ("deployer", "aia:art26(7)"): "organisation",
+    ("deployer", "aia:art26(11)"): "legal",
 }
 
 
@@ -1344,7 +1536,7 @@ def test_each_row_of_the_result_has_the_category_of_its_row_in_the_file() -> Non
     result = result_of(ALL_YES)
     rows = [(item.gate, row) for item in result.gates for row in item.rows]
 
-    assert len(rows) == 29
+    assert len(rows) == 37
     for gate, row in rows:
         assert row.category == CATEGORIES[(gate, row.id.split(":", 1)[1])]
 
@@ -1496,13 +1688,27 @@ def test_a_row_under_the_gate_of_a_regulation_is_refused_with_the_row() -> None:
         )
 
 
+CONDITION = {
+    "unit": "gdpr:art2(1)",
+    "title": "For a system already on the market before that date",
+    "text": "It must meet it by a later date.",
+}
+
+
 @pytest.mark.parametrize(
     ("start", "name"),
     [
         ({**START, "unit": "not_a_unit"}, "not_a_unit"),
-        ({**START, "condition": "gdpr:art3"}, "gdpr:art3"),
+        ({**START, "condition": {**CONDITION, "unit": "gdpr:art3"}}, "gdpr:art3"),
+        ({**START, "condition": without(CONDITION, "title")}, "title"),
+        ({**START, "condition": {**CONDITION, "text": ""}}, "text"),
     ],
-    ids=["unknown_unit", "condition_without_quote"],
+    ids=[
+        "unknown_unit",
+        "condition_without_quote",
+        "condition_without_title",
+        "condition_with_an_empty_sentence",
+    ],
 )
 def test_a_date_that_names_what_the_file_does_not_have_is_refused_with_the_date(
     start: dict[str, Any], name: str

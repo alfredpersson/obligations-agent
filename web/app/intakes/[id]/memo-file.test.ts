@@ -3,7 +3,7 @@ import { createElement } from "react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, expect, test } from "vitest";
 import { NOT_LEGAL_ADVICE } from "../../not-legal-advice";
-import type { Cited, Intake, Result } from "../../service";
+import type { Cited, Intake, Result, Row } from "../../service";
 import { testIntake, testRows, testSchema } from "../../testing";
 import IntakeResult from "./intake-result";
 import { type Choices, fileName, markdown, memo } from "./memo-file";
@@ -168,18 +168,52 @@ test("each row is a section with its label as its heading, then its result, cate
   );
 });
 
-test("a row under a condition of its date that the user decides has one line with the link to that condition, and not its quote", () => {
-  const condition: Cited = {
+test("a row under a condition of its date that the user decides has one line with the condition's title, its sentence and its link, and not its quote", () => {
+  const condition: NonNullable<Row["condition"]> = {
     citation: "Rule 111(2)",
     link: "https://eur-lex.europa.eu/rule#111.002",
     quote: "Old systems are covered only after a change.",
+    title: "For a camera already in use before that date",
+    text: "An older camera must meet it only after a change. You decide this.",
   };
   const text = file(ALL, withRows([{ ...testRows[0], condition }, testRows[1]]));
 
   expect(section(text, "Delete old video")).toContain(
-    `- For a system already on the market or in service before that date: [Rule 111(2)](${condition.link}).`,
+    `- For a camera already in use before that date: An older camera must meet it only after a change. You decide this. ([Rule 111(2)](${condition.link})).`,
   );
   expect(text).not.toContain("Old systems are covered");
+});
+
+test("a row whose unit its result quotes links it with quoted above, and the file quotes it once, with the result", () => {
+  const intake = withRows([testRows[0], testRows[1]]);
+  const quoted = {
+    ...intake,
+    result: {
+      ...intake.result,
+      gates: intake.result.gates.map((outcome) => (outcome.gate === "storage" ? { ...outcome, quotes: [testRows[0].unit] } : outcome)),
+    },
+  };
+  const text = file(ALL, quoted);
+
+  expect(text.split("> Video is deleted after a month.")).toHaveLength(2);
+  const old = section(text, "Delete old video");
+  expect(old).toContain(`- Clause: [Rule 5(1)](${testRows[0].unit.link}), quoted above as the article that defines the result`);
+  expect(old).not.toContain("> Video is deleted after a month.");
+});
+
+test("with the links only, a row whose unit its result quotes has its link without quoted above, since the file quotes nothing", () => {
+  const intake = withRows([testRows[0], testRows[1]]);
+  const quoted = {
+    ...intake,
+    result: {
+      ...intake.result,
+      gates: intake.result.gates.map((outcome) => (outcome.gate === "storage" ? { ...outcome, quotes: [testRows[0].unit] } : outcome)),
+    },
+  };
+  const old = section(file({ ...ALL, quotes: false }, quoted), "Delete old video");
+
+  expect(old).toContain(`- Clause: [Rule 5(1)](${testRows[0].unit.link})\n`);
+  expect(old).not.toContain("quoted above");
 });
 
 test("with one category, a file leaves out the rows of the other categories, keeps every result and every answer to check, and says so at its start", () => {
