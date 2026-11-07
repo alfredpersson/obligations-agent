@@ -35,6 +35,7 @@ const SECOND = question(2, "shares_video", "Does the product share video with ot
 // An intake that waits for the answer to its second question, and the same intake at its end with
 // its answers confirmed, and its result.
 const waiting = {
+  id: "kq2V8yZx0bP4mT7nLw3sAg",
   description: { purpose: "A door camera.", people: "Building staff." },
   answers: { uses_camera: "yes", audience: "staff", stores_video: "yes" },
   open_slots: [],
@@ -44,6 +45,8 @@ const waiting = {
   confirmed: false,
   result: null,
   texts: null,
+  open_changes: null,
+  conversation: null,
 } satisfies Intake;
 const ended = {
   ...waiting,

@@ -38,14 +38,14 @@ afterEach(() => {
 });
 
 function show(intake: Intake & { result: Result } = testIntake) {
-  render(<IntakeResult intake={intake} schema={testSchema} answers="/intakes/x/answers" />);
+  render(<IntakeResult intake={intake} schema={testSchema} answers="/intakes/x/answers" onIntake={() => {}} />);
   const fold = screen.getByRole("button", { name: "Download the result" });
   fireEvent.click(fold);
   return { fold, panel: screen.getByRole("region", { name: "Download the result" }) };
 }
 
 test("the result has a fold that opens the choices of the export and its two controls", () => {
-  render(<IntakeResult intake={testIntake} schema={testSchema} answers="/intakes/x/answers" />);
+  render(<IntakeResult intake={testIntake} schema={testSchema} answers="/intakes/x/answers" onIntake={() => {}} />);
   const fold = screen.getByRole("button", { name: "Download the result" });
   expect(fold.getAttribute("aria-expanded")).toBe("false");
   expect(screen.queryByRole("region", { name: "Download the result" })).toBeNull();

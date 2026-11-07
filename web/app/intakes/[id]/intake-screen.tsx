@@ -119,7 +119,12 @@ export default function IntakeScreen() {
     <div className={layout.wide}>
       {status}
       {intake.result && (
-        <IntakeResult intake={{ ...intake, result: intake.result }} schema={schema} answers={`/intakes/${id}/answers`} />
+        <IntakeResult
+          intake={{ ...intake, result: intake.result }}
+          schema={schema}
+          answers={`/intakes/${id}/answers`}
+          onIntake={(next) => setData({ schema, intake: next })}
+        />
       )}
     </div>
   );

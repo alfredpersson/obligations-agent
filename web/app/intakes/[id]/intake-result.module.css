@@ -538,3 +538,15 @@
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-card);
 }
+
+/* What each answer of an open question would change in the whole result, which code computes (#44):
+   one fold for each answer, under the item of the open answer. */
+.whatIf {
+  margin: var(--space-4) 0;
+}
+
+.whatIfTitle {
+  margin: 0 0 var(--space-2);
+  font-size: var(--size-note);
+  font-weight: 600;
+}

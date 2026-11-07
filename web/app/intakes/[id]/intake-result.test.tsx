@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import type { NotSure, Outcome, Row, Texts } from "../../service";
+import type { Intake, NotSure, Outcome, Row, Texts, WhatIf } from "../../service";
 import { testQuestions, testResult, testRows, testSchema } from "../../testing";
 import IntakeResult from "./intake-result";
 import styles from "./intake-result.module.css";
@@ -32,10 +32,16 @@ afterEach(() => {
 // The address of the screen of the answers of the intake (INTAKE-5).
 const ANSWERS = "/intakes/kq2V8yZx0bP4mT7nLw3sAg/answers";
 
-function show(gates: Outcome[] = testResult.gates, texts: Texts = null, openSlots: string[] = OPEN) {
+function show(
+  gates: Outcome[] = testResult.gates,
+  texts: Texts = null,
+  openSlots: string[] = OPEN,
+  openChanges: Intake["open_changes"] = {},
+) {
   render(
     <IntakeResult
       intake={{
+        id: "kq2V8yZx0bP4mT7nLw3sAg",
         description: {},
         answers: {},
         open_slots: openSlots,
@@ -45,9 +51,12 @@ function show(gates: Outcome[] = testResult.gates, texts: Texts = null, openSlot
         confirmed: true,
         result: { ...testResult, gates },
         texts,
+        open_changes: openChanges,
+        conversation: null,
       }}
       schema={testSchema}
       answers={ANSWERS}
+      onIntake={() => {}}
     />,
   );
 }
@@ -302,6 +311,106 @@ test("an open answer shows once in the second part, with its last question, its 
   const answer = within(audience).getByRole("link", { name: "Answer Audience on the screen of the answers" });
   expect(answer.getAttribute("href")).toBe(`${ANSWERS}#audience`);
   expect(answer.textContent).toBe("Answer it on the screen of the answers");
+});
+
+// What each value of an open answer would change in the whole result, as code computes it, also
+// without the key (issue #44: QA-1).
+function changes(value: string, label: string, more: Partial<WhatIf> = {}): WhatIf {
+  return {
+    changed: [{ fact: "Audience", fact_id: "audience", value, now: "Not sure", to: label }],
+    refused: [],
+    results: [],
+    rows_added: [],
+    rows_removed: [],
+    rows_changed: [],
+    now_open: [],
+    no_longer_asked: [],
+    ...more,
+  };
+}
+
+const PUBLIC = changes("public", "The public", {
+  results: [
+    {
+      result: "Audience rules apply",
+      regulation: "Camera Law",
+      before: { status: "conditional", open: ["Audience"], article_6_3: null },
+      after: { status: "does_not_apply", open: [], article_6_3: null },
+    },
+  ],
+  rows_removed: [
+    {
+      label: "Staff training",
+      result: "Audience rules apply",
+      category: "organisation",
+      status: "conditional",
+      citation: "Camera Law Rule 2(1)",
+      date: "2 February 2025",
+    },
+  ],
+  rows_changed: [
+    {
+      label: "Delete video after a month",
+      result: "Storage role",
+      category: "technical",
+      status: "applies",
+      before: "conditional",
+      citation: "Camera Law Rule 5(1)",
+      date: "2 August 2026",
+    },
+  ],
+  no_longer_asked: ["Video storage"],
+});
+
+test("each value of an open answer has a fold with what that value would change in the whole result", () => {
+  show(testResult.gates, null, OPEN, { audience: { staff: changes("staff", "Staff"), public: PUBLIC } });
+
+  const audience = region("Audience", region(CHECK));
+  expect(audience.textContent).toContain("What each answer would change in the whole result");
+  const folds = within(audience)
+    .getAllByText(/^If /, { selector: "summary" })
+    .map((summary) => summary.textContent);
+  expect(folds).toEqual([
+    "If Staff: changes nothing",
+    "If The public: changes 1 result, removes 1 obligation, changes the status of 1 obligation, removes 1 question",
+  ]);
+  const staff = within(audience).getByText(/^If Staff/, { selector: "summary" }).closest("details") as HTMLElement;
+  expect(staff.textContent).toContain("Nothing in the result would change.");
+  const fold = within(audience).getByText(/^If The public/, { selector: "summary" }).closest("details") as HTMLElement;
+  const shown = fold.textContent ?? "";
+  expect(shown).toContain("Results that would change");
+  expect(shown).toContain("Audience rules apply (Camera Law): Conditional to Does not apply");
+  expect(shown.indexOf("Obligations that would no longer apply")).toBeLessThan(shown.indexOf("Staff training"));
+  expect(shown).toContain("Camera Law Rule 2(1)");
+  expect(shown).toContain("Obligations whose status would change");
+  expect(shown).toContain("Delete video after a month: Conditional to Applies");
+  expect(shown).toContain("Questions that would no longer be asked: Video storage.");
+  expect(within(fold).getByText("Organisation").className).toContain(styles.tag_organisation);
+});
+
+test("a result whose status stays says so, with what Article 6(3) then gives for a listed use", () => {
+  const listed = changes("staff", "Staff", {
+    results: [
+      {
+        result: "High-risk",
+        regulation: "Camera Law",
+        before: { status: "conditional", open: [], article_6_3: "always" },
+        after: { status: "conditional", open: [], article_6_3: "unless" },
+      },
+    ],
+  });
+  show(testResult.gates, null, OPEN, { audience: { staff: listed } });
+
+  const fold = within(region("Audience", region(CHECK))).getByText(/^If Staff/, { selector: "summary" }).closest("details") as HTMLElement;
+  expect(fold.textContent).toContain(
+    "High-risk (Camera Law): stays Conditional Then a listed use is high-risk unless one of the conditions of Article 6(3) applies.",
+  );
+});
+
+test("an open answer without changes to show has no folds", () => {
+  show(testResult.gates, null, OPEN, null);
+
+  expect(region("Audience", region(CHECK)).textContent).not.toContain("What each answer would change");
 });
 
 test("a relevant slot without an answer says that it is not answered yet, with what each answer gives", () => {

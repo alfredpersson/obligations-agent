@@ -26,6 +26,7 @@ It covers what a user does when the web app and the Python service run on the us
 | Whether a clause applies (MEMO) | judge prompt | Deciding whether a clause applies to the given facts needs a model's judgment. |
 | Memo content and text (MEMO, RESP) | `writer_prompt.md`, `writer.py` and the code that builds the memo | The model writes the meaning and the action. Code adds the citation and the quoted clause. |
 | Validation of rows (VALID) | memo data and the web app | The user's decision is recorded. The system never guesses it. |
+| Questions about the result and changes to the product (QA, TOOL-2 to TOOL-6) | `gates.py` for the changes of answers, `conversation_prompt.md`, `conversation.py` and `regulations.py` | The model chooses the tools, names the questions that a change may change and writes the answer. Code computes each change, checks each quote, links each citation and enforces the limits. |
 
 The prompts therefore implement only part of the specification. A prompt cannot fix which facts can be recorded, and it cannot decide a risk tier reliably.
 
@@ -57,7 +58,7 @@ The prompts therefore implement only part of the specification. A prompt cannot 
 
 - Legal advice, and questions where the meaning of the law is disputed.
 - Anything outside the two regulations: national law, other EU acts, the terms of platforms, and rules for specific sectors. Examples from official guidance appear only in questions (RESP-5), as guidance and not as law.
-- Answering questions about the memo or the regulations.
+- Questions that are not about the result of an intake or a change to the product, under the two regulations (QA-1 to QA-9).
 - Obligations of companies that provide a general-purpose AI model (AI Act Chapter V). The memo uses the fact that a product is built on such a model. It does not cover placing such a model on the market.
 
 ## 3. Facts and gates
@@ -186,3 +187,37 @@ Code leaves out an entry id that is not an entry of the slot and an entry named 
 **RESP-6.** A question is shown under the label of its fact as its heading, in this order: the explanation, the examples and the check line (RESP-5), then the question and what each answer means, directly above the options. The model writes the explanation, the question and what each answer means as three texts, which together are the question of RESP-4. The explanation and what each answer means may be empty, and a default question has neither.
 
 **RESP-7.** The meaning says in plain words what the clause requires of this product, with its parties and data where the clause uses general terms. It keeps each condition of the clause and decides none of them for the user, and it states nothing about the product that the description, the answers or the notes do not state. For a conditional row, it is written for the case in which the row applies and does not state the answer to what the row depends on.
+
+**RESP-8.** An answer in the conversation (QA-3) answers the question that was asked, for this product: it names the product's parties, data and answers where the law uses general terms, and gives what the result does not show by itself. It states nothing about the product that the description, the answers, the notes or the user's questions do not state.
+
+## 8. Questions about the result
+
+**QA-1.** For each open answer in the second part (MEMO-6), the result shows, for each of the answer's values, what the whole result would be with that value: each result whose status would change, the rows that would be added, removed or change their status, and the questions that would become open or no longer be asked. Code computes them from the same gates and rows, with the value recorded as a change on the confirmation screen records it (INTAKE-1, INTAKE-3), with no model, also without the key.
+
+**QA-2.** When the service has the key, a panel to ask a question stays available beside the result, with the conversation so far, each question with its answer, in order, and the line of MEMO-9 above its field. A question has at most 500 characters, and an intake at most 20 questions. Without the key, no panel shows.
+
+**QA-3.** A model answers each question from the description, the answers, the notes, the result and its rows with their texts, the earlier questions and answers, and what the tools return. The tools only read, and no question changes an answer or the result. The user's text is given to the model only as data in user messages (INTAKE-4).
+
+**QA-4.** For a described change to the product, the answer names each question whose answer the change may change, with the value that it may take and the guidance entries that clarify it (FACT-6, RESP-5), and gives no answer in the user's place (VALID-2). The panel shows each such question's text with its entries, and the changes of those answers together as code computes them for QA-1, with each row that would be added or removed, its result, its category and its date. When the change touches a part that the result lists as not checked, the answer names that part with its link and does not decide it.
+
+**QA-5.** The model never decides an open answer, the listed use, or a condition of Article 6(3), of a date or of a quoted article (VALID-2). A change that another answer would make is shown only as code computed it.
+
+**QA-6.** Each citation in an answer is a link to EUR-Lex (MEMO-7). A quote is shown only when it occurs word for word in the stored copy of its article or annex, or in the point of Regulation (EU) 2026/1744 that changes or inserts it (MEMO-8). For an AI Act article that 2026/1744 changed or inserted, `article` gives the changed text, and the answer follows it. A guidance entry shows with its quotes and its source, as guidance and not as law (RESP-5).
+
+**QA-7.** A question that asks for legal advice, about law outside the two regulations, or about a meaning of the law that is disputed gets the answer that the tool does not cover it, and what it can answer instead (SCOPE-3).
+
+**QA-8.** A question gets at most 6 tool calls, no retry, a timeout for each call, and no new call after 60 seconds. When the model ends without `answer`, code reminds it once. When a limit ends the loop, the call fails or times out, or the model ends without `answer` after the reminder, the panel says that the question could not be answered, the question stays in the field, and the user can ask again. One log line for each question names the tools called and the reason the loop ended, and holds no text of the user.
+
+**QA-9.** The conversation is stored with the intake. After a change of an answer it stays, and each earlier answer says that it was given for the earlier answers and shows the changes for the answers at the time of its question.
+
+### Conversation tools
+
+Each tool only reads. The intake is the one of the address, never one that the model names.
+
+| ID | Tool | Inputs | On success | On failure |
+| --- | --- | --- | --- | --- |
+| TOOL-2 | `contents` | `ai_act` or `gdpr` | each chapter, section, article and annex with its title; for the AI Act, which parts 2026/1744 changed or inserted | |
+| TOOL-3 | `article` | regulation (`ai_act`, `gdpr`, `amending`), `article` or `annex`, a number ("26", "4a", "III"; a paragraph such as "3(3)" is ignored) | the text with its title, chapter and section; for a changed AI Act part, the text of each point that changes it; for an inserted part, its text from the point that inserts it | `not_found` |
+| TOOL-4 | `guidance` | a fact id | the fact's entries with their ids, quotes and sources (FACT-6) | `unknown_fact` |
+| TOOL-5 | `what_if` | one or more answers, each a fact id or label and a value id | each result whose status, open answers or Article 6(3) outcome changes, each row added, removed or with another status, the questions that become open or are no longer asked, and their counts (QA-1) | for each answer that cannot be applied: `unknown_fact`, `not_asked` (not relevant once the earlier answers are applied), `unknown_value` or `same_answer` |
+| TOOL-6 | `answer` | the text, with each citation in square brackets; quotes, each with its regulation, kind and number; the ids of guidance entries; the answers that a change may change, each a fact id or label and a value id | ends the loop; code checks each quote, leaves out an unknown entry, and shows the rest | |
