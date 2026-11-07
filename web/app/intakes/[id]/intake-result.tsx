@@ -272,19 +272,25 @@ function Obligation({
   );
 }
 
-// The rows of a result in runs of one date: each run's date once above its rows, with the condition
-// of that date that the user decides (Article 111(2) or 111(4)) folded under it, then the rows (MEMO-5,
-// GATE-5). A date is its day, the article that sets it and its condition.
+// The rows of a result in their order, in runs of adjacent rows of one date: each run's date once above
+// its rows, with the condition of that date that the user decides (Article 111(2) or 111(4)) folded
+// under it, then the rows (MEMO-5, GATE-5). A date is its day, the article that sets it and its
+// condition.
 function Rows({ rows, folded, ctx }: { rows: { row: Row; also: string[] }[]; folded: boolean; ctx: Context }) {
   const runOf = (row: Row) => `${row.date} ${row.date_unit.citation} ${row.condition?.citation ?? ""}`;
-  const runs = [...new Set(rows.map(({ row }) => runOf(row)))].map((value) => rows.filter(({ row }) => runOf(row) === value));
+  const runs: { row: Row; also: string[] }[][] = [];
+  for (const entry of rows) {
+    const last = runs.at(-1);
+    if (last && runOf(last[0].row) === runOf(entry.row)) last.push(entry);
+    else runs.push([entry]);
+  }
   return (
     <>
       {runs.map((run) => {
         const first = run[0].row;
         const condition = first.condition;
         return (
-          <Fragment key={runOf(first)}>
+          <Fragment key={first.id}>
             <p className={styles.dateLine}>
               <From row={first} ctx={ctx} />
             </p>

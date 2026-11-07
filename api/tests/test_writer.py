@@ -375,6 +375,39 @@ def test_the_user_message_holds_the_description_the_answers_the_notes_and_the_ro
     } == DRAFTING
 
 
+# A row that needs another result while that result is conditional depends on what that result
+# depends on: the deployer's rows of AI Act Article 26 need high-risk under Annex III, so they depend on
+# whether the intended use is listed, and on Article 6(3) while the answer about profiling is "no"
+# (issue #45, review of #60).
+LISTED = "whether the product's intended use is one of the uses listed in AI Act Annex III, point 4"
+
+
+@pytest.mark.parametrize(
+    ("profiling", "depends"),
+    [
+        ("yes", [LISTED]),
+        (
+            "no",
+            [LISTED, "whether one of the conditions of AI Act Article 6(3) applies"],
+        ),
+    ],
+    ids=["profiling", "no_profiling"],
+)
+def test_a_row_that_needs_a_conditional_result_depends_on_what_that_result_depends_on(
+    profiling: str, depends: list[str]
+) -> None:
+    requests: list[httpx2.Request] = []
+
+    service(recording(requests), ended({**ALL_YES, "profiling": profiling})).post(
+        "/intakes/one/texts"
+    )
+
+    rows = {row_of(request)["id"]: row_of(request) for request in requests}
+    article_26 = rows["deployer:aia:art26(1)"]
+    assert article_26["status"] == "conditional"
+    assert article_26["depends_on"] == depends
+
+
 # Each row reaches the writer with its category from gates.yaml (issue #52, RESP-1).
 def test_each_row_reaches_the_writer_with_its_category() -> None:
     requests: list[httpx2.Request] = []

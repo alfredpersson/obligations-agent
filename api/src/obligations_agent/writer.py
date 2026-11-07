@@ -66,30 +66,33 @@ class Write(BaseModel):
     rows: list[Written]
 
 
-def depends_on(
-    labels: dict[str, str], result: Result, outcome: Outcome, row: ObligationRow
-) -> list[str]:
-    """What a conditional row depends on, in words: the open slots of its result, a use listed in Annex III, the conditions of Article 6(3), and what else the row needs."""
-    depends = [f"the open answer about {labels[c.slot]}" for c in outcome.conditions]
+def open_items(labels: dict[str, str], outcome: Outcome) -> list[str]:
+    """What a result depends on, in words: its open slots, a use listed in Annex III, and the conditions of Article 6(3)."""
+    items = [f"the open answer about {labels[c.slot]}" for c in outcome.conditions]
     points = [q.citation for q in outcome.quotes if "Annex III" in q.citation]
     if outcome.result == "listed_use" or any(
         case.result == "listed_use" for c in outcome.conditions for case in c.cases
     ):
         point = points[0] if len(points) == 1 else "a point of AI Act Annex III"
-        depends.append(
+        items.append(
             f"whether the product's intended use is one of the uses listed in {point}"
         )
     if outcome.derogation == "unless":
-        depends.append("whether one of the conditions of AI Act Article 6(3) applies")
+        items.append("whether one of the conditions of AI Act Article 6(3) applies")
+    return items
+
+
+def depends_on(
+    labels: dict[str, str], result: Result, outcome: Outcome, row: ObligationRow
+) -> list[str]:
+    """What a conditional row depends on, in words: what its result depends on, what else the row needs, and what a result that it needs depends on while that result is conditional."""
+    depends = open_items(labels, outcome)
     need = row.needs
     if need is not None and need.slot is not None and need.value != "yes":
         depends.append(f"the open answer about {labels[need.slot]}")
     if need is not None and need.gate is not None and need.status == "conditional":
         other = next(o for o in result.gates if o.gate == need.gate)
-        for condition in other.conditions:
-            text = f"the open answer about {labels[condition.slot]}"
-            if text not in depends:
-                depends.append(text)
+        depends += [item for item in open_items(labels, other) if item not in depends]
     return depends
 
 

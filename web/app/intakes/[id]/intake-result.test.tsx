@@ -765,6 +765,20 @@ test("the rows of a result with two dates show each date once above its rows, wi
   expect([old.textContent, notice.textContent].some((text) => text?.includes("From "))).toBe(false);
 });
 
+test("the rows of a result keep their order, with a date line above each run of adjacent rows of one date", () => {
+  const later = { ...testRows[0], id: "storage:rule:art7(1)", label: "A log of the deletions" };
+  show(applying([testRows[0], { ...testRows[1], status: "applies", needs: null }, later]), null, []);
+
+  expect(within(region(APPLIES)).getAllByText(/^From /).map((line) => line.textContent)).toEqual([
+    "From 25 May 2018 (Rule 99(2)).",
+    "From 2 December 2027 (Rule 113).",
+    "From 25 May 2018 (Rule 99(2)).",
+  ]);
+  const [old, notice, log] = ["Delete old video", "A notice at the door", "A log of the deletions"].map(row);
+  expect(old.compareDocumentPosition(notice) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(notice.compareDocumentPosition(log) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+
 test("two dates on the same day that different articles set are two runs, each with its own article", () => {
   const sameDay = { ...testRows[0], id: "storage:rule:art7(1)", label: "A log of the deletions", date_unit: testRows[1].date_unit };
   show(applying([testRows[0], sameDay]), null, []);
