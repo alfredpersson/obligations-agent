@@ -70,6 +70,11 @@ async function expectOutline(element: Locator) {
   await expect(element).toHaveCSS("outline-width", "3px");
 }
 
+// The fonts of the look (#59), as the browser names them: the serif of the titles and section
+// headings, and the sans-serif of all other text.
+const SERIF = /^"Source Serif 4"/;
+const SANS = /^Inter\b/;
+
 // After a navigation, Next.js keeps the previous page in the document, hidden. The test finds
 // elements by role, because role queries skip hidden elements.
 test("a filled-in form and the answered follow-up questions lead to the screen of the answers, where a change and a confirmation show the result, and from the result the user answers an open fact and confirms again", async ({
@@ -85,6 +90,16 @@ test("a filled-in form and the answered follow-up questions lead to the screen o
   await expect(page).toHaveURL(/\/new$/);
   await expect(page.getByRole("textbox", { name: DESCRIPTION[0][0] })).toBeVisible();
   await expectScreen(page, "Describe your product");
+  // The look (#59): the title in the serif, the text and the button in the sans-serif, and a group
+  // of options as a white card with rounded corners and a shadow, on a page that is not white.
+  await expect(page.getByRole("main").getByRole("heading", { level: 1 })).toHaveCSS("font-family", SERIF);
+  await expect(page.locator("body")).toHaveCSS("font-family", SANS);
+  await expect(page.getByRole("button", { name: "Send" })).toHaveCSS("font-family", SANS);
+  const personalData = page.getByRole("group", { name: "Does the product process personal data?" });
+  await expect(personalData).toHaveCSS("background-color", "rgb(255, 255, 255)");
+  await expect(personalData).toHaveCSS("border-radius", "12px");
+  await expect(personalData).not.toHaveCSS("box-shadow", "none");
+  await expect(page.locator("body")).not.toHaveCSS("background-color", "rgb(255, 255, 255)");
   await page
     .getByRole("group", { name: "Does the product process personal data?" })
     .getByRole("radio", { name: "Yes" })
@@ -208,6 +223,13 @@ test("a filled-in form and the answered follow-up questions lead to the screen o
     "Controller",
     "Processor",
   ]);
+  // The look (#59): the headings of a part, a regulation and a result in the serif, and a row and a
+  // button in the sans-serif.
+  await expect(page.getByRole("heading", { level: 2, name: "What applies" })).toHaveCSS("font-family", SERIF);
+  await expect(applies.getByRole("heading", { level: 3, name: "GDPR", exact: true })).toHaveCSS("font-family", SERIF);
+  await expect(applies.getByRole("heading", { level: 4, name: "Controller", exact: true })).toHaveCSS("font-family", SERIF);
+  await expect(applies.getByRole("listitem").first()).toHaveCSS("font-family", SANS);
+  await expect(page.getByRole("button", { name: "Download the result" })).toHaveCSS("font-family", SANS);
   await expect(applies.getByRole("region", { name: "AI Act", exact: true }).getByRole("heading", { level: 4 })).toHaveText([
     "High-risk under Annex III",
     "Transparency: the product generates content",

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { JetBrains_Mono, Source_Serif_4 } from "next/font/google";
+import { Inter, Source_Serif_4 } from "next/font/google";
 import Link from "next/link";
 import "./globals.css";
 import styles from "./layout.module.css";
@@ -11,16 +11,17 @@ export const metadata: Metadata = {
     "Which parts of the AI Act and the GDPR apply to one AI product, with the articles that define each result quoted.",
 };
 
-// The two fonts of the design, which the web app serves itself. globals.css names their variables
-// first in --font-text and --font-label.
-const serif = Source_Serif_4({ subsets: ["latin"], variable: "--font-serif" });
-const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono" });
+// The two fonts of the design, which the web app serves itself: the serif for titles, with its
+// optical sizes so that large titles use its display design, and the sans-serif for all other text.
+// globals.css names their variables first in --font-title and --font-text.
+const serif = Source_Serif_4({ subsets: ["latin"], axes: ["opsz"], variable: "--font-serif" });
+const sans = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
 // Every screen: a header with the product name, which links to the start page, the content, and a
 // footer with the line on legal advice.
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${serif.variable} ${mono.variable}`}>
+    <html lang="en" className={`${serif.variable} ${sans.variable}`}>
       <body>
         <header className={styles.header}>
           <Link href="/" className={styles.name}>

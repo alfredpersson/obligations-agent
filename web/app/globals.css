@@ -1,29 +1,30 @@
-/* The design, the theme of the author's personal site: warm paper, near-black text and one
-   terracotta accent, a serif for the text and a monospace font for labels, and flat rows between
-   thin rules. The colors, type sizes, spaces and the radius are defined here once, with the rules for
-   the elements that every screen uses. Each component keeps its own rules in a CSS Module next to
-   it, and only this file names a color (design.test.ts checks the contrast of each pair). */
+/* The design: a warm grey page with white cards that have rounded corners and a light shadow,
+   near-black text, links and buttons, a serif for titles and section headings, and a sans-serif for
+   all other text. The colors, type sizes, spaces, radii and shadows are defined here once, with the
+   rules for the elements that every screen uses. Each component keeps its own rules in a CSS Module
+   next to it, and only this file names a color (design.test.ts checks the contrast of each pair). */
 
 :root {
-  --color-page: #faf7f2;
-  /* Text fields and groups of options. */
-  --color-surface: #fffdf9;
-  --color-text: #1a1714;
-  --color-muted: #6b6259;
+  --color-page: #f5f2ec;
+  /* Cards, text fields and groups of options. */
+  --color-surface: #ffffff;
+  --color-text: #1c1c1e;
+  --color-muted: #5f5f63;
   /* The borders of controls. */
-  --color-border: #8a7e72;
-  /* Lines that only separate parts of a screen. */
-  --color-rule: #e6dfd6;
+  --color-border: #85858b;
+  /* Lines that only separate parts of a screen, and the edges of cards. */
+  --color-rule: #e6e1d8;
   /* Links, the focus outline, the button's fill and the chosen option. */
-  --color-accent: #a34a2a;
-  --color-accent-text: #faf7f2;
-  --color-accent-soft: #f4e7df;
-  /* Marks only: the square before the product name and the bar above a section label. */
-  --color-mark: #bd684f;
-  --color-quote: #f3eee6;
+  --color-accent: #1c1c1e;
+  --color-accent-text: #ffffff;
+  --color-accent-soft: #f0ece4;
+  /* A citation, and the product's tag in the header, as a chip. */
+  --color-chip: #efebe3;
+  --color-chip-text: #3a3a3d;
+  --color-quote: #f8f6f1;
   --color-error: #b42318;
-  --color-disabled: #e6dfd6;
-  --color-disabled-text: #574f47;
+  --color-disabled: #e6e1d8;
+  --color-disabled-text: #57575b;
   /* The result of a gate: its status label, and the square before its title. The colors follow the
      AI Act's risk levels as the user meets them: orange where obligations apply, yellow where the
      result depends on an answer, green where nothing applies; red stays free for a prohibited
@@ -38,22 +39,25 @@
   --color-conditional-text: #713f12;
   --color-conditional-mark: #ca8a04;
   /* The page behind a dialog. */
-  --color-backdrop: rgb(26 23 20 / 0.45);
+  --color-backdrop: rgb(28 28 30 / 0.45);
   /* The fill of the tag of each category of a row (MEMO-5), in a hue outside the status scale, under
      the accent's light text. */
   --color-legal: #7b3388;
   --color-technical: #2a62a6;
   --color-organisation: #1d7468;
 
+  /* The shadow of a card, and the deeper shadow of a card that stands above the page. */
+  --shadow-card: 0 1px 2px rgb(28 28 30 / 0.06), 0 2px 12px rgb(28 28 30 / 0.04);
+  --shadow-raised: 0 16px 40px -16px rgb(28 28 30 / 0.3);
+
   /* The fonts that layout.tsx loads, then fonts of the system. */
-  --font-text: var(--font-serif), Georgia, "Times New Roman", serif;
-  --font-label: var(--font-mono), ui-monospace, Menlo, monospace;
-  --size-text: 1.0625rem;
-  --size-h1: 2.25rem;
-  --size-h2: 1.5rem;
-  --size-legend: 1.1875rem;
-  --size-section: 0.9375rem;
-  --size-button: 0.875rem;
+  --font-title: var(--font-serif), Georgia, "Times New Roman", serif;
+  --font-text: var(--font-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --size-text: 1rem;
+  --size-h1: 2.5rem;
+  --size-h2: 1.625rem;
+  --size-legend: 1.125rem;
+  --size-button: 0.9375rem;
   --size-note: 0.8125rem;
   --size-label: 0.75rem;
 
@@ -71,7 +75,9 @@
   /* The space inside a card: a group of options, or a group of examples. */
   --card-padding: var(--space-4) var(--space-6);
 
-  --radius: 0;
+  /* The radius of buttons and text fields, and of a card. */
+  --radius: 8px;
+  --radius-card: 12px;
 }
 
 /* On a phone, less space inside a card, so that its text keeps its width. */
@@ -96,46 +102,36 @@ body {
   line-height: 1.6;
   /* A long word or link in the user's text wraps, so that nothing scrolls sideways. */
   overflow-wrap: anywhere;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The title and the section headings are in the serif, in its regular weight. */
+h1,
+h2 {
+  font-family: var(--font-title);
+  font-weight: 400;
+  letter-spacing: -0.01em;
 }
 
 h1 {
   margin: 0 0 var(--space-6);
   font-size: var(--size-h1);
-  line-height: 1.2;
-  letter-spacing: -0.02em;
+  line-height: 1.15;
 }
 
-/* A section heading is a label: monospace and upper case, with a short bar above it. */
 h2 {
-  position: relative;
   margin: var(--space-8) 0 var(--space-3);
-  padding-top: var(--space-4);
-  font-family: var(--font-label);
-  font-size: var(--size-section);
-  font-weight: 600;
-  line-height: 1.3;
-  letter-spacing: 0.11em;
-  text-transform: uppercase;
+  font-size: var(--size-h2);
+  line-height: 1.25;
 }
 
-h2::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 30px;
-  height: 3px;
-  background: var(--color-mark);
-}
-
-/* A heading inside a section is a smaller label in the muted color. */
+/* A heading inside a section is a small label in the muted color. */
 h3 {
   margin: var(--space-6) 0 var(--space-2);
   color: var(--color-muted);
-  font-family: var(--font-label);
   font-size: var(--size-label);
   font-weight: 600;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
@@ -161,6 +157,8 @@ fieldset {
   padding: var(--card-padding);
   background: var(--color-surface);
   border: 1px solid var(--color-rule);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
 }
 
 /* A floating legend stays inside the border of its group, so that a question text over several
@@ -171,7 +169,8 @@ legend {
   padding: 0;
   margin-bottom: var(--space-3);
   font-size: var(--size-legend);
-  font-weight: 700;
+  font-weight: 600;
+  line-height: 1.4;
 }
 
 legend + * {
@@ -182,6 +181,8 @@ legend + * {
 fieldset fieldset {
   margin: var(--space-3) 0 0;
   padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius);
+  box-shadow: none;
 }
 
 fieldset fieldset legend {
@@ -206,7 +207,7 @@ input[type="radio"] {
   flex: none;
   width: 1.125rem;
   height: 1.125rem;
-  margin: 0.15em 0 0;
+  margin: 0.2em 0 0;
   accent-color: var(--color-accent);
 }
 
@@ -231,12 +232,14 @@ textarea {
   border-radius: var(--radius);
 }
 
+/* A button has the line height of the text, so that it is as high as a link with the look of a
+   button beside it (actions.module.css). */
 button {
   padding: var(--space-3) var(--space-6);
-  font-family: var(--font-label);
+  font-family: var(--font-text);
   font-size: var(--size-button);
   font-weight: 600;
-  letter-spacing: 0.04em;
+  line-height: inherit;
   color: var(--color-accent-text);
   background: var(--color-accent);
   border: 1px solid var(--color-accent);
@@ -261,6 +264,7 @@ blockquote {
   padding: var(--space-2) var(--space-4);
   background: var(--color-quote);
   border-left: 3px solid var(--color-rule);
+  border-radius: 0 var(--radius) var(--radius) 0;
 }
 
 ul {
