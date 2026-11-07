@@ -56,11 +56,13 @@ test.each([
   ["border", "page", 3],
   ["border", "surface", 3],
   // The focus outline and the button's fill on the page and on a text field are links' colors
-  // above. The tint of the chosen option is also the band of the start page, where the accent is
-  // the text of the outlined choice, so it needs 4.5:1 there (the outline on the chosen option
-  // needs 3:1), and the muted text needs 4.5:1.
+  // above. The tint of the chosen option is also the tint of an opened row, where links and the
+  // muted text stand on it, so both need 4.5:1 there (the outline on the chosen option needs 3:1).
   ["accent", "accent-soft", 4.5],
   ["muted", "accent-soft", 4.5],
+  // A citation and the product's tag as a chip (#59): the chip's text, and the link of a citation.
+  ["chip-text", "chip", 4.5],
+  ["accent", "chip", 4.5],
 ])("--color-%s on --color-%s has a contrast of at least %s:1", (color, background, minimum) => {
   expect(colors[color], color).toMatch(/^#/);
   expect(colors[background], background).toMatch(/^#/);

@@ -12,18 +12,18 @@
    page. */
 .button {
   padding: var(--space-3) var(--space-6);
-  font-family: var(--font-label);
   font-size: var(--size-button);
   font-weight: 600;
-  letter-spacing: 0.04em;
   color: var(--color-accent-text);
   background: var(--color-accent);
+  border-radius: var(--radius);
   text-decoration: none;
 }
 
-/* The second choice of the start page: the button's outline, without its fill. */
+/* A second choice, such as the second choice of the start page: a white button with the border of a
+   control. */
 .secondary {
-  color: var(--color-accent);
-  background: transparent;
-  box-shadow: inset 0 0 0 1px var(--color-accent);
+  color: var(--color-text);
+  background: var(--color-surface);
+  box-shadow: inset 0 0 0 1px var(--color-border);
 }

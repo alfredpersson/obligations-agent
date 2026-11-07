@@ -28,10 +28,11 @@
   padding: 0 var(--gutter);
 }
 
-/* The product name in bold, after a square in the color of the marks. */
+/* The product name in the serif, after a near-black square. */
 .name {
-  font-size: 1.25rem;
-  font-weight: 700;
+  font-family: var(--font-title);
+  font-size: 1.375rem;
+  font-weight: 600;
   color: inherit;
   text-decoration: none;
 }
@@ -46,18 +47,20 @@
   width: 11px;
   height: 11px;
   margin-right: 10px;
-  background: var(--color-mark);
+  background: var(--color-text);
+  border-radius: 3px;
 }
 
+/* The product's tag as a chip. */
 .tag {
-  padding: 0 var(--space-2);
-  font-family: var(--font-label);
+  padding: 0.0625rem var(--space-2);
   font-size: var(--size-label);
   font-weight: 600;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--color-muted);
-  border: 1px solid var(--color-border);
+  color: var(--color-chip-text);
+  background: var(--color-chip);
+  border-radius: 999px;
 }
 
 /* The links on the right, which go below the name on a narrow screen. */
@@ -65,7 +68,6 @@
   display: flex;
   gap: var(--space-6);
   margin-left: auto;
-  font-family: var(--font-label);
   font-size: var(--size-note);
 }
 
