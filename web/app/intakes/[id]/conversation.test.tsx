@@ -447,7 +447,13 @@ test("an added change says so with a link to its section in place of the button,
   expect(turn.textContent).toContain("Added to the result as Door screen.");
   expect(within(turn).getByRole("link", { name: "Door screen" }).getAttribute("href")).toBe("#planned-1");
   expect(within(turn).queryByRole("button", { name: ADD })).toBeNull();
-  expect((within(turn).getAllByRole("checkbox") as HTMLInputElement[]).every((box) => box.disabled)).toBe(true);
+  const boxes = within(turn).getAllByRole("checkbox") as HTMLInputElement[];
+  expect(boxes.every((box) => box.disabled)).toBe(true);
+  // The planned change holds only the answer about sharing video (review of #71).
+  expect(boxes.map((box) => [box.closest("label")?.textContent?.split(":")[0], box.checked])).toEqual([
+    ["Audience", false],
+    ["Video sharing", true],
+  ]);
 });
 
 test("a change that could not be added says so, and the button stays", async () => {
@@ -487,4 +493,20 @@ test("each row in the changes of a change links its citation through the dialog 
   expect(link.getAttribute("href")).toBe("https://eur-lex.europa.eu/rule#006.001");
   expect(fireEvent.click(link)).toBe(false);
   expect((screen.getByRole("dialog", { name: "Opening EUR-Lex", hidden: true }) as HTMLDialogElement).open).toBe(true);
+});
+
+test("an added change ticks also its answer that can no longer be applied", () => {
+  const refused = {
+    ...testPlanned,
+    changes: {
+      ...testPlanned.changes,
+      changed: [],
+      refused: [{ fact: "shares_video", value: "yes", error: "same_answer" as const }],
+    },
+  };
+  show([CHANGE], () => {}, () => {}, [refused]);
+  opened();
+
+  const boxes = within(turnOf(CHANGE.question)).getAllByRole("checkbox") as HTMLInputElement[];
+  expect(boxes.map((box) => box.checked)).toEqual([false, true]);
 });

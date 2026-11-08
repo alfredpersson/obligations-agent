@@ -30,13 +30,23 @@ export default function IntakeScreen() {
   // runs again, as on a page that Next.js shows again, writes nothing more (MEMO-1).
   const empty = (texts: Texts) => texts !== null && Object.keys(texts).length === 0;
   const rowsOf = (planned: Planned) => planned.results.flatMap((outcome) => outcome.rows);
-  // The texts of the rows of a planned change are written the same way, once it is added (#63).
-  const pending =
-    data !== null &&
-    ((empty(data.intake.texts) && (data.intake.result?.gates.some((outcome) => outcome.rows.length > 0) ?? false)) ||
-      (data.intake.planned ?? []).some((item) => empty(item.texts) && rowsOf(item).length > 0));
+  // The texts of the rows of a planned change are written the same way, once it is added (#63). The
+  // effect follows which rows wait, the result's and each planned change's by its question, so that a
+  // response that leaves out a planned change added meanwhile makes the screen ask again.
+  const waiting =
+    data === null
+      ? ""
+      : [
+          ...(empty(data.intake.texts) && (data.intake.result?.gates.some((outcome) => outcome.rows.length > 0) ?? false)
+            ? ["result"]
+            : []),
+          ...(data.intake.planned ?? [])
+            .filter((item) => empty(item.texts) && rowsOf(item).length > 0)
+            .map((item) => String(item.turn)),
+        ].join(" ");
+  const pending = waiting !== "";
   useEffect(() => {
-    if (!pending) return;
+    if (!waiting) return;
     // A response that ends after the page was hidden changes nothing: the page shown again sends its
     // own request.
     let current = true;
@@ -75,7 +85,7 @@ export default function IntakeScreen() {
     return () => {
       current = false;
     };
-  }, [pending, id, setData]);
+  }, [waiting, id, setData]);
 
   // One status for the screen, first in each of its views, so that React keeps its element and
   // screen readers announce a change of its message, such as the writing of the texts.
@@ -139,7 +149,9 @@ export default function IntakeScreen() {
                 old && { ...old, intake: { ...old.intake, conversation: [...(old.intake.conversation ?? []), turn] } },
             )
           }
-          onIntake={(changed) => setData((old) => old && { ...old, intake: changed })}
+          // An add, a rename or a remove changes only the planned changes, so the screen takes only
+          // those from the response: a slower response cannot take away a question asked meanwhile.
+          onIntake={(changed) => setData((old) => old && { ...old, intake: { ...old.intake, planned: changed.planned } })}
         />
       )}
     </div>

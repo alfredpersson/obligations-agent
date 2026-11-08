@@ -650,7 +650,7 @@ function PlannedChange({
       })}
       {(changes.rows_changed.length > 0 || changes.rows_removed.length > 0) && (
         <div className={styles.plannedOther}>
-          <ChangedRows rows={changes.rows_changed.filter(ctx.kept)} planned={planned.label} />
+          <ChangedRows rows={changes.rows_changed.filter(ctx.kept)} onOpen={ctx.onOpen} planned={planned.label} />
           <Obligations
             title={NO_LONGER_APPLY}
             rows={changes.rows_removed.filter(ctx.kept)}

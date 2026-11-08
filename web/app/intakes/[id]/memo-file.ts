@@ -256,8 +256,10 @@ export function memo(intake: Intake & { result: Result }, schema: Schema, choice
             line({ strong: STATUS_WOULD_CHANGE }),
             {
               kind: "list" as const,
-              items: changedRows.map((row) => [
-                `${row.label}: ${STATE[row.before]} to ${STATE[row.status]} (${row.result}). Planned change: ${item.label}.`,
+              items: changedRows.map((row): Span[] => [
+                `${row.label}: ${STATE[row.before]} to ${STATE[row.status]} (${row.result}, `,
+                link(row),
+                `). Planned change: ${item.label}.`,
               ]),
             },
           ]

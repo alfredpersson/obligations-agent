@@ -352,7 +352,9 @@ test("a file lists the rows whose status a planned change would change and those
   const part = file(ALL, WITH_PLANNED).slice(file(ALL, WITH_PLANNED).indexOf("### Door screen"));
 
   expect(part).toContain("**Obligations whose status would change**");
-  expect(part).toContain("- A notice at the door: Conditional to Applies (Storage role). Planned change: Door screen.");
+  expect(part).toContain(
+    "- A notice at the door: Conditional to Applies (Storage role, [Camera Law Rule 6(1)](https://eur-lex.europa.eu/rule#006.001)). Planned change: Door screen.",
+  );
   expect(part).toContain("**Obligations that would no longer apply**");
   expect(part).toContain(
     "- Staff training (Audience rules apply, [Camera Law Rule 2(1)](https://eur-lex.europa.eu/rule#002.001), from 2 February 2025). Planned change: Door screen.",

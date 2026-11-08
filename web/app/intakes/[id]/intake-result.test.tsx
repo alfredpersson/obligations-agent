@@ -1275,6 +1275,9 @@ test("the rows whose status a planned change would change and those that would n
   expect(shown.indexOf("Obligations whose status would change")).toBeLessThan(shown.indexOf("A notice at the door: Conditional to Applies"));
   const changed = within(change).getByText(/^A notice at the door: Conditional to Applies/).closest("li") as HTMLElement;
   expect(within(changed).getByText("Planned: Door screen")).toBeTruthy();
+  expect(within(changed).getByRole("link", { name: "Camera Law Rule 6(1)" }).getAttribute("href")).toBe(
+    "https://eur-lex.europa.eu/rule#006.001",
+  );
   expect(shown.indexOf("Obligations that would no longer apply")).toBeLessThan(shown.indexOf("Staff training"));
   const removed = rowOf("Staff training", change);
   expect(within(removed).getByText("Planned: Door screen")).toBeTruthy();
@@ -1432,4 +1435,15 @@ test("a row of a planned change that depends on two items names both", () => {
   expect(rowOf("A record of who watches", doorScreen()).textContent).toContain(
     "Depends on the open answer about Audience, and on the open answer about Video storage.",
   );
+});
+
+test("each row whose status would change, in the folds under an open answer, links its citation through the dialog about EUR-Lex", () => {
+  show(testResult.gates, null, OPEN, { audience: { public: PUBLIC } });
+  const fold = within(region("Audience", region(CHECK))).getByText(/^If The public/, { selector: "summary" }).closest("details") as HTMLElement;
+
+  const link = within(fold).getByRole("link", { name: "Camera Law Rule 5(1)" });
+
+  expect(link.getAttribute("href")).toBe("https://eur-lex.europa.eu/rule#005.001");
+  expect(fireEvent.click(link)).toBe(false);
+  expect((screen.getByRole("dialog", { name: "Opening EUR-Lex", hidden: true }) as HTMLDialogElement).open).toBe(true);
 });

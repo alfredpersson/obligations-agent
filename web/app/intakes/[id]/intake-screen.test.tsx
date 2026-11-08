@@ -492,3 +492,89 @@ test("a planned change that the panel adds joins the screen, which then asks for
   expect(textRequests(fetchMock)).toHaveLength(1);
   expect(screen.getByText(/^Added to the result as/)).toBeTruthy();
 });
+
+// The review of #71: a response for the texts that leaves out a planned change that waits, and a
+// response of an add that arrives after a newer question.
+
+const DOOR_TURN = {
+  question: testPlanned.question,
+  answered: true,
+  blocks: [{ kind: "paragraph", segments: [{ text: "One answer may change.", link: null }] }],
+  quotes: [],
+  guidance: [],
+  scenario: {
+    questions: [
+      {
+        fact: "Video sharing",
+        fact_id: "shares_video",
+        question: "Does the product share video with others?",
+        now: "no answer",
+        to: "Yes",
+        guidance: [],
+      },
+    ],
+    changes: testPlanned.changes,
+  },
+  label: "Door screen",
+  for_earlier_answers: false,
+} satisfies Turn;
+
+test("a planned change that a response for the texts leaves out makes the screen ask for its texts again", async () => {
+  const second = { ...testPlanned, turn: 2, label: "Door camera", texts: {} };
+  const responses = [
+    Response.json({ texts: TEXTS, planned: { "1": PLANNED_TEXTS } }),
+    Response.json({ texts: TEXTS, planned: { "1": PLANNED_TEXTS, "2": PLANNED_TEXTS } }),
+  ];
+  const fetchMock = vi.fn<typeof fetch>(async (input) => {
+    if (String(input) === TEXTS_URL) return responses.shift() ?? new Response(null, { status: 500 });
+    if (String(input) === INTAKE_URL) {
+      return Response.json({ ...endedWith(TEXTS), planned: [{ ...testPlanned, texts: {} }, second] });
+    }
+    return Response.json(testSchema);
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  render(<IntakeScreen />);
+
+  await waitFor(() => expect(textRequests(fetchMock)).toHaveLength(2));
+  await waitFor(() => expect(screen.getAllByText("Blur the faces on the door screen.")).toHaveLength(2));
+  expect(screen.queryByText(PLACEHOLDER)).toBeNull();
+});
+
+test("the response of an add that arrives after a newer question keeps that question", async () => {
+  const later = {
+    question: "What does Rule 7 say?",
+    answered: true,
+    blocks: [{ kind: "paragraph", segments: [{ text: "It asks to blur faces.", link: null }] }],
+    quotes: [],
+    guidance: [],
+    scenario: null,
+    label: "What does Rule 7 say?",
+    for_earlier_answers: false,
+  } satisfies Turn;
+  const before = { ...endedWith(TEXTS), conversation: [DOOR_TURN], planned: [] };
+  const added = Promise.withResolvers<Response>();
+  vi.stubGlobal(
+    "fetch",
+    vi.fn<typeof fetch>(async (input) => {
+      const url = String(input);
+      if (url === `${INTAKE_URL}/planned`) return added.promise;
+      if (url === `${INTAKE_URL}/questions`) return Response.json({ turn: later });
+      if (url === TEXTS_URL) return Response.json({ texts: TEXTS, planned: { "1": PLANNED_TEXTS } });
+      if (url === INTAKE_URL) return Response.json(before);
+      return Response.json(testSchema);
+    }),
+  );
+  render(<IntakeScreen />);
+  await expectResult();
+  fireEvent.click(screen.getByRole("button", { name: /^What if/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Add to the result as “Door screen”" }));
+  fireEvent.change(screen.getByRole("textbox", { name: "Your question" }), { target: { value: later.question } });
+  fireEvent.click(screen.getByRole("button", { name: "Ask" }));
+  expect(await screen.findByText("It asks to blur faces.")).toBeTruthy();
+
+  // The add was sent before the question, so its intake holds the conversation without it.
+  added.resolve(Response.json({ ...before, planned: [{ ...testPlanned, texts: {} }] }));
+
+  expect(await screen.findByText("Blur the faces on the door screen.")).toBeTruthy();
+  expect(screen.getByText("It asks to blur faces.")).toBeTruthy();
+});

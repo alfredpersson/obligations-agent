@@ -150,9 +150,10 @@ export function Obligations({
   );
 }
 
-// The obligations whose status changed answers would change, each with its status now and then; in a
-// planned change, each with the change's label (#63).
-export function ChangedRows({ rows, planned }: { rows: WhatIf["rows_changed"]; planned?: string }) {
+// The obligations whose status changed answers would change, each with its status now and then and
+// its citation linked to EUR-Lex through the dialog (MEMO-7); in a planned change, each with the
+// change's label (#63).
+export function ChangedRows({ rows, onOpen, planned }: { rows: WhatIf["rows_changed"]; onOpen: Open; planned?: string }) {
   if (rows.length === 0) return null;
   return (
     <>
@@ -161,7 +162,10 @@ export function ChangedRows({ rows, planned }: { rows: WhatIf["rows_changed"]; p
         {rows.map((row) => (
           <li key={row.id}>
             {row.label}: {STATE[row.before]} to {STATE[row.status]}
-            <span className={result.meta}> ({row.result})</span>
+            <span className={result.meta}>
+              {" "}
+              ({row.result}, <Links links={[{ citation: row.citation, link: row.link, quote: null }]} onOpen={onOpen} />)
+            </span>
             {planned && <PlannedTag label={planned} />}
           </li>
         ))}
@@ -179,7 +183,7 @@ export function Changes({ change, onOpen }: { change: WhatIf; onOpen: Open }) {
       {parts(change).length === 0 && <p className={styles.quiet}>Nothing in the result would change.</p>}
       <Obligations title="Obligations this would add" rows={change.rows_added} onOpen={onOpen} />
       <Obligations title={NO_LONGER_APPLY} rows={change.rows_removed} onOpen={onOpen} />
-      <ChangedRows rows={change.rows_changed} />
+      <ChangedRows rows={change.rows_changed} onOpen={onOpen} />
       {change.results.length > 0 && (
         <>
           <p className={styles.changesTitle}>Results that would change</p>
@@ -304,8 +308,13 @@ function Answer({
   const [failed, setFailed] = useState(false);
   if (!turn.answered) return <p className={styles.failed}>This question could not be answered. Ask it again.</p>;
   const scenario = turn.scenario !== null && turn.scenario.questions.length > 0 ? turn.scenario : null;
-  // Every answer that the change may change is ticked until the user unticks it.
-  const chosen = ticked ?? scenario?.questions.map((question) => question.fact_id) ?? [];
+  // Every answer that the change may change is ticked until the user unticks it; once the change is
+  // added, the answers that it holds, also one that can no longer be applied.
+  const held = planned && [
+    ...planned.changes.changed.map((item) => item.fact_id),
+    ...planned.changes.refused.map((item) => item.fact),
+  ];
+  const chosen = held ?? ticked ?? scenario?.questions.map((question) => question.fact_id) ?? [];
   async function add() {
     setAdding(true);
     setFailed(false);
