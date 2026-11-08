@@ -118,17 +118,13 @@ function Status({ status }: { status: keyof typeof STATUS }) {
   return <strong className={`${styles.status} ${styles[`badge_${status}`]}`}>{STATUS[status]}</strong>;
 }
 
-// The units that define a result, folded behind a line that names them (MEMO-7, MEMO-8). A folded
-// quote stays on the page, one click away.
+// The units that define a result, folded behind "Details", with their citations inside (MEMO-7,
+// MEMO-8). A folded quote stays on the page, one click away.
 function Definition({ quotes, onOpen }: { quotes: Cited[]; onOpen: Open }) {
   if (quotes.length === 0) return null;
   return (
     <details className={styles.definition}>
-      <summary>
-        {quotes.length === 1
-          ? `Show the article that defines it: ${quotes[0].citation}`
-          : `Show the ${quotes.length} articles that define it`}
-      </summary>
+      <summary>Details</summary>
       {quotes.map((unit) => (
         <Fragment key={unit.citation}>
           <p className={styles.citation}>
@@ -600,7 +596,7 @@ function ResultList({
             </li>
           )}
           <li className={styles.partItem}>
-            <a href="#not-checked">Not checked yet</a>
+            <a href="#not-checked">What the tool does not check yet</a>
           </li>
         </ul>
       </nav>
@@ -635,7 +631,7 @@ function ResultList({
             <a href="#also">{PARTS[2]}</a>
           </span>
         )}
-        <a href="#not-checked">Not checked yet</a>
+        <a href="#not-checked">What the tool does not check yet</a>
       </nav>
     </>
   );
@@ -872,7 +868,7 @@ export default function IntakeResult({
         </section>
       )}
       <section id="not-checked" aria-labelledby="not-checked-title" className={styles.part}>
-        <h2 id="not-checked-title">Not checked yet</h2>
+        <h2 id="not-checked-title">What the tool does not check yet</h2>
         <ul>
           {result.not_checked.map((item) => (
             <li key={item.text}>

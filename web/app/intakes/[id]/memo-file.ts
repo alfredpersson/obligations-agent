@@ -105,8 +105,8 @@ export function fileName(made: Date, choices: Choices, extension: "md" | "pdf") 
 }
 
 // The memo as blocks: the title and the day, the description and the answers, the three parts of
-// the result as the screen shows them, "Not checked yet", and the line on legal advice with the
-// official texts and the note on EUR-Lex.
+// the result as the screen shows them, "What the tool does not check yet", and the line on legal
+// advice with the official texts and the note on EUR-Lex.
 export function memo(intake: Intake & { result: Result }, schema: Schema, choices: Choices, made: Date): Block[] {
   const result = intake.result;
   const slots = [...schema.slots, ...schema.follow_up_slots];
@@ -277,7 +277,7 @@ export function memo(intake: Intake & { result: Result }, schema: Schema, choice
           ]),
         ]
       : []),
-    heading(2, "Not checked yet"),
+    heading(2, "What the tool does not check yet"),
     { kind: "list", items: result.not_checked.map((item) => [`${item.text}: `, ...links(item.links)]) },
   ];
   return [...blocks, ...end(blocks)];

@@ -38,13 +38,13 @@ function descriptionField(question: string) {
 }
 
 function sendButton() {
-  return screen.getByRole("button", { name: "Send" }) as HTMLButtonElement;
+  return screen.getByRole("button", { name: "Next" }) as HTMLButtonElement;
 }
 
 // Answers both slots, the second with "Not sure", a reason and a note, and fills in both
 // description fields.
 async function fillIn() {
-  await screen.findByRole("button", { name: "Send" });
+  await screen.findByRole("button", { name: "Next" });
   fireEvent.click(radio("Does the product use a camera?", "Yes"));
   fireEvent.click(radio("Who uses the product?", "Not sure"));
   fireEvent.click(reason("Who uses the product?", "I don't know this about the product"));
@@ -76,7 +76,7 @@ function expectStart(example?: typeof EXAMPLE) {
 test("the form opened without an example has every text field empty and no option chosen", async () => {
   stubFetch({ "/api/schema": Response.json(testSchema) });
   render(<IntakeForm />);
-  await screen.findByRole("button", { name: "Send" });
+  await screen.findByRole("button", { name: "Next" });
 
   expectStart();
 });
@@ -84,7 +84,7 @@ test("the form opened without an example has every text field empty and no optio
 test("the form opened with an example shows its texts and its answers, and can be sent at once", async () => {
   stubFetch({ "/api/schema": Response.json(testSchema) });
   render(<IntakeForm example={EXAMPLE} />);
-  await screen.findByRole("button", { name: "Send" });
+  await screen.findByRole("button", { name: "Next" });
 
   expectStart(EXAMPLE);
   expect(sendButton().disabled).toBe(false);
@@ -99,7 +99,7 @@ test("a text and an answer of the example that the user changes are sent as chan
     ),
   });
   render(<IntakeForm example={EXAMPLE} />);
-  await screen.findByRole("button", { name: "Send" });
+  await screen.findByRole("button", { name: "Next" });
   fireEvent.change(descriptionField(PURPOSE), { target: { value: "A gate camera." } });
   fireEvent.click(radio("Who uses the product?", "The public"));
 
@@ -159,7 +159,7 @@ test("the form shows the description fields and every slot from the schema, in o
 test("the description fields are the first fields, so that the product is described before the questions", async () => {
   stubFetch({ "/api/schema": Response.json(testSchema) });
   render(<IntakeForm />);
-  await screen.findByRole("button", { name: "Send" });
+  await screen.findByRole("button", { name: "Next" });
 
   const fields = descriptionField(PURPOSE).form?.elements;
   expect(fields?.[0]).toBe(descriptionField(PURPOSE));
@@ -169,7 +169,7 @@ test("the description fields are the first fields, so that the product is descri
 test("the form cannot be sent until every slot has an answer and every description field is filled in", async () => {
   stubFetch({ "/api/schema": Response.json(testSchema) });
   render(<IntakeForm />);
-  await screen.findByRole("button", { name: "Send" });
+  await screen.findByRole("button", { name: "Next" });
   expect(sendButton().disabled).toBe(true);
 
   fireEvent.click(radio("Does the product use a camera?", "Yes"));
@@ -217,7 +217,7 @@ test("a sent form creates the intake and opens the screen with the recorded answ
   });
 });
 
-test("Send is disabled while the answers are sent, so that a second click sends nothing", async () => {
+test("Next is disabled while the answers are sent, so that a second click sends nothing", async () => {
   let fail: (error: Error) => void = () => {};
   const fetchMock = vi.fn<typeof fetch>((input) =>
     input === "/api/schema"
@@ -235,7 +235,7 @@ test("Send is disabled while the answers are sent, so that a second click sends 
   fireEvent.click(sendButton());
   expect(fetchMock.mock.calls.filter(([url]) => url === "/api/intakes")).toHaveLength(1);
 
-  // After a failure, Send can be used again.
+  // After a failure, Next can be used again.
   fail(new TypeError("fetch failed"));
   await screen.findByRole("alert");
   await waitFor(() => expect(sendButton().disabled).toBe(false));
@@ -248,7 +248,7 @@ test("while the schema loads, a status says that the form is loading", () => {
   expect(screen.getByRole("status").textContent).toBe("Loading the form.");
 });
 
-test("while the answers are sent, the status after Send says that the next question is being written, and it is empty again after an error", async () => {
+test("while the answers are sent, the status after Next says that the next question is being written, and it is empty again after an error", async () => {
   const sent = Promise.withResolvers<Response>();
   vi.stubGlobal(
     "fetch",
@@ -280,7 +280,7 @@ test.each([
   render(<IntakeForm />);
 
   expect((await screen.findByRole("alert")).textContent).not.toBe("");
-  expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Next" })).toBeNull();
 });
 
 test.each([
@@ -316,7 +316,7 @@ test("the value not_sure, whatever its label, shows the reasons below the option
   };
   stubFetch({ "/api/schema": Response.json(schema) });
   render(<IntakeForm />);
-  await screen.findByRole("button", { name: "Send" });
+  await screen.findByRole("button", { name: "Next" });
   expect(screen.queryByRole("group", { name: "Why are you not sure?" })).toBeNull();
 
   fireEvent.click(radio("Who uses the product?", "Can't say"));
@@ -356,7 +356,7 @@ test("a reason and a note entered for a slot that then gets another answer are n
   });
 });
 
-test("two slots answered not_sure each get their own reasons, and Send waits for both", async () => {
+test("two slots answered not_sure each get their own reasons, and Next waits for both", async () => {
   stubFetch({ "/api/schema": Response.json(testSchema) });
   render(<IntakeForm />);
   await fillIn();
