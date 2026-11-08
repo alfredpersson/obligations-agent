@@ -415,6 +415,20 @@ def test_a_quote_of_a_changed_article_is_found_in_the_point_that_changes_it() ->
     )
 
 
+def test_a_quote_of_one_inserted_article_is_dropped_under_another_from_the_same_point() -> (
+    None
+):
+    # Point (32) of Regulation (EU) 2026/1744 inserts Articles 75a to 75d.
+    text = "the AI Office shall have all the powers of a market surveillance authority"
+
+    assert check_quote("ai_act", "article", "75b", text) is None
+    found = check_quote("ai_act", "article", "75a", text)
+    assert found is not None
+    assert found.citation == (
+        "AI Act Article 75a(1), as inserted by Regulation (EU) 2026/1744"
+    )
+
+
 @pytest.mark.parametrize(
     ("regulation", "kind", "number", "text"),
     [
@@ -459,6 +473,21 @@ def test_a_citation_in_brackets_links_to_its_paragraph_article_or_annex() -> Non
         "AI Act Article 4a": f"{consolidated}#art_4a",
         ", ": None,
         " and ": None,
+        ".": None,
+    }
+
+
+def test_a_citation_of_regulation_2026_1744_links_to_its_article() -> None:
+    amending = f"{EUR_LEX}32026R1744"
+
+    assert links(
+        "See [Regulation (EU) 2026/1744 Article 4] and "
+        "[Regulation (EU) 2026/1744, Article 1, point (9)]."
+    ) == {
+        "See ": None,
+        "Regulation (EU) 2026/1744 Article 4": f"{amending}#art_4",
+        " and ": None,
+        "Regulation (EU) 2026/1744, Article 1, point (9)": f"{amending}#art_1",
         ".": None,
     }
 
@@ -665,6 +694,33 @@ def test_each_later_question_follows_the_earlier_questions_with_their_answers() 
     assert json.loads(messages[2]["content"]) == {"question": "And Article 22?"}
     assert messages[3]["content"] == "This question could not be answered."
     assert json.loads(messages[4]["content"]) == {"question": QUESTION}
+
+
+def test_an_earlier_answer_given_for_other_answers_says_which_answers_changed_since() -> (
+    None
+):
+    earlier = Turn(
+        question="What if we add a chat?",
+        reason="answered",
+        text="One answer may change.",
+        answers=ANSWERS,
+    )
+    intake = INTAKE.model_copy(
+        update={
+            "answers": {**ANSWERS, "automated_decisions": "no"},
+            "not_sure": {},
+            "conversation": [earlier],
+        }
+    )
+
+    _, requests = asked(answer(), intake=intake)
+
+    rendered = body(requests[0])["messages"][1]["content"]
+    assert rendered.startswith("One answer may change.")
+    assert (
+        "This answer was given for earlier answers. Changed since: "
+        "Automated decisions about people: Not sure, now No."
+    ) in rendered
 
 
 # The loop.

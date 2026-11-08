@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { Activity } from "react";
 import { afterEach, expect, test, vi } from "vitest";
-import type { Intake, Question, Texts } from "../../service";
+import type { Intake, Question, Texts, Turn } from "../../service";
 import { PLAIN, stubFetch, testResult, testRows, testSchema } from "../../testing";
 import IntakeScreen from "./intake-screen";
 
@@ -247,6 +247,40 @@ test("while the request for the texts waits, the result and the rows show, each 
   texts.resolve(Response.json({ texts: TEXTS }));
   expect(await screen.findByText("Draft the notice.")).toBeTruthy();
   await waitFor(() => expect(screen.getByRole("status").textContent).toBe(""));
+});
+
+test("texts that arrive while a question about the result waits stay after its answer, with no second request (#44)", async () => {
+  const texts = Promise.withResolvers<Response>();
+  const asked = Promise.withResolvers<Response>();
+  const turn = {
+    question: "What if we add a screen?",
+    answered: true,
+    blocks: [{ kind: "paragraph", segments: [{ text: "One answer may change.", link: null }] }],
+    quotes: [],
+    guidance: [],
+    scenario: null,
+    for_earlier_answers: false,
+  } satisfies Turn;
+  const fetchMock = vi.fn<typeof fetch>(async (input) => {
+    if (String(input) === TEXTS_URL) return texts.promise;
+    if (String(input) === `${INTAKE_URL}/questions`) return asked.promise;
+    if (String(input) === INTAKE_URL) return Response.json({ ...endedWith({}), conversation: [] });
+    return Response.json(testSchema);
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  render(<IntakeScreen />);
+  await expectResult();
+  fireEvent.click(screen.getByRole("button", { name: /^What if/ }));
+  fireEvent.change(screen.getByRole("textbox", { name: "Your question" }), { target: { value: turn.question } });
+  fireEvent.click(screen.getByRole("button", { name: "Ask" }));
+
+  texts.resolve(Response.json({ texts: TEXTS }));
+  expect(await screen.findByText("Draft the notice.")).toBeTruthy();
+  asked.resolve(Response.json({ turn }));
+
+  expect(await screen.findByText("One answer may change.")).toBeTruthy();
+  expect(screen.getByText("Draft the notice.")).toBeTruthy();
+  expect(fetchMock.mock.calls.filter(([input]) => String(input) === TEXTS_URL)).toHaveLength(1);
 });
 
 test("without the key, the screen sends no request for the texts and shows no placeholder", async () => {

@@ -56,7 +56,7 @@ function show(
       }}
       schema={testSchema}
       answers={ANSWERS}
-      onIntake={() => {}}
+      onTurn={() => {}}
     />,
   );
 }

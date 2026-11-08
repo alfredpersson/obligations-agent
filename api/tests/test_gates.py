@@ -2077,3 +2077,14 @@ def test_an_open_question_that_a_change_makes_irrelevant_is_no_longer_asked() ->
         "Special categories of personal data",
         "Automated decisions about people",
     ]
+
+
+def test_a_fact_named_twice_keeps_only_its_last_value() -> None:
+    changes = changes_of(
+        WITHOUT_DATA, ("personal_data", "yes"), ("Personal data", "not_sure")
+    )
+
+    assert [(item.fact_id, item.to) for item in changes.changed] == [
+        ("personal_data", "Not sure")
+    ]
+    assert changes.refused == []

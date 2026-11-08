@@ -3,7 +3,7 @@ import { Fragment, type MouseEvent, useEffect, useId, useRef, useState } from "r
 import actions from "../../actions.module.css";
 import loading from "../../loading-status.module.css";
 import { REASONS } from "../../not-sure-reason";
-import type { Asked, Cited, Intake, NotSure, Outcome, Regulation, Result, Row, Schema, Texts } from "../../service";
+import type { Asked, Cited, Intake, NotSure, Outcome, Regulation, Result, Row, Schema, Texts, Turn } from "../../service";
 import Conversation, { Changes, changed } from "./conversation";
 import styles from "./intake-result.module.css";
 import MemoExport from "./memo-export";
@@ -622,13 +622,13 @@ export default function IntakeResult({
   intake,
   schema,
   answers,
-  onIntake,
+  onTurn,
 }: {
   intake: Intake & { result: Result };
   schema: Schema;
   answers: string;
-  // The intake after a question in the panel.
-  onIntake: (intake: Intake) => void;
+  // A question in the panel with its answer.
+  onTurn: (turn: Turn) => void;
 }) {
   const { result, not_sure: notSure, questions, open_slots: openSlots, texts } = intake;
   // Whether the choices and the controls of the export show (#53).
@@ -772,7 +772,7 @@ export default function IntakeResult({
       </section>
       {/* Without the key, there is no conversation and no panel (QA-2). */}
       {intake.conversation && (
-        <Conversation intake={{ ...intake, conversation: intake.conversation }} onOpen={open} onIntake={onIntake} />
+        <Conversation intake={{ ...intake, conversation: intake.conversation }} onOpen={open} onTurn={onTurn} />
       )}
       <dialog ref={dialog} aria-labelledby={title} onClose={() => setOpening(null)} className={styles.dialog}>
         <h2 id={title}>Opening EUR-Lex</h2>

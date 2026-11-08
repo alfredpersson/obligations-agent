@@ -148,9 +148,9 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function show(conversation: Turn[] | null, onIntake: (intake: Intake) => void = () => {}) {
+function show(conversation: Turn[] | null, onTurn: (turn: Turn) => void = () => {}) {
   const intake: Intake & { result: Result } = { ...testIntake, conversation };
-  render(<IntakeResult intake={intake} schema={testSchema} answers={ANSWERS} onIntake={onIntake} />);
+  render(<IntakeResult intake={intake} schema={testSchema} answers={ANSWERS} onTurn={onTurn} />);
   return intake;
 }
 
@@ -215,6 +215,16 @@ test("the button shows an icon with its name, and after questions their number",
   const button = screen.getByRole("button", { name: `${WHAT_IF} 2 questions` });
   expect(button.querySelector("svg")).not.toBeNull();
   expect(button.textContent).toBe(`${WHAT_IF}2`);
+});
+
+test("opening the panel moves the focus to its field, and closing it moves the focus back to the button", () => {
+  show([]);
+
+  const panel = opened();
+  expect(document.activeElement).toBe(field());
+  fireEvent.click(within(panel).getByRole("button", { name: "Close" }));
+
+  expect(document.activeElement).toBe(screen.getByRole("button", { name: /^What if…\?/ }));
 });
 
 test("the panel's title is the button's name, with a line on what it answers", () => {
@@ -288,8 +298,8 @@ test("a question that could not be answered says so", () => {
 test("Enter sends the question and the answer joins the conversation, and Shift and Enter does not send it", async () => {
   const answer: Turn = { ...ANSWERED, question: "What does Rule 5 say?" };
   const fetchMock = stubFetch({ [ASKED]: new Response(JSON.stringify({ turn: answer })) });
-  const onIntake = vi.fn<(intake: Intake) => void>();
-  const intake = show([FAILED], onIntake);
+  const onTurn = vi.fn<(turn: Turn) => void>();
+  show([FAILED], onTurn);
   opened();
 
   fireEvent.change(field(), { target: { value: "What does Rule 5 say?" } });
@@ -297,9 +307,9 @@ test("Enter sends the question and the answer joins the conversation, and Shift 
   expect(fetchMock).not.toHaveBeenCalled();
   fireEvent.keyDown(field(), { key: "Enter" });
 
-  await waitFor(() => expect(onIntake).toHaveBeenCalledOnce());
+  await waitFor(() => expect(onTurn).toHaveBeenCalledOnce());
   expect(sent(fetchMock)).toEqual([[ASKED, "POST", { text: "What does Rule 5 say?" }]]);
-  expect(onIntake).toHaveBeenCalledWith({ ...intake, conversation: [FAILED, answer] });
+  expect(onTurn).toHaveBeenCalledWith(answer);
   expect(field().value).toBe("");
 });
 
@@ -321,13 +331,13 @@ test("while a question is answered, the panel shows the loading status and the f
 test("a question that could not be answered or sent stays in the field", async () => {
   const failed: Turn = { ...FAILED, question: "What if we add a screen?" };
   stubFetch({ [ASKED]: new Response(JSON.stringify({ turn: failed })) });
-  const onIntake = vi.fn<(intake: Intake) => void>();
-  show([], onIntake);
+  const onTurn = vi.fn<(turn: Turn) => void>();
+  show([], onTurn);
   opened();
 
   fireEvent.change(field(), { target: { value: "What if we add a screen?" } });
   fireEvent.click(screen.getByRole("button", { name: "Ask" }));
-  await waitFor(() => expect(onIntake).toHaveBeenCalledOnce());
+  await waitFor(() => expect(onTurn).toHaveBeenCalledWith(failed));
   expect(field().value).toBe("What if we add a screen?");
 
   stubFetch({ [ASKED]: new Error("offline") });

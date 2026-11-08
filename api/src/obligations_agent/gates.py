@@ -623,7 +623,7 @@ def in_words(iso: str) -> str:
 def apply_answers(
     schema: Schema, intake: Intake, changes: list[Requested]
 ) -> tuple[Intake, list[AppliedAnswer], list[Refused]]:
-    """The intake with the answers changed, each as a change on the screen of the answers records it (INTAKE-1), in the order of the facts, so that a fact may be one that an earlier change makes asked; the answers changed, and those that could not be. A fact is named by its id or its label. The intake given does not change."""
+    """The intake with the answers changed, each as a change on the screen of the answers records it (INTAKE-1), in the order of the facts, so that a fact may be one that an earlier change makes asked; the answers changed, and those that could not be. A fact is named by its id or its label, and a fact named twice keeps its last value. The intake given does not change."""
     slots = [*schema.slots, *schema.follow_up_slots]
     ids = {slot.label: slot.id for slot in slots} | {slot.id: slot.id for slot in slots}
     labels = {slot.id: slot.label for slot in slots}
@@ -638,11 +638,11 @@ def apply_answers(
     ]
     changed: list[AppliedAnswer] = []
     after = intake
-    for change in sorted(
-        (change for change in changes if change.fact in ids),
-        key=lambda change: order.index(ids[change.fact]),
+    # A fact named twice, by its id and its label, keeps its last value.
+    latest = {ids[change.fact]: change for change in changes if change.fact in ids}
+    for slot_id, change in sorted(
+        latest.items(), key=lambda item: order.index(item[0])
     ):
-        slot_id = ids[change.fact]
         try:
             changed_intake = change_answer(schema, after, slot_id, change.value, None)
         except IntakeError as error:

@@ -516,11 +516,13 @@ def check_quote(regulation: str, kind: str, number: str, text: str) -> Quoted | 
     if part is None or len(quote.split()) < 3:
         return None
     name = f"{document.name} {name_of(part)}"
-    points = [part.inserted_by] if part.inserted_by else part.changed_by
+    # An inserted article's own text, which its point holds with any other article that it inserts;
+    # a changed one's Official Journal text, then each point that changes it.
     sources: list[tuple[Point | None, list[str]]] = (
-        [] if part.inserted_by else [(None, part.lines)]
+        [(part.inserted_by, part.lines)]
+        if part.inserted_by
+        else [(None, part.lines), *((point, point.lines) for point in part.changed_by)]
     )
-    sources += [(point, point.lines) for point in points]
     for point, lines in sources:
         found = locate(lines, quote)
         if found is None:
@@ -549,8 +551,9 @@ def check_quote(regulation: str, kind: str, number: str, text: str) -> Quoted | 
     return None
 
 
-# A citation that names its regulation, such as "GDPR Article 21(1)" or "AI Act Annex III, point 4".
-NAMED = r"(?P<reg>AI Act|GDPR) (?P<kind>Article|Annex) (?P<num>\d+[a-z]?|[IVXL]+)(?P<par>(?:\(\d+\))*)(?:\([a-z]\))*(?:, point \d+)?"
+# A citation that names its regulation, such as "GDPR Article 21(1)", "AI Act Annex III, point 4" or
+# "Regulation (EU) 2026/1744, Article 1, point (9)".
+NAMED = r"(?P<reg>AI Act|GDPR|Regulation \(EU\) 2026/1744),? (?P<kind>Article|Annex) (?P<num>\d+[a-z]?|[IVXL]+)(?P<par>(?:\(\d+\))*)(?:\([a-z]\))*(?:, point \(?\d+\)?)?"
 CITED = re.compile(NAMED)
 # A citation in square brackets, one that names its regulation, or an article alone.
 CITE = re.compile(
@@ -670,7 +673,7 @@ def at_question(intake: Intake, turn: Turn) -> Intake:
 
 
 def rendered(schema: Schema, intake: Intake, turn: Turn) -> str:
-    """An earlier answer as the history of a later question gives it: its text, its quotes, its guidance entries and the answers that it named."""
+    """An earlier answer as the history of a later question gives it: its text, its quotes, its guidance entries, the answers that it named, and the answers that changed since it was given."""
     if turn.reason != "answered":
         return "This question could not be answered."
     parts = [turn.text]
@@ -686,6 +689,27 @@ def rendered(schema: Schema, intake: Intake, turn: Turn) -> str:
         parts.append(
             "Answers that this change may change, as shown under the answer: "
             + "; ".join(f"{item.fact}: {item.to}" for item in changed)
+        )
+    if turn.answers != intake.answers:
+        slots = [*schema.slots, *schema.follow_up_slots]
+        values = {
+            (slot.id, value.id): value.label for slot in slots for value in slot.values
+        }
+
+        def label(slot_id: str, answers: dict[str, str]) -> str:
+            return (
+                values[slot_id, answers[slot_id]] if slot_id in answers else "no answer"
+            )
+
+        since = [
+            f"{slot.label}: {label(slot.id, turn.answers)}, now {label(slot.id, intake.answers)}"
+            for slot in slots
+            if turn.answers.get(slot.id) != intake.answers.get(slot.id)
+        ]
+        parts.append(
+            "This answer was given for earlier answers. Changed since: "
+            + "; ".join(since)
+            + "."
         )
     return "\n\n".join(parts)
 

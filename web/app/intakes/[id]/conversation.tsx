@@ -316,11 +316,12 @@ function Answer({ turn, onOpen }: { turn: Turn; onOpen: Open }) {
 export default function Conversation({
   intake,
   onOpen,
-  onIntake,
+  onTurn,
 }: {
   intake: Intake & { conversation: Turn[] };
   onOpen: Open;
-  onIntake: (intake: Intake) => void;
+  // A new turn, which the screen adds to the intake as it is when the answer arrives.
+  onTurn: (turn: Turn) => void;
 }) {
   const turns = intake.conversation;
   const [open, setOpen] = useState(false);
@@ -329,6 +330,15 @@ export default function Conversation({
   const [asking, setAsking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const title = useId();
+  // Opening the panel moves the focus to its field, and closing it moves the focus back to the button.
+  const field = useRef<HTMLTextAreaElement>(null);
+  const opener = useRef<HTMLButtonElement>(null);
+  const wasOpen = useRef(false);
+  useEffect(() => {
+    if (open) field.current?.focus();
+    else if (wasOpen.current) opener.current?.focus();
+    wasOpen.current = open;
+  }, [open]);
 
   // The conversation scrolls between the panel's head and its field. A new answer, and the panel
   // when it opens, show the last question at the top.
@@ -358,7 +368,7 @@ export default function Conversation({
       }
       if (!response.ok) throw new Error(String(response.status));
       const { turn } = (await response.json()) as { turn: Turn };
-      onIntake({ ...intake, conversation: [...turns, turn] });
+      onTurn(turn);
       if (turn.answered) setText("");
     } catch {
       setError("The question could not be sent. Ask it again.");
@@ -398,6 +408,7 @@ export default function Conversation({
           </div>
         )}
         <button
+          ref={opener}
           type="button"
           className={styles.opener}
           aria-label={turns.length > 0 ? `${WHAT_IF} ${many(turns.length, "question")}` : WHAT_IF}
@@ -424,8 +435,8 @@ export default function Conversation({
       <div className={styles.panelBody} ref={body}>
         <p className={result.meta}>
           Describe a change to your product, such as a new feature, to see which of your answers it may change and what
-          the rules would then add. You can also ask about an article or a result. Your answers change only when you add
-          the answers of a change.
+          the rules would then add. You can also ask about an article or a result. Your answers stay as they are: you
+          change them on the screen of the answers.
         </p>
         {turns.length > 0 && (
           <ol className={styles.turns}>
@@ -452,6 +463,7 @@ export default function Conversation({
           }}
         >
           <textarea
+            ref={field}
             aria-label="Your question"
             className={styles.input}
             value={text}

@@ -123,7 +123,13 @@ export default function IntakeScreen() {
           intake={{ ...intake, result: intake.result }}
           schema={schema}
           answers={`/intakes/${id}/answers`}
-          onIntake={(next) => setData({ schema, intake: next })}
+          // The turn joins the intake as it is now, with texts that arrived while the question waited.
+          onTurn={(turn) =>
+            setData(
+              (old) =>
+                old && { ...old, intake: { ...old.intake, conversation: [...(old.intake.conversation ?? []), turn] } },
+            )
+          }
         />
       )}
     </div>
