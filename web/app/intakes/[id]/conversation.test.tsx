@@ -281,7 +281,7 @@ test("an answer shows its paragraphs and lists with each citation as a link that
   const citation = turn.getByRole("link", { name: "Rule 5(1)" });
   expect(citation.getAttribute("href")).toBe(LINK);
   expect(fireEvent.click(citation)).toBe(false);
-  expect((screen.getByRole("dialog", { hidden: true }) as HTMLDialogElement).open).toBe(true);
+  expect((screen.getByRole("dialog", { name: "Opening EUR-Lex", hidden: true }) as HTMLDialogElement).open).toBe(true);
   expect(turn.getByRole("link", { name: "Camera Law Rule 5(1)" }).getAttribute("href")).toBe(`${LINK}:~:text=Video`);
   expect(turn.getByText("Video shall be deleted after one month.").tagName).toBe("BLOCKQUOTE");
   expect(turn.getByText("1 example from official guidance (not law)").tagName).toBe("SUMMARY");

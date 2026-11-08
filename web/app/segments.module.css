@@ -1,0 +1,57 @@
+/* A segmented control (#62): the options side by side on a grey track, the chosen one on the accent,
+   or, for a category, in the category's colour, as its tag on the rows. The radio stays in the page
+   for the keyboard, unseen, and its focus shows on the option. The bar of the categories of the
+   result and the choices of the export's dialog use it. The rules name the track and the option, so
+   that they come before the rules of an option in a group (globals.css). */
+.segments {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  max-width: 100%;
+  padding: 3px;
+  background: var(--color-chip);
+  border-radius: var(--radius);
+}
+
+.segments > .segment {
+  position: relative;
+  display: block;
+  padding: var(--space-1) var(--space-3);
+  color: var(--color-chip-text);
+  font-size: var(--size-button);
+  line-height: 1.5;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.segments > .segment > input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  opacity: 0;
+}
+
+.segments > .segment:has(> input:checked) {
+  color: var(--color-accent-text);
+  font-weight: 600;
+  background: var(--color-accent);
+}
+
+.segments > .legal:has(> input:checked) {
+  background: var(--color-legal);
+}
+
+.segments > .technical:has(> input:checked) {
+  background: var(--color-technical);
+}
+
+.segments > .organisation:has(> input:checked) {
+  background: var(--color-organisation);
+}
+
+.segments > .segment:has(> input:focus-visible) {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 2px;
+}

@@ -311,8 +311,7 @@
 }
 
 .detailsButton::before,
-.labelButton > .rowLabel::before,
-.exportButton::before {
+.labelButton > .rowLabel::before {
   content: "▶";
   display: inline-block;
   margin-right: 0.45em;
@@ -321,8 +320,7 @@
 }
 
 .detailsButton[aria-expanded="true"]::before,
-.labelButton[aria-expanded="true"] > .rowLabel::before,
-.exportButton[aria-expanded="true"]::before {
+.labelButton[aria-expanded="true"] > .rowLabel::before {
   transform: rotate(90deg);
 }
 
@@ -473,11 +471,12 @@
   }
 }
 
-/* The dialog before a link to EUR-Lex: a card over the page dimmed, as wide as the text of the page
-   at most, and inside the window on a narrow screen. */
+/* A dialog: a card over the page dimmed, as wide as the text of the page at most, and inside the
+   window on a narrow screen. Its content fills it, so that a click on the dialog element itself is a
+   click on the page around it. */
 .dialog {
   max-width: min(36rem, 100% - 2 * var(--gutter));
-  padding: var(--space-6);
+  padding: 0;
   color: var(--color-text);
   background: var(--color-surface);
   border: 1px solid var(--color-rule);
@@ -489,17 +488,54 @@
   background: var(--color-backdrop);
 }
 
-.dialog h2 {
-  margin-top: 0;
+/* The head of a dialog: its title, and the X at its right. */
+.dialogHead {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: var(--space-6) var(--space-4) var(--space-2) var(--space-6);
 }
 
-/* Opening EUR-Lex is what the dialog is for, so its link has the look of the button
-   (actions.module.css), and Cancel is a white button with the border of a control. */
-.cancel {
+.dialogHead > h2 {
+  margin: 0;
+}
+
+/* The X: a thin cross in the colour of the text on a quiet square button, tinted under the pointer. */
+.x {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  margin-top: -0.25rem;
+  padding: 0;
   color: var(--color-text);
-  background: var(--color-surface);
+  background: none;
   border: 0;
-  box-shadow: inset 0 0 0 1px var(--color-border);
+}
+
+.x:hover {
+  background: var(--color-accent-soft);
+}
+
+/* The text of the dialog before EUR-Lex, and its link, which has the look of the button
+   (actions.module.css), since opening EUR-Lex is what the dialog is for. */
+.dialogText {
+  padding: 0 var(--space-6) var(--space-6);
+}
+
+/* The dialog of the export: wider than the dialog before EUR-Lex, as high as the window allows, with
+   its choices scrolling between the head and the footer (memo-export.module.css). */
+.exportDialog {
+  width: min(34rem, 100% - 2 * var(--gutter));
+  max-width: none;
+  max-height: calc(100% - 2 * var(--gutter));
+}
+
+.exportDialog[open] {
+  display: flex;
+  flex-direction: column;
 }
 
 /* A row's category as a tag in the category's colour, at the start of its action. */
@@ -524,19 +560,117 @@
   background: var(--color-organisation);
 }
 
-/* The fold of the export (#53): a button in the look of the way back to the answers, with the arrow
-   of the other folds, and its choices on a card under the row of buttons. */
-.exportButton {
-  border: 0;
+/* The export's control (#62) floats at the right of the title, and sticks to the top of the window
+   once the page scrolls, as far from the window's right edge as the button of the panel is at the
+   bottom (conversation.module.css), and in its shape: a pill with the deeper shadow. A negative
+   margin takes it from the page's edge to the window's on a wide window. Its arrow shows only on a
+   phone. */
+.download {
+  position: sticky;
+  top: var(--space-6);
+  z-index: 12;
+  float: right;
+  margin: 0 calc((100% + 2 * var(--gutter) - 100vw) / 2) 0 var(--space-4);
+  border-radius: 999px;
+  box-shadow: var(--shadow-raised);
 }
 
-.exportPanel {
-  padding: var(--card-padding);
-  margin-bottom: var(--space-6);
+.download > svg {
+  display: none;
+}
+
+/* The line in place of the rows of a result that has rows, none of them of the chosen category. */
+.none {
+  margin: var(--space-3) 0 0;
+  padding: var(--space-3) var(--space-4);
+  color: var(--color-muted);
+  font-size: var(--size-note);
+  background: var(--color-surface);
+  border: 1px dashed var(--color-rule);
+  border-radius: var(--radius-card);
+}
+
+/* The bar of the categories (#62): a white bar with the deeper shadow, fixed in the middle of the
+   bottom of the window; the body keeps space for it under the footer (globals.css). */
+.filter {
+  position: fixed;
+  bottom: var(--space-4);
+  left: 50%;
+  z-index: 10;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  align-items: center;
+  justify-content: center;
+  width: max-content;
+  max-width: calc(100% - 2 * var(--space-4));
+  padding: var(--space-2) var(--space-3);
   background: var(--color-surface);
   border: 1px solid var(--color-rule);
   border-radius: var(--radius-card);
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--shadow-raised);
+  transform: translateX(-50%);
+}
+
+.filterLabel {
+  color: var(--color-muted);
+  font-size: var(--size-note);
+  font-weight: 600;
+}
+
+.filterLine {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: var(--size-note);
+  white-space: nowrap;
+}
+
+/* On a phone: the control shows only its arrow, and its name stays for screen readers; the bar is as
+   wide as the column, with "Show" and the line on one row and the four options under them. */
+@media (max-width: 30rem) {
+  .download {
+    padding: var(--space-3);
+  }
+
+  .download > svg {
+    display: block;
+  }
+
+  .downloadLabel {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .filter {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    right: var(--space-4);
+    left: var(--space-4);
+    width: auto;
+    gap: var(--space-1) var(--space-3);
+    transform: none;
+  }
+
+  .filterLine {
+    grid-column: 2;
+    grid-row: 1;
+    text-align: right;
+  }
+
+  .filter > .choices {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-content: space-between;
+  }
+
+  .filter > .choices > label {
+    padding: var(--space-1) 0.55rem;
+    font-size: 0.875rem;
+  }
 }
 
 /* What each answer of an open question would change in the whole result, which code computes (#44):

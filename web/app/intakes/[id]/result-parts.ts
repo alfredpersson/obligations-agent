@@ -92,6 +92,12 @@ function decided(result: Result) {
 // The rows of a result that apply.
 export const applying = (outcome: Outcome) => outcome.rows.filter((row) => row.status === "applies");
 
+// Whether a row shows for a category, or for all when the category is null: the rule of a file of one
+// category (MEMO-10) and of the result screen with a category chosen (MEMO-11), so that both hold the
+// same rows.
+export const ofCategory = (category: Row["category"] | null) => (row: Row) =>
+  category === null || row.category === category;
+
 // Whether a row's unit is a unit that its result quotes, such as AI Act Article 50(2) for the marking of
 // generated content: the row then links it, and the quote shows once, with the result (MEMO-8).
 export const quotedAbove = (outcome: Outcome, row: Row) =>
@@ -150,12 +156,13 @@ export function parts(result: Result, openSlots: string[], slots: Slot[]) {
 }
 
 // The rows of one result in a group of the third part, each with the other items that it depends on,
-// and those that every row shares, which the result names once above its rows.
+// and those that every row shares, which the result names once above its rows; none when no row of
+// the result is among the rows given, as for a category that hides them all (MEMO-11).
 export function alsoRows(here: Placed[], outcome: Outcome, item: Item) {
   const entries = here
     .filter((entry) => entry.outcome === outcome)
     .map(({ row, on }) => ({ row, also: on.filter((other) => other !== item.key) }));
-  const shared = entries[0].also;
+  const shared = entries[0]?.also ?? [];
   const once = shared.length > 0 && entries.every(({ also: other }) => other.join() === shared.join());
   return { entries: once ? entries.map(({ row }) => ({ row, also: [] })) : entries, shared: once ? shared : [] };
 }

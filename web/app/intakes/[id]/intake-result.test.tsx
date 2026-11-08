@@ -1,9 +1,10 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { Intake, NotSure, Outcome, Row, Texts, WhatIf } from "../../service";
-import { testQuestions, testResult, testRows, testSchema } from "../../testing";
+import { testIntake, testQuestions, testResult, testRows, testSchema } from "../../testing";
 import IntakeResult from "./intake-result";
 import styles from "./intake-result.module.css";
+import { memo } from "./memo-file";
 
 // The intake ended with "not sure" about the audience, with a reason and a note; the slot
 // stores_video is relevant and was not asked, so it has neither. Its open slots, in schema order.
@@ -147,8 +148,10 @@ test("the result has its heading, the assumptions and the items not checked, eac
 const FIRST_VISIT =
   "EUR-Lex checks the browser on a first visit, and again after some minutes. The page then opens at the top, not at the article. Answer the cookie notice if it shows, come back to this page and open the link again: it then opens at the article.";
 
+// The dialog before EUR-Lex, by its heading, since the export has a dialog too (#62), and a closed
+// dialog has no accessible name.
 function dialog() {
-  return screen.getByRole("dialog", { hidden: true }) as HTMLDialogElement;
+  return screen.getByRole("heading", { name: "Opening EUR-Lex", hidden: true }).closest("dialog") as HTMLDialogElement;
 }
 
 // fireEvent gives false when the screen stops the browser from following the link.
@@ -196,15 +199,30 @@ test("five minutes after EUR-Lex was opened from the dialog, the next link opens
   expect(dialog().open).toBe(true);
 });
 
-test("cancel closes the dialog, and the next link opens it again", () => {
+test("the X closes the dialog, in place of Cancel, and the next link opens it again", () => {
   show();
   follows("Rule 1");
+  expect(within(dialog()).queryByRole("button", { name: "Cancel" })).toBeNull();
 
-  fireEvent.click(within(dialog()).getByRole("button", { name: "Cancel" }));
+  fireEvent.click(within(dialog()).getByRole("button", { name: "Close" }));
 
   expect(dialog().open).toBe(false);
   expect(follows("Rule 9")).toBe(false);
   expect(dialog().open).toBe(true);
+});
+
+// A click on the page around a modal dialog lands on the dialog element itself; in jsdom the test
+// clicks it.
+test("a click on the page around the dialog closes it, and a click inside it does not", () => {
+  show();
+  follows("Rule 1");
+
+  fireEvent.click(within(dialog()).getByRole("heading", { name: "Opening EUR-Lex" }));
+  fireEvent.click(within(dialog()).getByText(/^EUR-Lex checks the browser/));
+  expect(dialog().open).toBe(true);
+  fireEvent.click(dialog());
+
+  expect(dialog().open).toBe(false);
 });
 
 test("when session storage cannot be used, every link opens the dialog first", () => {
@@ -974,4 +992,153 @@ test("the list of the results has the three parts: the results that apply, the i
   for (const id of ["applies", "check", "also", "regulation-camera_law", "result-storage", "check-audience", "also-audience", "also-audience-audience_rules", "not-checked"]) {
     expect(document.getElementById(id)?.tagName, id).toBe("SECTION");
   }
+});
+
+// The bar of the categories (issue #62), on the intake of testing.ts: the storage role applies with
+// a row of the organisation, and its legal row depends on the open answer about sharing video.
+function showIntake() {
+  return render(<IntakeResult intake={testIntake} schema={testSchema} answers={ANSWERS} onTurn={() => {}} />);
+}
+
+function bar() {
+  return screen.getByRole("radiogroup", { name: "Show" });
+}
+
+function choose(name: string) {
+  fireEvent.click(within(bar()).getByRole("radio", { name }));
+}
+
+// The labels of the rows on the screen, in their order.
+function rowLabels() {
+  return [...document.querySelectorAll(`.${styles.rowLabel}`)].map((label) => label.firstChild?.textContent);
+}
+
+test("the result has a bar that offers All, Legal, Technical and Organisation, with All chosen, also when the result shows anew", () => {
+  const { unmount } = showIntake();
+  const options = () => within(bar()).getAllByRole("radio") as HTMLInputElement[];
+  expect(options().map((radio) => [radio.closest("label")?.textContent, radio.checked])).toEqual([
+    ["All", true],
+    ["Legal", false],
+    ["Technical", false],
+    ["Organisation", false],
+  ]);
+  choose("Legal");
+  expect(options().map((radio) => radio.checked)).toEqual([false, true, false, false]);
+
+  unmount();
+  showIntake();
+
+  expect(options().map((radio) => radio.checked)).toEqual([true, false, false, false]);
+});
+
+test.each([
+  [null, "All", ["Delete old video", "A notice at the door"]],
+  ["legal", "Legal", ["A notice at the door"]],
+  ["technical", "Technical", []],
+  ["organisation", "Organisation", ["Delete old video"]],
+] as const)(
+  "with %s chosen, each part shows only the rows of a file of that category, and every result and every answer to check stays",
+  (category, name, rows) => {
+    showIntake();
+    const all = [headings(3), headings(4)];
+
+    choose(name);
+
+    expect(rowLabels()).toEqual(rows);
+    const file = memo(testIntake, testSchema, { category, quotes: true, meanings: true }, new Date());
+    expect(rowLabels()).toEqual(file.flatMap((block) => (block.kind === "heading" && block.level === 5 ? [block.text] : [])));
+    expect([headings(3), headings(4)]).toEqual(all);
+  },
+);
+
+test("with a category chosen, the line above the rows of a result of the third part names the other items that each row that shows depends on", () => {
+  const [, storage, , head] = testResult.gates;
+  const sign = conditional("storage", "A sign at the gate", { slot: "shares_video", value: null, gate: null, status: null });
+  show(
+    [head, { ...storage, rows: [conditional("storage", "A notice at the door"), { ...sign, category: "legal" }] }],
+    null,
+    ["audience", "stores_video", "shares_video"],
+  );
+  const group = () => region("Storage role", region("Audience", region(ALSO)));
+  expect(group().textContent).not.toContain("Each of these");
+
+  choose("Legal");
+
+  expect(within(group()).queryByText(/A notice at the door/)).toBeNull();
+  expect(group().textContent).toContain(
+    "Each of these also depends on the open answer about Video storage, and on the open answer about Video sharing.",
+  );
+  expect(within(group()).getByRole("button", { name: /^A sign at the gate/ }).textContent).toBe("A sign at the gate Legal");
+});
+
+test.each([
+  ["All", "2 obligations", ["1", "1", "1"], ["Storage role (1)", "Video sharing (1)"]],
+  ["Legal", "1 of 2 obligations", ["0", "1", "1"], ["Storage role (0)", "Video sharing (1)"]],
+  ["Technical", "0 of 2 obligations", ["0", "0", "0"], ["Storage role (0)", "Video sharing (0)"]],
+  ["Organisation", "1 of 2 obligations", ["1", "0", "0"], ["Storage role (1)", "Video sharing (0)"]],
+])(
+  "with %s chosen, the line in the bar and the counts of both lists of the results count the rows that show, and the summary keeps the totals",
+  (name, line, side, short) => {
+    showIntake();
+
+    choose(name);
+
+    expect(within(bar()).getByText(/obligations$/).textContent).toBe(line);
+    // In the margin: the result of the first part, the answer to check and the result of the third part.
+    const counts = screen.getByRole("navigation", { name: "The results" }).querySelectorAll(`.${styles.count}`);
+    expect([...counts].map((count) => [count.previousElementSibling?.textContent, count.textContent])).toEqual([
+      ["Storage role", side[0]],
+      ["Video sharing", side[1]],
+      ["Storage role", side[2]],
+    ]);
+    const links = within(screen.getByRole("navigation", { name: "The results, in short" })).getAllByRole("link");
+    expect(links.map((link) => link.textContent).filter((text) => text?.endsWith(")"))).toEqual(short);
+    expect(screen.getByText(/obligations? appl/).textContent).toBe("1 obligation applies now. 4 answers to check could add 1 more.");
+  },
+);
+
+test("the line in the bar counts one obligation as one", () => {
+  const [, storage, , head] = testResult.gates;
+  show([head, { ...storage, status: "applies", result: "applies", conditions: [], rows: [testRows[0]] }], null, []);
+
+  expect(within(bar()).getByText(/obligation$/).textContent).toBe("1 obligation");
+  choose("Legal");
+  expect(within(bar()).getByText(/obligation$/).textContent).toBe("0 of 1 obligation");
+});
+
+test("with a category chosen, a result that has rows, none of them of the category, says so in place of its rows, and a result without rows says nothing", () => {
+  const [audience, storage, , head] = testResult.gates;
+  show(
+    [
+      head,
+      { ...audience, status: "does_not_apply", result: "does_not_apply", answers: { audience: "public" }, conditions: [] },
+      { ...storage, status: "applies", result: "applies", conditions: [], rows: [testRows[0]] },
+    ],
+    null,
+    [],
+  );
+
+  choose("Legal");
+
+  expect(text(under("Storage role"))).toContain("No legal obligations here.");
+  expect(within(region("Storage role")).queryAllByRole("listitem")).toEqual([]);
+  expect(text(under("Audience rules apply"))).not.toContain("obligations here");
+  choose("Organisation");
+  expect(screen.queryByText(/obligations here/)).toBeNull();
+});
+
+test("while the result shows the bar, the body says so, so that the page keeps space under its footer for the bar", () => {
+  const { unmount } = showIntake();
+  expect(document.body.dataset.bar).toBe("");
+
+  unmount();
+
+  expect(document.body.dataset.bar).toBeUndefined();
+});
+
+test("a result without rows has no bar, and the body keeps no space for it", () => {
+  show();
+
+  expect(screen.queryByRole("radiogroup", { name: "Show" })).toBeNull();
+  expect(document.body.dataset.bar).toBeUndefined();
 });

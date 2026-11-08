@@ -250,6 +250,13 @@
   color: var(--color-muted);
 }
 
+/* Where the button would meet the bar of the result's categories (#62), it stands above the bar. */
+@media (max-width: 64rem) {
+  :global(body[data-bar]) .launcher {
+    bottom: var(--bar-space);
+  }
+}
+
 @media (max-width: 30rem) {
   .launcher {
     right: var(--space-4);

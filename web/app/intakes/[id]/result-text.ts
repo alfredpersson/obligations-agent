@@ -52,6 +52,10 @@ export function counted(rows: number) {
     : `${rows} ${rows === 1 ? "obligation depends" : "obligations depend"} on this`;
 }
 
+// The line in place of the rows of a result that has rows, none of them of the category that the
+// result screen shows (MEMO-11).
+export const noneOf = (category: keyof typeof CATEGORY) => `No ${CATEGORY[category].toLowerCase()} obligations here.`;
+
 // The other items that a row, or every row of a result, of the third part depends on.
 export const alsoOn = (items: string[]) => `Also depends on ${items.join(", and on ")}.`;
 export const eachAlsoOn = (items: string[]) => `Each of these also depends on ${items.join(", and on ")}.`;
