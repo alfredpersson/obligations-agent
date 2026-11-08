@@ -64,6 +64,39 @@ async function tabTo(page: Page, element: Locator) {
   }
 }
 
+// The element lies inside the window.
+async function expectInWindow(page: Page, element: Locator) {
+  const box = await element.boundingBox();
+  const size = page.viewportSize();
+  const inside =
+    box !== null &&
+    size !== null &&
+    Math.min(box.x, box.y, size.width - box.x - box.width, size.height - box.y - box.height) >= 0;
+  expect(inside, `${JSON.stringify(box)} inside ${JSON.stringify(size)}`).toBe(true);
+}
+
+// A dialog that its control opens closes with its X, with Escape and with a click on the page around
+// it, each time with the focus back on the control, and stays open on a click inside it (#62).
+async function expectCloses(page: Page, control: Locator, name: string) {
+  const dialog = page.getByRole("dialog", { name });
+  for (const close of [
+    () => dialog.getByRole("button", { name: "Close" }).click(),
+    () => page.keyboard.press("Escape"),
+    () => page.mouse.click(4, 4),
+  ]) {
+    await control.click();
+    await expect(dialog).toBeVisible();
+    await close();
+    await expect(dialog).toBeHidden();
+    await expect(control).toBeFocused();
+  }
+  await control.click();
+  await dialog.getByRole("heading", { name }).click();
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+}
+
 async function expectOutline(element: Locator) {
   await expect(element).toBeFocused();
   await expect(element).toHaveCSS("outline-style", "solid");
@@ -252,6 +285,8 @@ test("a filled-in form and the answered follow-up questions lead to the screen o
   await expect(legalBasis.getByRole("link", { name: "GDPR Article 6(1)" })).toHaveCount(0);
   await legalBasis.getByRole("button", { name: "Details" }).click();
   await expect(legalBasis.getByRole("link", { name: "GDPR Article 6(1)" })).toBeVisible();
+  // The first link to EUR-Lex of a session opens the dialog about the first visit in its place.
+  await expectCloses(page, legalBasis.getByRole("link", { name: "GDPR Article 6(1)" }), "Opening EUR-Lex");
   // The changed answer: the processor applies, with its rows.
   const processor = page.getByRole("region", { name: "Processor", exact: true });
   await expect(processor.getByRole("paragraph").first()).toContainText("Applies.");
@@ -287,18 +322,67 @@ test("a filled-in form and the answered follow-up questions lead to the screen o
     "Each of these also depends on the open answer about Interacts with people.",
   );
 
-  // The result as a Markdown file, which the web app makes in the browser (#53).
-  await page.getByRole("button", { name: "Download the result" }).click();
+  // The result as a Markdown file, which the web app makes in the browser (#53), from the export's
+  // dialog, which stays open after the download, and nothing scrolls sideways while it is open (#62).
+  const control = page.getByRole("button", { name: "Download the result" });
+  await control.click();
+  const exportDialog = page.getByRole("dialog", { name: "Download the result" });
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth),
+  ).toBe(0);
   const [download] = await Promise.all([
     page.waitForEvent("download"),
-    page.getByRole("button", { name: "Download Markdown" }).click(),
+    exportDialog.getByRole("button", { name: "Download Markdown" }).click(),
   ]);
   expect(download.suggestedFilename()).toMatch(/^obligations-memo-\d{4}-\d{2}-\d{2}\.md$/);
   expect(readFileSync(await download.path(), "utf8").split("\n")[0]).toBe("# Obligations memo");
+  await expect(exportDialog).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expectCloses(page, control, "Download the result");
 
-  // Back to the answers: the open fact under own name answered, then a second confirmation.
+  // The bar of the categories (#62), with All chosen, inside the window also after a scroll.
+  const bar = page.getByRole("radiogroup", { name: "Show" });
+  await expect(bar.getByRole("radio", { name: "All" })).toBeChecked();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expectInWindow(page, bar);
+  await page.evaluate(() => window.scrollBy(0, 1500));
+  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+  await expectInWindow(page, bar);
+  // One category: the rows of the other categories are hidden in each part, every result stays, and
+  // the bar's line counts the rows that show.
+  await bar.getByRole("radio", { name: "Organisation" }).check();
+  await expect(controller.getByRole("listitem").filter({ hasText: "A legal basis for each purpose" })).toHaveCount(0);
+  for (const part of ["What applies", "What may also apply"]) {
+    const rows = page.getByRole("region", { name: part }).getByRole("listitem");
+    for (const other of ["Legal", "Technical"]) {
+      await expect(rows.filter({ has: page.getByText(other, { exact: true }) })).toHaveCount(0);
+    }
+    await expect(rows.filter({ has: page.getByText("Organisation", { exact: true }) }).first()).toBeVisible();
+  }
+  await expect(applies.getByRole("region", { name: "GDPR", exact: true }).getByRole("heading", { level: 4 })).toHaveText([
+    "Controller",
+    "Processor",
+  ]);
+  await expect(bar).toContainText(/^Show.*\d+ of \d+ obligations$/);
+  await expectScreen(page, "Result");
+  // At the end of the page the bar covers neither the last item of "Not checked yet" nor the footer's
+  // line.
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  const top = (await bar.boundingBox())?.y ?? 0;
+  for (const above of [
+    page.getByRole("region", { name: "Not checked yet" }).getByRole("listitem").last(),
+    page.getByRole("contentinfo").getByRole("paragraph"),
+  ]) {
+    const box = await above.boundingBox();
+    expect(box && box.y + box.height).toBeLessThanOrEqual(top);
+  }
+  await bar.getByRole("radio", { name: "All" }).check();
+
+  // Back to the answers: the open fact under own name answered, then a second confirmation. The
+  // answers keep no space for the bar of the result.
   await page.getByRole("link", { name: "Check or change the answers" }).click();
   await expectScreen(page, "Check your answers");
+  await expect(page.locator("body")).toHaveCSS("padding-bottom", "0px");
   await page.getByRole("link", { name: "Answer Under own name or trademark" }).click();
   await expectScreen(page, "Under own name or trademark");
   const ownNameAgain = page.getByRole("group", {

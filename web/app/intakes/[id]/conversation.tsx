@@ -32,8 +32,8 @@ function rememberHint() {
   }
 }
 
-// The icon of a button that closes: a cross.
-function Cross() {
+// The icon of a button that closes: a cross, also in the head of the result's dialogs (#62).
+export function Cross() {
   return (
     <svg
       viewBox="0 0 24 24"

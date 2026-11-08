@@ -5,6 +5,7 @@ import {
   type Item,
   alsoRows,
   applying,
+  ofCategory,
   onSlot,
   parts,
   pointOf,
@@ -115,7 +116,7 @@ export function memo(intake: Intake & { result: Result }, schema: Schema, choice
   const ctx = { result, labelOf };
   const { list, placed, items, also } = parts(result, intake.open_slots, slots);
   const texts = intake.texts;
-  const kept = (row: Row) => choices.category === null || row.category === choices.category;
+  const kept = ofCategory(choices.category);
 
   // A result's status and the answers that decided it, then its units.
   function head(outcome: Outcome): Block[] {

@@ -3,8 +3,9 @@ import { Fragment, type MouseEvent, useEffect, useId, useRef, useState } from "r
 import actions from "../../actions.module.css";
 import loading from "../../loading-status.module.css";
 import { REASONS } from "../../not-sure-reason";
+import segments from "../../segments.module.css";
 import type { Asked, Cited, Intake, NotSure, Outcome, Regulation, Result, Row, Schema, Texts, Turn } from "../../service";
-import Conversation, { Changes, changed } from "./conversation";
+import Conversation, { Changes, Cross, changed } from "./conversation";
 import styles from "./intake-result.module.css";
 import MemoExport from "./memo-export";
 import {
@@ -13,6 +14,7 @@ import {
   type Placed,
   alsoRows,
   applying,
+  ofCategory,
   onSlot,
   parts,
   pointOf,
@@ -46,6 +48,7 @@ import {
   ifYes,
   needsFact,
   needsResult,
+  noneOf,
 } from "./result-text";
 
 // On a first visit, EUR-Lex checks the browser and loads the page again, which loses the place that
@@ -100,7 +103,15 @@ type Context = Labels & {
   answers: string;
   // What each value of each open answer would change in the whole result, by slot and value (QA-1).
   openChanges: Intake["open_changes"];
+  // The category that the bar shows, or null for all, and whether a row shows (MEMO-11).
+  category: Row["category"] | null;
+  kept: (row: Row) => boolean;
 };
+
+// The line in place of the rows of a result that has rows, none of them of the chosen category.
+function None({ ctx }: { ctx: Context }) {
+  return ctx.category && <p className={styles.none}>{noneOf(ctx.category)}</p>;
+}
 
 // A status as a label in the color of the status.
 function Status({ status }: { status: keyof typeof STATUS }) {
@@ -348,18 +359,26 @@ function RegulationPart({
           </p>
         )
       )}
-      {parts.map((outcome) => (
-        <section
-          key={outcome.gate}
-          id={`result-${outcome.gate}`}
-          aria-labelledby={`result-${outcome.gate}-title`}
-          className={`${styles.result} ${styles[outcome.status]}`}
-        >
-          <h4 id={`result-${outcome.gate}-title`}>{outcome.label}</h4>
-          <ResultHead outcome={outcome} ctx={ctx} />
-          <Rows rows={applying(outcome).map((row) => ({ row, also: [] }))} folded={false} ctx={ctx} />
-        </section>
-      ))}
+      {parts.map((outcome) => {
+        const rows = applying(outcome);
+        const shown = rows.filter(ctx.kept);
+        return (
+          <section
+            key={outcome.gate}
+            id={`result-${outcome.gate}`}
+            aria-labelledby={`result-${outcome.gate}-title`}
+            className={`${styles.result} ${styles[outcome.status]}`}
+          >
+            <h4 id={`result-${outcome.gate}-title`}>{outcome.label}</h4>
+            <ResultHead outcome={outcome} ctx={ctx} />
+            {rows.length > 0 && shown.length === 0 ? (
+              <None ctx={ctx} />
+            ) : (
+              <Rows rows={shown.map((row) => ({ row, also: [] }))} folded={false} ctx={ctx} />
+            )}
+          </section>
+        );
+      })}
     </section>
   );
 }
@@ -504,24 +523,30 @@ function ListedUse({ item, outcome, where, ctx }: { item: Item; outcome: Outcome
 
 // The three parts as links, in the page's side margin where it is wide enough, so that the rows keep
 // the page's width, and else in one row above the results: the regulations and the results that the
-// answers decide, the items to check, and the results of the third part.
+// answers decide, the items to check, and the results of the third part. The counts count the rows
+// that show (MEMO-11).
 function ResultList({
   list,
+  placed,
   items,
   also,
   ctx,
 }: {
   list: ReturnType<typeof parts>["list"];
+  placed: Placed[];
   items: Item[];
   also: { item: Item; rows: Placed[] }[];
   ctx: Context;
 }) {
+  // The rows that show of a result that applies, and of the conditional rows that depend on an item.
+  const shownOf = (outcome: Outcome) => applying(outcome).filter(ctx.kept).length;
+  const shownOn = (item: Item) => placed.filter(({ on, row }) => on.includes(item.key) && ctx.kept(row)).length;
   // The results of the third part, each once, in the page's order, linked to the first group that
   // holds one of its rows, with its number of rows there.
   const results = [...new Set(also.flatMap(({ rows }) => rows.map((entry) => entry.outcome)))].map((outcome) => ({
     outcome,
     where: also.find(({ rows }) => rows.some((entry) => entry.outcome === outcome))?.item.key,
-    count: also.flatMap(({ rows }) => rows).filter((entry) => entry.outcome === outcome).length,
+    count: also.flatMap(({ rows }) => rows).filter((entry) => entry.outcome === outcome && ctx.kept(entry.row)).length,
   }));
   return (
     <>
@@ -538,7 +563,7 @@ function ResultList({
                       <li key={outcome.gate}>
                         <span className={`${styles.square} ${styles[`mark_${outcome.status}`]}`} aria-hidden="true" />
                         <a href={`#result-${outcome.gate}`}>{outcome.label}</a>
-                        {applying(outcome).length > 0 && <span className={styles.count}>{applying(outcome).length}</span>}
+                        {applying(outcome).length > 0 && <span className={styles.count}>{shownOf(outcome)}</span>}
                       </li>
                     ))}
                   </ul>
@@ -554,7 +579,7 @@ function ResultList({
                   <li key={item.key}>
                     <span className={`${styles.square} ${styles.mark_conditional}`} aria-hidden="true" />
                     <a href={`#check-${item.key}`}>{titleOf(item, ctx)}</a>
-                    {item.rows > 0 && <span className={styles.count}>{item.rows}</span>}
+                    {item.rows > 0 && <span className={styles.count}>{shownOn(item)}</span>}
                   </li>
                 ))}
               </ul>
@@ -588,7 +613,7 @@ function ResultList({
               {parts.map((outcome) => (
                 <a key={outcome.gate} href={`#result-${outcome.gate}`}>
                   {outcome.label}
-                  {applying(outcome).length > 0 && ` (${applying(outcome).length})`}
+                  {applying(outcome).length > 0 && ` (${shownOf(outcome)})`}
                 </a>
               ))}
             </Fragment>
@@ -600,7 +625,7 @@ function ResultList({
             {items.map((item) => (
               <a key={item.key} href={`#check-${item.key}`}>
                 {titleOf(item, ctx)}
-                {item.rows > 0 && ` (${item.rows})`}
+                {item.rows > 0 && ` (${shownOn(item)})`}
               </a>
             ))}
           </span>
@@ -616,8 +641,80 @@ function ResultList({
   );
 }
 
+// The head of a dialog: its title, and the X at its right, which has no text; its label is for screen
+// readers.
+function DialogHead({ id, title, onClose }: { id: string; title: string; onClose: () => void }) {
+  return (
+    <div className={styles.dialogHead}>
+      <h2 id={id}>{title}</h2>
+      <button type="button" aria-label="Close" className={styles.x} onClick={onClose}>
+        <Cross />
+      </button>
+    </div>
+  );
+}
+
+// A click on the page around a dialog lands on the dialog element itself, whose content fills it, and
+// closes it.
+function closeOutside(event: MouseEvent<HTMLDialogElement>) {
+  if (event.target === event.currentTarget) event.currentTarget.close();
+}
+
+// The icon of the export's control on a phone: an arrow down onto a line.
+function Arrow() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="18"
+      height="18"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 4v11M7 10l5 5 5-5M5 20h14" />
+    </svg>
+  );
+}
+
+// The bar of the categories, fixed at the bottom of the window: All or one category, and a line that
+// counts the rows that show (MEMO-11).
+function Filter({
+  category,
+  choose,
+  shown,
+  total,
+}: {
+  category: Row["category"] | null;
+  choose: (category: Row["category"] | null) => void;
+  shown: number;
+  total: number;
+}) {
+  const id = useId();
+  const all = `${total} ${total === 1 ? "obligation" : "obligations"}`;
+  return (
+    <div role="radiogroup" aria-labelledby={id} className={styles.filter}>
+      <span id={id} className={styles.filterLabel}>
+        Show
+      </span>
+      <div className={`${segments.segments} ${styles.choices}`}>
+        {[null, ...(Object.keys(CATEGORY) as Row["category"][])].map((key) => (
+          <label key={key ?? "all"} className={`${segments.segment} ${key ? segments[key] : ""}`}>
+            <input type="radio" name={id} checked={category === key} onChange={() => choose(key)} />
+            {key ? CATEGORY[key] : "All"}
+          </label>
+        ))}
+      </div>
+      <p className={styles.filterLine}>{category === null ? all : `${shown} of ${all}`}</p>
+    </div>
+  );
+}
+
 // The result of the gates in three parts: what the answers decide, the answers to check, and the
-// obligations that depend on them (GATE-4, GATE-5, MEMO-5 to MEMO-9).
+// obligations that depend on them (GATE-4, GATE-5, MEMO-5 to MEMO-9), with the bar of the categories
+// (MEMO-11) and the export in a dialog (MEMO-10).
 export default function IntakeResult({
   intake,
   schema,
@@ -631,8 +728,12 @@ export default function IntakeResult({
   onTurn: (turn: Turn) => void;
 }) {
   const { result, not_sure: notSure, questions, open_slots: openSlots, texts } = intake;
-  // Whether the choices and the controls of the export show (#53).
-  const [exporting, setExporting] = useState(false);
+  // The category that the bar shows, or null for all; not stored, so that a reload shows all.
+  const [category, setCategory] = useState<Row["category"] | null>(null);
+  const kept = ofCategory(category);
+  // The dialog of the export (#53, #62).
+  const exportDialog = useRef<HTMLDialogElement>(null);
+  const exportTitle = useId();
   const slots = [...schema.slots, ...schema.follow_up_slots];
   const slotOf = (id: string) => slots.find((slot) => slot.id === id);
   const valueOf = (slot: string, value: string) =>
@@ -662,12 +763,32 @@ export default function IntakeResult({
     onOpen: open,
     answers,
     openChanges: intake.open_changes,
+    category,
+    kept,
   };
   const rows = result.gates.flatMap((outcome) => outcome.rows);
   const { list, placed, items, also } = parts(result, openSlots, slots);
   const where = (item: Item) => also.find((group) => group.rows.some(({ on }) => on.includes(item.key)))?.item.key;
+
+  // While the bar shows, the body says so: the page then has space under its footer for the bar, and
+  // the button of the panel, whose rules are in another CSS Module, stands above it (globals.css,
+  // conversation.module.css). The attribute goes when the result unmounts or is hidden.
+  useEffect(() => {
+    if (rows.length === 0) return;
+    document.body.dataset.bar = "";
+    return () => {
+      delete document.body.dataset.bar;
+    };
+  }, [rows.length]);
+
   return (
     <>
+      {/* The export's control floats at the top right: beside the title at first, then in the window's
+          top right corner while the page scrolls; on a phone, only its arrow shows. */}
+      <button type="button" className={styles.download} onClick={() => exportDialog.current?.showModal()}>
+        <Arrow />
+        <span className={styles.downloadLabel}>Download the result</span>
+      </button>
       <h1>Result</h1>
       {(rows.length > 0 || items.length > 0) && <p className={styles.summary}>{summary(rows, items.length)}</p>}
       {/* The way back to the answers, in place of the recorded answers (INTAKE-5). */}
@@ -675,20 +796,7 @@ export default function IntakeResult({
         <Link href={answers} className={`${actions.button} ${actions.secondary}`}>
           Check or change the answers
         </Link>
-        <button
-          type="button"
-          className={`${actions.button} ${actions.secondary} ${styles.exportButton}`}
-          aria-expanded={exporting}
-          onClick={() => setExporting(!exporting)}
-        >
-          Download the result
-        </button>
       </p>
-      {exporting && (
-        <section aria-label="Download the result" className={styles.exportPanel}>
-          <MemoExport intake={intake} schema={schema} />
-        </section>
-      )}
       <p className={styles.assumes}>
         This result assumes:{" "}
         {result.assumptions.map((item, index) => (
@@ -701,7 +809,9 @@ export default function IntakeResult({
       {items.length === 0 && (
         <p className={styles.nothing}>{NOTHING_OPEN}</p>
       )}
-      <ResultList list={list} items={items} also={also} ctx={ctx} />
+      {/* Fixed at the bottom of the window, and before the results in the page's order. */}
+      {rows.length > 0 && <Filter category={category} choose={setCategory} shown={rows.filter(kept).length} total={rows.length} />}
+      <ResultList list={list} placed={placed} items={items} also={also} ctx={ctx} />
       <section id="applies" aria-labelledby="applies-title" className={styles.part}>
         <h2 id="applies-title">{PARTS[0]}</h2>
         {list.map((group) => (
@@ -741,8 +851,9 @@ export default function IntakeResult({
               {result.gates
                 .filter((outcome) => here.some((entry) => entry.outcome === outcome))
                 .map((outcome) => {
-                  // The other items that every row of the result depends on are named once above them.
-                  const { entries, shared } = alsoRows(here, outcome, item);
+                  // The rows that show; the other items that every one of them depends on are named
+                  // once above them, as in a file of one category.
+                  const { entries, shared } = alsoRows(here.filter(({ row }) => kept(row)), outcome, item);
                   return (
                     <section
                       key={outcome.gate}
@@ -752,7 +863,7 @@ export default function IntakeResult({
                     >
                       <h4 id={`also-${item.key}-${outcome.gate}-title`}>{outcome.label}</h4>
                       {shared.length > 0 && <p className={styles.alsoLine}>{eachAlsoOn(shared.map((other) => said(other, ctx)))}</p>}
-                      <Rows rows={entries} folded ctx={ctx} />
+                      {entries.length > 0 ? <Rows rows={entries} folded ctx={ctx} /> : <None ctx={ctx} />}
                     </section>
                   );
                 })}
@@ -774,31 +885,45 @@ export default function IntakeResult({
       {intake.conversation && (
         <Conversation intake={{ ...intake, conversation: intake.conversation }} onOpen={open} onTurn={onTurn} />
       )}
-      <dialog ref={dialog} aria-labelledby={title} onClose={() => setOpening(null)} className={styles.dialog}>
-        <h2 id={title}>Opening EUR-Lex</h2>
-        <p>
-          EUR-Lex checks the browser on a first visit, and again after some minutes. The page then opens
-          at the top, not at the article. Answer the cookie notice if it shows, come back to this page and
-          open the link again: it then opens at the article.
-        </p>
-        <div className={actions.actions}>
-          {opening && (
-            <a
-              href={opening.link}
-              target="_blank"
-              rel="noreferrer"
-              className={actions.button}
-              onClick={() => {
-                remember(opening.link);
-                dialog.current?.close();
-              }}
-            >
-              Open EUR-Lex
-            </a>
-          )}
-          <button type="button" className={styles.cancel} onClick={() => dialog.current?.close()}>
-            Cancel
-          </button>
+      <dialog
+        ref={exportDialog}
+        aria-labelledby={exportTitle}
+        onClick={closeOutside}
+        className={`${styles.dialog} ${styles.exportDialog}`}
+      >
+        <DialogHead id={exportTitle} title="Download the result" onClose={() => exportDialog.current?.close()} />
+        <MemoExport intake={intake} schema={schema} />
+      </dialog>
+      <dialog
+        ref={dialog}
+        aria-labelledby={title}
+        onClose={() => setOpening(null)}
+        onClick={closeOutside}
+        className={styles.dialog}
+      >
+        <DialogHead id={title} title="Opening EUR-Lex" onClose={() => dialog.current?.close()} />
+        <div className={styles.dialogText}>
+          <p>
+            EUR-Lex checks the browser on a first visit, and again after some minutes. The page then opens
+            at the top, not at the article. Answer the cookie notice if it shows, come back to this page and
+            open the link again: it then opens at the article.
+          </p>
+          <div className={actions.actions}>
+            {opening && (
+              <a
+                href={opening.link}
+                target="_blank"
+                rel="noreferrer"
+                className={actions.button}
+                onClick={() => {
+                  remember(opening.link);
+                  dialog.current?.close();
+                }}
+              >
+                Open EUR-Lex
+              </a>
+            )}
+          </div>
         </div>
       </dialog>
     </>

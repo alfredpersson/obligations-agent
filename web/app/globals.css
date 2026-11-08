@@ -74,16 +74,21 @@
   --page: 72rem;
   /* The space inside a card: a group of options, or a group of examples. */
   --card-padding: var(--space-4) var(--space-6);
+  /* The space that the bar of the categories of a result takes at the bottom of the window, with its
+     distance from the window's edge (#62). */
+  --bar-space: 5.5rem;
 
   /* The radius of buttons and text fields, and of a card. */
   --radius: 8px;
   --radius-card: 12px;
 }
 
-/* On a phone, less space inside a card, so that its text keeps its width. */
+/* On a phone, less space inside a card, so that its text keeps its width, and the bar of the
+   categories in two rows. */
 @media (max-width: 30rem) {
   :root {
     --card-padding: var(--space-3) var(--space-4);
+    --bar-space: 7.5rem;
   }
 }
 
@@ -103,6 +108,12 @@ body {
   /* A long word or link in the user's text wraps, so that nothing scrolls sideways. */
   overflow-wrap: anywhere;
   -webkit-font-smoothing: antialiased;
+}
+
+/* While a result shows the bar of its categories (#62), the page has space under its footer as high
+   as the bar, so that the end of the page scrolls above the bar. */
+body[data-bar] {
+  padding-bottom: var(--bar-space);
 }
 
 /* The title and the section headings are in the serif, in its regular weight. */
