@@ -135,7 +135,7 @@ test("the result has its heading, the assumptions and the items not checked, eac
   expect(within(assumptions).getByRole("link", { name: "Rule 1" }).getAttribute("href")).toBe(
     "https://eur-lex.europa.eu/rule#art_1",
   );
-  const notChecked = within(under("Not checked yet")[0] as HTMLElement);
+  const notChecked = within(under("What the tool does not check yet")[0] as HTMLElement);
   expect(notChecked.getAllByRole("listitem").map((item) => item.textContent)).toEqual(["The exclusions: Rule 9"]);
   expect(notChecked.getByRole("link", { name: "Rule 9" }).getAttribute("href")).toBe(
     "https://eur-lex.europa.eu/rule#art_9",
@@ -245,7 +245,7 @@ test("the result has three parts in this order: what applies, the answers to che
   const [audience, storage, , head] = testResult.gates;
   show([head, audience, { ...storage, rows: [conditional("storage", "A notice at the door")] }]);
 
-  expect(headings(2)).toEqual([APPLIES, CHECK, ALSO, "Not checked yet"]);
+  expect(headings(2)).toEqual([APPLIES, CHECK, ALSO, "What the tool does not check yet"]);
 });
 
 // The first part (criterion 2).
@@ -294,7 +294,9 @@ test("a conditional result does not show in the first part, nor a regulation who
   expect(headings(3, first)).toEqual(["Camera Law", "Listing Law"]);
   expect(headings(4, first)).toEqual([]);
   expect(under("Camera Law", first)[0].textContent).toBe("Applies. Your answer: Camera: Yes.");
-  expect(text(under("Camera Law", first))).toContain("Show the article that defines it: Rule 1(1)");
+  const camera = within(under("Camera Law", first)[1] as HTMLElement);
+  expect(camera.getByText("Details").tagName).toBe("SUMMARY");
+  expect(camera.getByRole("link", { name: "Rule 1(1)" })).toBeTruthy();
   expect(under("Listing Law", first)[0].textContent).toBe(
     "Assumed. No check decides yet whether the Listing Law applies to the product: the result assumes that it does, as said above.",
   );
@@ -325,7 +327,9 @@ test("an open answer shows once in the second part, with its last question, its 
     "If Staff: depends on the other open answer.",
     "If The public: does not apply.",
   ]);
-  expect(within(audience).getByText("Show the article that defines it: Rule 2(1)").tagName).toBe("SUMMARY");
+  const fold = within(audience).getAllByText("Details")[0];
+  expect(fold.tagName).toBe("SUMMARY");
+  expect(within(fold.closest("details") as HTMLElement).getByRole("link", { name: "Rule 2(1)" })).toBeTruthy();
   const answer = within(audience).getByRole("link", { name: "Answer Audience on the screen of the answers" });
   expect(answer.getAttribute("href")).toBe(`${ANSWERS}#audience`);
   expect(answer.textContent).toBe("Answer it on the screen of the answers");
@@ -463,11 +467,10 @@ test("an open slot that nothing depends on shows with a line that says so", () =
   expect(within(sharing).getByRole("link", { name: "Answer Video sharing on the screen of the answers" })).toBeTruthy();
 });
 
-test("each defining quote is folded behind its citation, a link to EUR-Lex, and keeps its lines", () => {
+test("each defining quote is folded behind Details, with its citation as a link to EUR-Lex, and keeps its lines (#68)", () => {
   show([testResult.gates[0]]);
 
-  const definition = screen.getByText("Show the article that defines it: Rule 2(1)");
-  expect(definition.tagName).toBe("SUMMARY");
+  const definition = screen.getByText("Details", { selector: "summary" });
   const folded = definition.closest("details");
   expect(folded?.open).toBe(false);
   const link = within(folded as HTMLElement).getByRole("link", { name: "Rule 2(1)" });
@@ -476,6 +479,15 @@ test("each defining quote is folded behind its citation, a link to EUR-Lex, and 
   const quote = link.closest("p")?.nextElementSibling;
   expect(quote?.tagName).toBe("BLOCKQUOTE");
   expect(quote?.textContent).toBe("Staff cameras are covered:\n(a) door cameras;");
+});
+
+test("several defining articles are folded behind one Details, each with its citation (#68)", () => {
+  const gate = testResult.gates[0];
+  const second = { citation: "Rule 2(2)", link: "https://eur-lex.europa.eu/rule#002.002", quote: "Shop cameras are covered too." };
+  show([{ ...gate, quotes: [...gate.quotes, second] }]);
+
+  const folded = screen.getByText("Details", { selector: "summary" }).closest("details") as HTMLElement;
+  expect(within(folded).getAllByRole("link").map((link) => link.textContent)).toEqual(["Rule 2(1)", "Rule 2(2)"]);
 });
 
 test("the areas of Annex III are one case, named as such and not by their labels", () => {
@@ -534,7 +546,8 @@ test.each([
     if (sentence) expect(listed.textContent).toContain(sentence);
     else expect(listed.textContent).not.toContain("Under Article 6(3)");
     // The other units of the result, folded.
-    expect(within(listed).getByText("Show the article that defines it: Listing Rule 6(2)").tagName).toBe("SUMMARY");
+    const other = within(listed).getByText("Details", { selector: "summary" }).closest("details") as HTMLElement;
+    expect(within(other).getAllByRole("link").map((link) => link.textContent)).toEqual(["Listing Rule 6(2)"]);
     expect(links([listed]).filter(([, href]) => href?.startsWith(ANSWERS))).toEqual([]);
   },
 );
@@ -679,7 +692,7 @@ test("when nothing is open, the result shows only the first part, with a line th
     [],
   );
 
-  expect(headings(2)).toEqual([APPLIES, "Not checked yet"]);
+  expect(headings(2)).toEqual([APPLIES, "What the tool does not check yet"]);
   expect(screen.getByText("Nothing is left to check: the result depends on no open answer.")).toBeTruthy();
   expect(screen.queryByRole("region", { name: CHECK })).toBeNull();
 });
@@ -974,7 +987,7 @@ test("the list of the results has the three parts: the results that apply, the i
     ["Audience", "#check-audience"],
     [ALSO, "#also"],
     ["Audience rules apply", "#also-audience-audience_rules"],
-    ["Not checked yet", "#not-checked"],
+    ["What the tool does not check yet", "#not-checked"],
   ]);
   expect(list.getAllByRole("listitem").map((item) => item.textContent)).toEqual(
     expect.arrayContaining(["Storage role1", "Audience1", "Audience rules apply1"]),
@@ -987,7 +1000,7 @@ test("the list of the results has the three parts: the results that apply, the i
     CHECK,
     "Audience (1)",
     ALSO,
-    "Not checked yet",
+    "What the tool does not check yet",
   ]);
   for (const id of ["applies", "check", "also", "regulation-camera_law", "result-storage", "check-audience", "also-audience", "also-audience-audience_rules", "not-checked"]) {
     expect(document.getElementById(id)?.tagName, id).toBe("SECTION");

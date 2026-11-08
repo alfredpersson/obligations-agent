@@ -108,6 +108,54 @@ async function expectOutline(element: Locator) {
 const SERIF = /^"Source Serif 4"/;
 const SANS = /^Inter\b/;
 
+// The icon in the head of the start page, and the steps of "How it works" as a stepper (#68): the
+// circles in one row above their titles on a wide screen, in a column left of their texts on a phone,
+// and no rule with a head.
+test("the start page links its icon, and shows the steps as circles in a row on a wide screen and in a column on a phone", async ({
+  page,
+  request,
+}) => {
+  await page.goto("/");
+  await expectScreen(page, START);
+  const icon = page.locator('head link[rel="icon"]');
+  await expect(icon).toHaveAttribute("type", "image/svg+xml");
+  const response = await request.get((await icon.getAttribute("href")) ?? "");
+  expect(response.ok()).toBe(true);
+  expect(response.headers()["content-type"]).toContain("image/svg+xml");
+
+  const steps = page.locator("#how-it-works li");
+  await expect(steps).toHaveCount(5);
+  const boxes = async () =>
+    Promise.all(
+      (await steps.all()).map(async (step) => {
+        const circle = await step.locator('[aria-hidden="true"]').boundingBox();
+        const title = await step.getByRole("heading", { level: 3 }).boundingBox();
+        if (!circle || !title) throw new Error("A step's circle or title has no box.");
+        return { circle, title };
+      }),
+    );
+  // On a phone: one column of circles, each left of its title, and nothing scrolls sideways.
+  const column = await boxes();
+  for (const [index, { circle, title }] of column.entries()) {
+    expect(circle.x + circle.width).toBeLessThan(title.x);
+    expect(circle.x).toBe(column[0].circle.x);
+    if (index > 0) expect(circle.y).toBeGreaterThan(column[index - 1].circle.y);
+  }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBe(0);
+  // On a wide screen: one row of circles, each above its title, without the rule and its head.
+  await page.setViewportSize({ width: 1280, height: 900 });
+  const row = await boxes();
+  for (const [index, { circle, title }] of row.entries()) {
+    expect(circle.y + circle.height).toBeLessThan(title.y);
+    expect(circle.y).toBe(row[0].circle.y);
+    if (index > 0) expect(circle.x).toBeGreaterThan(row[index - 1].circle.x);
+  }
+  for (const step of await steps.all()) {
+    await expect(step).toHaveCSS("border-top-style", "none");
+    expect(await step.evaluate((element) => getComputedStyle(element, "::after").content)).toBe("none");
+  }
+});
+
 // After a navigation, Next.js keeps the previous page in the document, hidden. The test finds
 // elements by role, because role queries skip hidden elements.
 test("a filled-in form and the answered follow-up questions lead to the screen of the answers, where a change and a confirmation show the result, and from the result the user answers an open fact and confirms again", async ({
@@ -127,7 +175,7 @@ test("a filled-in form and the answered follow-up questions lead to the screen o
   // of options as a white card with rounded corners and a shadow, on a page that is not white.
   await expect(page.getByRole("main").getByRole("heading", { level: 1 })).toHaveCSS("font-family", SERIF);
   await expect(page.locator("body")).toHaveCSS("font-family", SANS);
-  await expect(page.getByRole("button", { name: "Send" })).toHaveCSS("font-family", SANS);
+  await expect(page.getByRole("button", { name: "Next", exact: true })).toHaveCSS("font-family", SANS);
   const personalData = page.getByRole("group", { name: "Does the product process personal data?" });
   await expect(personalData).toHaveCSS("background-color", "rgb(255, 255, 255)");
   await expect(personalData).toHaveCSS("border-radius", "12px");
@@ -161,7 +209,7 @@ test("a filled-in form and the answered follow-up questions lead to the screen o
   await expectOutline(
     page.getByRole("group", { name: "Does the product process personal data?" }).getByRole("radio", { name: "Yes" }),
   );
-  const send = page.getByRole("button", { name: "Send" });
+  const send = page.getByRole("button", { name: "Next", exact: true });
   await tabTo(page, send);
   await expectOutline(send);
 
@@ -239,14 +287,14 @@ test("a filled-in form and the answered follow-up questions lead to the screen o
 
   // The confirmation: the result in three parts (issue #51), with the way back to the answers in
   // place of the recorded answers.
-  await page.getByRole("button", { name: "Confirm and show the result" }).click();
+  await page.getByRole("button", { name: "Confirm", exact: true }).click();
   await expect(page).toHaveURL(/\/intakes\/[A-Za-z0-9_-]{22}$/);
   await expectScreen(page, "Result");
   await expect(page.getByRole("heading", { level: 2 })).toHaveText([
     "What applies",
     "Answers to check",
     "What may also apply",
-    "Not checked yet",
+    "What the tool does not check yet",
   ]);
   // What applies, grouped by regulation: the provider and the transparency for interaction depend
   // on the open answers, so they stand in the other parts; the transparency for generated content
@@ -365,12 +413,12 @@ test("a filled-in form and the answered follow-up questions lead to the screen o
   ]);
   await expect(bar).toContainText(/^Show.*\d+ of \d+ obligations$/);
   await expectScreen(page, "Result");
-  // At the end of the page the bar covers neither the last item of "Not checked yet" nor the footer's
-  // line.
+  // At the end of the page the bar covers neither the last item of "What the tool does not check yet"
+  // nor the footer's line.
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
   const top = (await bar.boundingBox())?.y ?? 0;
   for (const above of [
-    page.getByRole("region", { name: "Not checked yet" }).getByRole("listitem").last(),
+    page.getByRole("region", { name: "What the tool does not check yet" }).getByRole("listitem").last(),
     page.getByRole("contentinfo").getByRole("paragraph"),
   ]) {
     const box = await above.boundingBox();
@@ -394,7 +442,7 @@ test("a filled-in form and the answered follow-up questions lead to the screen o
   await page.getByRole("button", { name: "Save the answer" }).click();
   await expectScreen(page, "Check your answers");
   await expect(page.getByRole("region", { name: "Open answers" }).getByRole("term")).toHaveText(["Interacts with people"]);
-  await page.getByRole("button", { name: "Confirm and show the result" }).click();
+  await page.getByRole("button", { name: "Confirm", exact: true }).click();
   await expectScreen(page, "Result");
   const provider = page.getByRole("region", { name: "What applies" }).getByRole("region", { name: "Provider", exact: true });
   await expect(provider.getByRole("paragraph").first()).toContainText("Applies.");

@@ -109,9 +109,10 @@
   margin: 0;
 }
 
-/* The steps in a row, each under a rule in the accent's color that ends in a head pointing at the
-   next step. On a narrow screen they are one column, without the heads. */
+/* The steps in a row, each with its icon in a circle above its title, the circles joined by a line in
+   the color of the rules. On a narrow screen the circles stand in a column left of their texts. */
 .steps {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: var(--space-8);
@@ -120,24 +121,40 @@
   list-style: none;
 }
 
+/* The line from the center of the first circle to the center of the last, behind the circles. */
+.steps::before {
+  content: "";
+  position: absolute;
+  top: 21px;
+  right: calc((100% - 4 * var(--space-8)) / 5 - 22px);
+  left: 22px;
+  height: 2px;
+  background: var(--color-rule);
+}
+
 .steps li {
   position: relative;
   margin: 0;
-  padding-top: var(--space-6);
-  border-top: 2px solid var(--color-accent);
 }
 
-/* The head: two sides of a square, turned to point at the next step. */
-.steps li:not(:last-child)::after {
-  content: "";
-  position: absolute;
-  top: -7px;
-  right: -1px;
-  width: 12px;
-  height: 12px;
-  border-top: 2px solid var(--color-accent);
-  border-right: 2px solid var(--color-accent);
-  transform: rotate(45deg);
+/* The circle of a step's icon, which covers the line; the last step's, the result, is filled. */
+.icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: var(--space-4);
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1.5px solid var(--color-text);
+  border-radius: 50%;
+}
+
+.steps li:last-child .icon {
+  color: var(--color-accent-text);
+  background: var(--color-accent);
 }
 
 /* A step's title in the serif, not as the label that h3 is elsewhere. */
@@ -216,8 +233,31 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .steps li:not(:last-child)::after {
+  .steps::before {
     display: none;
+  }
+
+  .steps li {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr);
+    column-gap: var(--space-4);
+    align-content: start;
+  }
+
+  .icon {
+    grid-row: span 2;
+    margin-bottom: 0;
+  }
+
+  /* The line from each circle down to the next. */
+  .steps li:not(:last-child)::after {
+    content: "";
+    position: absolute;
+    top: 44px;
+    bottom: calc(-1 * var(--space-8));
+    left: 21px;
+    width: 2px;
+    background: var(--color-rule);
   }
 }
 

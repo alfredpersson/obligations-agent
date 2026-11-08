@@ -167,7 +167,7 @@ export default function AnswersScreen() {
       {message && <p role="alert">{message}</p>}
       <div className={actions.actions}>
         <button type="button" onClick={confirm} disabled={confirming}>
-          Confirm and show the result
+          Confirm
         </button>
       </div>
     </div>

@@ -45,7 +45,7 @@ export default function IntakeForm({
   function send(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage(null);
-    // Send stays disabled until the request fails or the next page is shown, so that a second
+    // Next stays disabled until the request fails or the next page is shown, so that a second
     // click cannot store a second intake.
     startTransition(async () => {
       try {
@@ -115,7 +115,7 @@ export default function IntakeForm({
       {message && <p role="alert">{message}</p>}
       <div className={styles.actions}>
         <button type="submit" disabled={!complete || sending}>
-          Send
+          Next
         </button>
         <LoadingStatus message={sending ? WRITING : null} />
       </div>

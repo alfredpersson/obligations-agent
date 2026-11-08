@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, expect, test } from "vitest";
+import actions from "./actions.module.css";
 import Home from "./page";
 
 afterEach(cleanup);
@@ -48,17 +49,43 @@ test("the start page says what the tool does, how to use it, what the user gets,
   ).toBeTruthy();
 });
 
-test("the first choice opens the form with the example product, and the other one the empty form", () => {
+test("at the top and at the end, the first choice opens the empty form with the primary look, and the second the form with the example product with the secondary look (#68)", () => {
   render(<Home />);
 
-  const links = screen.getAllByRole("link");
-  expect(links[0].textContent).toBe("Use the example product");
-  for (const link of screen.getAllByRole("link", { name: "Use the example product" })) {
-    expect(link.getAttribute("href")).toBe("/example");
-  }
-  for (const link of screen.getAllByRole("link", { name: "Start with your own product" })) {
+  const own = screen.getAllByRole("link", { name: "Start with your own product" });
+  const example = screen.getAllByRole("link", { name: "Use the example product" });
+  expect(own).toHaveLength(2);
+  expect(screen.getAllByRole("link")[0]).toBe(own[0]);
+  own.forEach((link, index) => {
     expect(link.getAttribute("href")).toBe("/new");
+    expect(link.className).toBe(actions.button);
+    expect(link.nextElementSibling).toBe(example[index]);
+    expect(example[index].getAttribute("href")).toBe("/example");
+    expect(example[index].className).toBe(`${actions.button} ${actions.secondary}`);
+  });
+  // The note under the choices at the top, and the line above them at the end, name the own product
+  // first too.
+  expect(screen.getByText(/^Your own product starts with an empty form\./).textContent).toBe(
+    "Your own product starts with an empty form. The example product is a candidate-matching tool for recruiters. Its form opens filled in, and you can change any field or answer before you send it.",
+  );
+  expect(own[1].parentElement?.previousElementSibling?.textContent).toBe(
+    "Describe your own product, or follow the example product from the form to the result.",
+  );
+});
+
+test("each step of How it works has its own icon above its title, hidden from screen readers (#68)", () => {
+  render(<Home />);
+
+  const steps = within(screen.getByRole("heading", { level: 2, name: "How it works" }).parentElement as HTMLElement).getAllByRole(
+    "listitem",
+  );
+  expect(steps).toHaveLength(5);
+  for (const step of steps) {
+    const icon = step.querySelector("svg");
+    expect(icon?.closest('[aria-hidden="true"]')).toBe(step.firstElementChild);
+    expect(step.firstElementChild?.nextElementSibling).toBe(within(step).getByRole("heading", { level: 3 }));
   }
+  expect(new Set(steps.map((step) => step.querySelector("svg")?.innerHTML)).size).toBe(5);
 });
 
 test("the excerpt shows the four gates that the example's form answers decide in the parts of the result, and quotes the stored text word for word", () => {

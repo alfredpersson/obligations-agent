@@ -25,6 +25,40 @@ const STEPS = [
   ],
 ];
 
+// The icon of each step, in the order of the steps, drawn in the page as the X of the dialogs is: a
+// pencil, options with one chosen, a speech bubble with a question mark, two checked lines, and a
+// folded map.
+const ICONS = [
+  <>
+    <path d="M4 20h4L19.5 8.5a2.1 2.1 0 0 0-3-3L5 17v3z" />
+    <path d="M14.5 7.5l3 3" />
+  </>,
+  <>
+    <circle cx="6" cy="6.5" r="2" />
+    <path d="M11 6.5h9" />
+    <circle cx="6" cy="12" r="2" fill="currentColor" />
+    <path d="M11 12h9" />
+    <circle cx="6" cy="17.5" r="2" />
+    <path d="M11 17.5h9" />
+  </>,
+  <>
+    <path d="M4 5.5h16v10.5H10l-4.5 3.5V16H4z" />
+    <path d="M10 9.3a2 2 0 1 1 2.9 1.8c-.6.3-.9.7-.9 1.3" />
+    <path d="M12 14.2h.01" />
+  </>,
+  <>
+    <path d="M4 7.5l2 2 3.5-3.5" />
+    <path d="M13 8h7" />
+    <path d="M4 15.5l2 2 3.5-3.5" />
+    <path d="M13 16h7" />
+  </>,
+  <>
+    <path d="M3 6.5l6-2.5 6 2.5 6-2.5v13.5l-6 2.5-6-2.5-6 2.5z" />
+    <path d="M9 4v13.5" />
+    <path d="M15 6.5V20" />
+  </>,
+];
+
 // The gates of the result (gates.yaml), each with the units that define it.
 const CHECKS = [
   ["GDPR", "GDPR Article 2(1)"],
@@ -50,11 +84,11 @@ const QUOTE = [
 function Choices() {
   return (
     <div className={`${actions.actions} ${styles.choices}`}>
-      <Link href="/example" className={actions.button}>
-        Use the example product
-      </Link>
-      <Link href="/new" className={`${actions.button} ${actions.secondary}`}>
+      <Link href="/new" className={actions.button}>
         Start with your own product
+      </Link>
+      <Link href="/example" className={`${actions.button} ${actions.secondary}`}>
+        Use the example product
       </Link>
     </div>
   );
@@ -79,9 +113,9 @@ export default function Home() {
             </p>
             <Choices />
             <p className={styles.note}>
-              The example product is a candidate-matching tool for recruiters. Its form opens filled in, and
-              you can change any field or answer before you send it. Your own product starts with an empty
-              form.
+              Your own product starts with an empty form. The example product is a candidate-matching tool
+              for recruiters. Its form opens filled in, and you can change any field or answer before you
+              send it.
             </p>
             <p className={styles.note}>{NOT_LEGAL_ADVICE}</p>
           </div>
@@ -116,8 +150,22 @@ export default function Home() {
         <section id="how-it-works">
           <h2>How it works</h2>
           <ol className={styles.steps}>
-            {STEPS.map(([title, text]) => (
+            {STEPS.map(([title, text], index) => (
               <li key={title}>
+                <span className={styles.icon} aria-hidden="true">
+                  <svg
+                    viewBox="0 0 24 24"
+                    width="22"
+                    height="22"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.75"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    {ICONS[index]}
+                  </svg>
+                </span>
                 <h3>{title}</h3>
                 <p>{text}</p>
               </li>
@@ -166,7 +214,7 @@ export default function Home() {
           </div>
         </section>
         <section className={styles.again}>
-          <p>See the whole flow with the example product, from the form to the result.</p>
+          <p>Describe your own product, or follow the example product from the form to the result.</p>
           <Choices />
         </section>
       </div>

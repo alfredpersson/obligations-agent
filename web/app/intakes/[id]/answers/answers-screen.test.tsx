@@ -294,7 +294,7 @@ test("Confirm sends the confirmation, stays disabled while it is sent, and then 
   });
   vi.stubGlobal("fetch", fetchMock);
   render(<AnswersScreen />);
-  const confirm = (await screen.findByRole("button", { name: "Confirm and show the result" })) as HTMLButtonElement;
+  const confirm = (await screen.findByRole("button", { name: "Confirm" })) as HTMLButtonElement;
 
   fireEvent.click(confirm);
 
@@ -308,7 +308,7 @@ test("a failed confirmation stays on the screen and says so", async () => {
   stubIntake(intake, { [CONFIRM_URL]: new Response(null, { status: 500 }) });
   render(<AnswersScreen />);
 
-  fireEvent.click(await screen.findByRole("button", { name: "Confirm and show the result" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Confirm" }));
 
   expect((await screen.findByRole("alert")).textContent).toBe("The answers could not be confirmed. Try again.");
   expect(router.push).not.toHaveBeenCalled();

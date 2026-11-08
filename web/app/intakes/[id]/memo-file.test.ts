@@ -121,7 +121,7 @@ test("between them, a file holds the three parts as the screen shows them: the s
     "What may also apply",
     "Video sharing",
     "Storage role",
-    "Not checked yet",
+    "What the tool does not check yet",
   ]);
   // The rows' sections, in the order of the rows on the screen.
   const rows = parts.filter(({ level }) => level === 5).map(({ title }) => title);
