@@ -42,11 +42,6 @@ export function assumed(name: string) {
   return `No check decides yet whether the ${name} applies to the product: the result assumes that it does, as said above.`;
 }
 
-// The answers that decided a result, each as "label: value".
-export function answered(answers: string[]) {
-  return `${answers.length === 1 ? "Your answer" : "Your answers"}: ${answers.join("; ")}.`;
-}
-
 // The number of the rows that depend on an item of the second part.
 export function counted(rows: number) {
   return rows === 0
@@ -112,10 +107,8 @@ export function plannedCount(change: WhatIf) {
   return `Adds ${many(added, "obligation")} and removes ${removed}.`;
 }
 
-// The question of a planned change, and the answers that it uses with the answers now (#63).
+// The question of a planned change (#63).
 export const youAsked = (question: string) => `You asked: ${question}`;
-export const withAnswers = (changed: WhatIf["changed"]) =>
-  `With ${changed.map((item) => `${item.fact}: ${item.to} (now ${item.now})`).join("; ")}.`;
 
 // What a row depends on, in the file, and on the screen for a row of a planned change.
 export const dependsOn = (items: string[]) => `Depends on ${items.join(", and on ")}.`;

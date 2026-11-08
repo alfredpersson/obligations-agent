@@ -299,31 +299,48 @@ test("a filled-in form and the answered follow-up questions lead to the screen o
   // What applies, grouped by regulation: the provider and the transparency for interaction depend
   // on the open answers, so they stand in the other parts; the transparency for generated content
   // does not apply by its own answer, and the deployer applies (#45).
+  // Each regulation and each result with its status in its heading (#69).
   const applies = page.getByRole("region", { name: "What applies" });
-  await expect(applies.getByRole("region", { name: "GDPR", exact: true }).getByRole("heading", { level: 4 })).toHaveText([
-    "Controller",
-    "Processor",
+  await expect(applies.getByRole("region", { name: "GDPR Applies.", exact: true }).getByRole("heading", { level: 4 })).toHaveText([
+    "Controller Applies.",
+    "Processor Applies.",
   ]);
   // The look (#59): the headings of a part, a regulation and a result in the serif, and a row and a
-  // button in the sans-serif.
+  // button in the sans-serif; a status in a heading in the sans-serif of the text (#69).
+  const gdpr = applies.getByRole("heading", { level: 3, name: "GDPR Applies.", exact: true });
   await expect(page.getByRole("heading", { level: 2, name: "What applies" })).toHaveCSS("font-family", SERIF);
-  await expect(applies.getByRole("heading", { level: 3, name: "GDPR", exact: true })).toHaveCSS("font-family", SERIF);
-  await expect(applies.getByRole("heading", { level: 4, name: "Controller", exact: true })).toHaveCSS("font-family", SERIF);
+  await expect(gdpr).toHaveCSS("font-family", SERIF);
+  await expect(gdpr.getByText("Applies.")).toHaveCSS("font-family", SANS);
+  await expect(applies.getByRole("heading", { level: 4, name: "Controller Applies.", exact: true })).toHaveCSS("font-family", SERIF);
   await expect(applies.getByRole("listitem").first()).toHaveCSS("font-family", SANS);
   await expect(page.getByRole("button", { name: "Download the result" })).toHaveCSS("font-family", SANS);
-  await expect(applies.getByRole("region", { name: "AI Act", exact: true }).getByRole("heading", { level: 4 })).toHaveText([
-    "High-risk under Annex III",
-    "Transparency: the product generates content",
-    "Deployer",
+  await expect(applies.getByRole("region", { name: "AI Act Assumed.", exact: true }).getByRole("heading", { level: 4 })).toHaveText([
+    "High-risk under Annex III Does not apply.",
+    "Transparency: the product generates content Does not apply.",
+    "Deployer Applies.",
   ]);
+  // A regulation's results stand inside it, indented from its heading (#69).
+  const gdprBox = await gdpr.boundingBox();
+  const controllerBox = await applies.getByRole("heading", { level: 4, name: "Controller Applies.", exact: true }).boundingBox();
+  expect((controllerBox?.x ?? 0) - (gdprBox?.x ?? 0)).toBeGreaterThan(0);
   // The deployer from the form's fourth answer, with its one row: AI literacy, since the rows of
   // Article 26 need high-risk under Annex III.
-  const deployer = applies.getByRole("region", { name: "Deployer", exact: true });
-  await expect(deployer.getByRole("paragraph").first()).toContainText("Applies.");
+  const deployer = applies.getByRole("region", { name: "Deployer Applies.", exact: true });
   await expect(deployer.getByRole("listitem")).toHaveCount(1);
   // The rows of the controller, without the key: each row's label and no action, and no
   // placeholder (issue #41); its clause in its details.
-  const controller = page.getByRole("region", { name: "Controller", exact: true });
+  const controller = page.getByRole("region", { name: "Controller Applies.", exact: true });
+  // The answer that decided it as a chip inside the window at the width of a phone (#69).
+  const decides = controller.getByText("Decides why and how personal data is processed", { exact: true });
+  await decides.scrollIntoViewIfNeeded();
+  await expectInWindow(page, decides.locator(".."));
+  // Its answer stays on one line while the label wraps.
+  const lines = await decides.locator("xpath=following-sibling::strong").evaluate((answer) => {
+    const range = document.createRange();
+    range.selectNodeContents(answer);
+    return new Set([...range.getClientRects()].map((rect) => Math.round(rect.top))).size;
+  });
+  expect(lines).toBe(1);
   await expect(controller.getByRole("listitem")).toHaveCount(9);
   const legalBasis = controller.getByRole("listitem").first();
   await expect(legalBasis).toContainText("A legal basis for each purpose");
@@ -336,8 +353,7 @@ test("a filled-in form and the answered follow-up questions lead to the screen o
   // The first link to EUR-Lex of a session opens the dialog about the first visit in its place.
   await expectCloses(page, legalBasis.getByRole("link", { name: "GDPR Article 6(1)" }), "Opening EUR-Lex");
   // The changed answer: the processor applies, with its rows.
-  const processor = page.getByRole("region", { name: "Processor", exact: true });
-  await expect(processor.getByRole("paragraph").first()).toContainText("Applies.");
+  const processor = page.getByRole("region", { name: "Processor Applies.", exact: true });
   await expect(processor.getByRole("listitem")).toHaveCount(4);
   // At the width of a phone, the list of the results stands in one row above them.
   await expect(
@@ -407,9 +423,9 @@ test("a filled-in form and the answered follow-up questions lead to the screen o
     }
     await expect(rows.filter({ has: page.getByText("Organisation", { exact: true }) }).first()).toBeVisible();
   }
-  await expect(applies.getByRole("region", { name: "GDPR", exact: true }).getByRole("heading", { level: 4 })).toHaveText([
-    "Controller",
-    "Processor",
+  await expect(applies.getByRole("region", { name: "GDPR Applies.", exact: true }).getByRole("heading", { level: 4 })).toHaveText([
+    "Controller Applies.",
+    "Processor Applies.",
   ]);
   await expect(bar).toContainText(/^Show.*\d+ of \d+ obligations$/);
   await expectScreen(page, "Result");
@@ -444,9 +460,29 @@ test("a filled-in form and the answered follow-up questions lead to the screen o
   await expect(page.getByRole("region", { name: "Open answers" }).getByRole("term")).toHaveText(["Interacts with people"]);
   await page.getByRole("button", { name: "Confirm", exact: true }).click();
   await expectScreen(page, "Result");
-  const provider = page.getByRole("region", { name: "What applies" }).getByRole("region", { name: "Provider", exact: true });
-  await expect(provider.getByRole("paragraph").first()).toContainText("Applies.");
+  const provider = page.getByRole("region", { name: "What applies" }).getByRole("region", { name: "Provider Applies.", exact: true });
   await expect(provider.getByRole("listitem")).toHaveCount(1);
+
+  // With actions, as with the key: the browser adds texts for the rows to the service's answer, so
+  // that the rows show their heading row, which fits the width of a phone (#69).
+  const intakeAddress = new URL(page.url()).pathname.replace("/intakes/", "**/api/intakes/");
+  await page.route(intakeAddress, async (route) => {
+    const response = await route.fetch();
+    const intake = (await response.json()) as { result: { gates: { rows: { id: string }[] }[] }; texts: unknown };
+    intake.texts = Object.fromEntries(
+      intake.result.gates
+        .flatMap((outcome) => outcome.rows)
+        .map((row) => [row.id, { meaning: "What the row means.", action: "An action long enough to take two lines at the width of a phone." }]),
+    );
+    await route.fulfill({ response, json: intake });
+  });
+  await page.reload();
+  await expectScreen(page, "Result");
+  const columns = controller.getByText("Obligation", { exact: true }).first().locator("..");
+  await columns.scrollIntoViewIfNeeded();
+  await expect(columns).toHaveText("ObligationAction");
+  await expectInWindow(page, columns);
+  await page.unroute(intakeAddress);
 
   // The next intake starts on an empty form, although Next.js keeps the form's page with its state.
   await page.getByRole("banner").getByRole("link", { name: "Dutymap" }).click();

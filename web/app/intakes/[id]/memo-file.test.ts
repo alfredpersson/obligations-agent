@@ -96,10 +96,12 @@ test("a file ends with the line on legal advice, the official texts that its quo
 
 test("between them, a file holds the three parts as the screen shows them: the same headings in the same order, and one section for each row of the screen, in the same order", () => {
   render(createElement(IntakeResult, { intake: testIntake, schema: testSchema, answers: "/intakes/x/answers", onTurn: () => {}, onIntake: () => {} }));
+  // Each heading's title, without the status that the screen shows in the headings of the first part
+  // and a file under them (#69).
   const shown = screen
     .getAllByRole("heading")
     .filter((heading) => ["H2", "H3", "H4"].includes(heading.tagName))
-    .map((heading) => heading.textContent);
+    .map((heading) => heading.firstChild?.textContent);
 
   const text = file();
   const all = headings(text);
@@ -251,7 +253,7 @@ test("with only the links, each row has its citation as a link and nothing is qu
   expect(linked).not.toMatch(/^>/m);
   expect(section(linked, "Delete old video")).toContain(`- Clause: [Rule 5(1)](${testRows[0].unit.link})`);
   expect(linked).toContain(
-    `**Applies.** Your answer: Camera: Yes.\n\nThe article that defines it: [Rule 1(1)](${testIntake.result.gates[3].quotes[0].link}).`,
+    `**Applies.**\n\nYour answer\n\n- Camera: **Yes**\n\nThe article that defines it: [Rule 1(1)](${testIntake.result.gates[3].quotes[0].link}).`,
   );
   expect(linked).toContain("[Listing Rule Annex III, point 2](https://eur-lex.europa.eu/rule#anx_III.002)");
   expect(linked.split("\n\n")[2]).toBe("The articles are linked, not quoted.");
@@ -329,7 +331,7 @@ test("a file has the planned changes after its three parts and before the items 
   );
   expect(part).toContain("Adds 2 obligations and removes 1.");
   expect(part).toContain(`You asked: ${testPlanned.question}`);
-  expect(part).toContain("With Video sharing: Yes (now no answer).");
+  expect(part).toContain("With these answers\n\n- Video sharing: **Yes** (now no answer)");
 });
 
 test("each row of a planned change is a section that starts with the change's label, with its texts, what it depends on and the status of a result that it needs with the change", () => {
@@ -416,4 +418,21 @@ test("a row of a planned change that depends on two items names both in the file
   expect(section(text, "A record of who watches")).toContain(
     "- Depends on the open answer about Audience, and on the open answer about Video storage.",
   );
+});
+
+// Issue #69: the answers that decided a result, as a list under the line with its status.
+test("each result in a file lists the answers that decided it under Your answer or Your answers, each answer in bold after its question's label", () => {
+  const two = {
+    ...testIntake,
+    result: {
+      ...testIntake.result,
+      gates: testIntake.result.gates.map((outcome) =>
+        outcome.gate === "camera_law_applies" ? { ...outcome, answers: { uses_camera: "yes", audience: "public" } } : outcome,
+      ),
+    },
+  };
+
+  const text = file(ALL, two);
+  expect(text).toContain("**Applies.**\n\nYour answers\n\n- Camera: **Yes**\n- Audience: **The public**\n\n");
+  expect(text).not.toContain("Your answer:");
 });

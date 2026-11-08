@@ -79,6 +79,35 @@
   background: var(--color-does-not-apply-mark);
 }
 
+/* A regulation's results inside it: indented on a line in the colour of the rules, with the square of
+   each result on the line (#69); less indented on a narrow screen, so that the rows keep their width. */
+.results {
+  margin-left: 4px;
+  padding-left: var(--space-7);
+  border-left: 2px solid var(--color-rule);
+}
+
+.results > .result > h4 {
+  position: relative;
+}
+
+.results > .result > h4::before {
+  position: absolute;
+  top: calc(50% - 5px);
+  left: calc(-1 * var(--space-7) - 6px);
+  margin: 0;
+}
+
+@media (max-width: 48rem) {
+  .results {
+    padding-left: var(--space-4);
+  }
+
+  .results > .result > h4::before {
+    left: calc(-1 * var(--space-4) - 6px);
+  }
+}
+
 /* A status as a label. Its words carry the meaning, and its color repeats it by the label's class,
    on the result screen and in the start page's excerpt. */
 .status {
@@ -107,6 +136,15 @@
   background: var(--color-conditional);
 }
 
+/* A status in the heading of a regulation or a result, in the text's font (#69). */
+.regulation > h3 > .status,
+.result > h4 > .status {
+  margin: 0 0 0 var(--space-1);
+  font-family: var(--font-text);
+  letter-spacing: normal;
+  vertical-align: 0.2em;
+}
+
 /* A citation as a chip. */
 .citation {
   display: table;
@@ -117,6 +155,32 @@
   font-weight: 600;
   background: var(--color-chip);
   border-radius: 6px;
+}
+
+/* An answer as a chip: the label of its question on the colour of the chips, then the answer in bold
+   on white (#69). Both come from the schema, so they wrap only between words, and the answer stays
+   whole beside a label that wraps (the page lets the user's own long words wrap anywhere). */
+.answer {
+  display: inline-flex;
+  margin: var(--space-1) var(--space-1) var(--space-1) 0;
+  overflow: hidden;
+  overflow-wrap: normal;
+  font-size: var(--size-note);
+  vertical-align: middle;
+  border: 1px solid var(--color-rule);
+  border-radius: 999px;
+}
+
+.answer > span {
+  padding: 0.125rem var(--space-2);
+  color: var(--color-chip-text);
+  background: var(--color-chip);
+}
+
+.answer > strong {
+  padding: 0.125rem var(--space-3) 0.125rem var(--space-2);
+  font-weight: 600;
+  background: var(--color-surface);
 }
 
 /* A quote from a regulation keeps the line of each paragraph and point. */
@@ -217,6 +281,32 @@
 
 .row:first-child {
   border-top: 0;
+}
+
+/* The names of the two columns over the rows of the first part, in the grid of a row, so that each
+   stands over its column; on one line on a narrow screen, where a row's label stands above its
+   action (#69). */
+.columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: var(--space-6);
+  margin: 0;
+  padding: var(--space-2) var(--space-4);
+  color: var(--color-muted);
+  font-size: var(--size-note);
+  font-weight: 600;
+  background: var(--color-quote);
+}
+
+@media (max-width: 48rem) {
+  .columns {
+    display: flex;
+    gap: 0;
+  }
+
+  .columns > span + span::before {
+    content: "\00a0· ";
+  }
 }
 
 .row.open {
