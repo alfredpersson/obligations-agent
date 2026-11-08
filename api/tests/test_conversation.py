@@ -1,4 +1,4 @@
-"""Tests for the conversation about the result of an intake: the tools that read the stored copies, the guidance and the changes of answers, the check of each quote, the link of each citation, the data that the model receives, the loop with its limits, and each turn as the service shows it (issue #44: QA-3 to QA-9, TOOL-2 to TOOL-6, INTAKE-4, MEMO-7, MEMO-8). The model client sends each request to a fake transport, so no test calls the provider."""
+"""Tests for the conversation about the result of an intake: the tools that read the stored copies, the guidance and the changes of answers, the check of each quote, the link of each citation, the data that the model receives, the loop with its limits, and each turn as the service shows it (issue #44: QA-3 to QA-9, TOOL-2 to TOOL-6, INTAKE-4, MEMO-7, MEMO-8); and the label of a change, a planned change added from a question, and what it changes for the answers of the intake (issue #63: QA-10 to QA-12, TOOL-6). The model client sends each request to a fake transport, so no test calls the provider."""
 
 import json
 import logging
@@ -19,10 +19,13 @@ from obligations_agent.conversation import (
     ask,
     blocks,
     check_quote,
+    label_of,
+    plan_change,
     read_article,
     read_contents,
     read_guidance,
     user_data,
+    view_planned,
     view_turn,
 )
 from obligations_agent.gates import EUR_LEX, Unit, decide, link, load_gates, what_if
@@ -31,11 +34,14 @@ from obligations_agent.intake_model import new_client
 from obligations_agent.intakes import (
     Example,
     Intake,
+    IntakeError,
     NotSure,
+    Planned,
     Quoted,
     Requested,
     Text,
     Turn,
+    change_answer,
     last_questions,
 )
 from obligations_agent.regulations import contents, load_copies
@@ -122,6 +128,7 @@ def answer(
     quotes: list[dict[str, str]] | None = None,
     guidance: list[str] | None = None,
     changes: list[dict[str, str]] | None = None,
+    label: str = "",
 ) -> httpx2.Response:
     """A response with a call of the tool answer."""
     return call(
@@ -131,6 +138,7 @@ def answer(
             "quotes": quotes or [],
             "guidance": guidance or [],
             "changes": changes or [],
+            "label": label,
         },
     )
 
@@ -881,6 +889,7 @@ def test_an_answered_turn_shows_its_blocks_quotes_and_entries() -> None:
         "quotes": [OBJECT_QUOTE.model_dump()],
         "guidance": [entry_of(ENTRY)],
         "scenario": None,
+        "label": QUESTION,
         "for_earlier_answers": False,
     }
 
@@ -895,6 +904,7 @@ def test_a_turn_that_was_not_answered_shows_only_its_question() -> None:
         "quotes": [],
         "guidance": [],
         "scenario": None,
+        "label": QUESTION,
         "for_earlier_answers": False,
     }
 
@@ -982,3 +992,241 @@ def test_an_earlier_turn_keeps_its_scenario_and_says_it_was_for_the_earlier_answ
     # The changes are those of the answers at the time of the question.
     assert shown["scenario"]["questions"][0]["now"] == "Not sure"
     assert shown["scenario"]["changes"]["rows_changed"]
+
+
+# Issue #63: the label of a change, and a planned change.
+
+LONG_QUESTION = "What if we add a chat where candidates can ask about the status of their application?"
+CHAT = Turn(
+    question=QUESTION,
+    reason="answered",
+    text="Two answers may change.",
+    # The model may name a fact by its label; the profiling answer is the recorded one already, so
+    # the panel does not show it.
+    changes=[
+        Requested(fact="Interacts with people", value="yes"),
+        Requested(fact="generates_content", value="yes"),
+        Requested(fact="profiling", value="yes"),
+    ],
+    label="Candidate chat",
+    answers=ANSWERS,
+)
+WITH_CHAT = INTAKE.model_copy(update={"conversation": [CHAT]})
+
+
+def test_the_tool_answer_asks_for_the_label_of_a_change_in_at_most_60_characters() -> (
+    None
+):
+    [tool] = [
+        item for item in json.loads(json.dumps(TOOLS)) if item["name"] == "answer"
+    ]
+
+    schema = tool["input_schema"]
+    assert schema["properties"]["label"] == {"type": "string"}
+    assert "label" in schema["required"]
+    assert "at most 60 characters" in tool["description"]
+    assert "label" in PROMPT
+
+
+def test_the_label_of_the_models_answer_is_kept_with_its_turn() -> None:
+    turn, _ = asked(answer(label="Candidate chat"))
+
+    assert turn.label == "Candidate chat"
+
+
+@pytest.mark.parametrize(
+    ("label", "question", "expected"),
+    [
+        ("Candidate chat", LONG_QUESTION, "Candidate chat"),
+        ("  Candidate \n chat ", LONG_QUESTION, "Candidate chat"),
+        ("x" * 60, LONG_QUESTION, "x" * 60),
+        ("", "What if we add a chat?", "What if we add a chat?"),
+        ("x" * 61, "What if we add a chat?", "What if we add a chat?"),
+        (
+            "   ",
+            LONG_QUESTION,
+            "What if we add a chat where candidates can ask about the…",
+        ),
+    ],
+    ids=[
+        "the_label",
+        "whitespace_as_one_space",
+        "60_characters",
+        "empty_short_question",
+        "61_characters",
+        "empty_long_question",
+    ],
+)
+def test_a_planned_change_takes_the_label_of_the_answer_or_the_start_of_the_question(
+    label: str, question: str, expected: str
+) -> None:
+    turn = Turn(question=question, reason="answered", label=label, answers=ANSWERS)
+
+    assert label_of(turn) == expected
+    assert len(label_of(turn)) <= 60
+
+
+def test_a_planned_change_keeps_the_answers_of_its_question_by_fact_id_and_no_recorded_answer_changes() -> (
+    None
+):
+    planned = plan_change(
+        SCHEMA,
+        WITH_CHAT,
+        1,
+        ["interacts_with_people", "generates_content", "profiling"],
+    )
+
+    assert planned.planned == [
+        Planned(
+            turn=1,
+            label="Candidate chat",
+            changes=[
+                Requested(fact="interacts_with_people", value="yes"),
+                Requested(fact="generates_content", value="yes"),
+            ],
+        )
+    ]
+    assert planned.model_copy(update={"planned": []}) == WITH_CHAT
+
+
+def test_a_planned_change_keeps_only_the_ticked_answers() -> None:
+    planned = plan_change(SCHEMA, WITH_CHAT, 1, ["generates_content"])
+
+    assert planned.planned[0].changes == [
+        Requested(fact="generates_content", value="yes")
+    ]
+
+
+def test_a_planned_change_without_a_ticked_answer_of_its_question_is_refused() -> None:
+    with pytest.raises(IntakeError) as raised:
+        plan_change(SCHEMA, WITH_CHAT, 1, ["profiling", "price"])
+
+    assert (raised.value.code, raised.value.field) == ("invalid_value", "facts")
+
+
+def test_a_question_added_a_second_time_changes_nothing() -> None:
+    once = plan_change(SCHEMA, WITH_CHAT, 1, ["interacts_with_people"])
+
+    assert plan_change(SCHEMA, once, 1, ["generates_content"]) is once
+
+
+def test_a_planned_change_shows_what_its_answers_change_and_the_rows_that_it_adds() -> (
+    None
+):
+    intake = plan_change(
+        SCHEMA, WITH_CHAT, 1, ["interacts_with_people", "generates_content"]
+    )
+    planned = intake.planned[0]
+
+    shown = view_planned(SCHEMA, GATES, intake, RESULT, planned, True)
+
+    changes = what_if(GATES, SCHEMA, INTAKE, planned.changes)
+    assert (shown["turn"], shown["label"], shown["question"]) == (
+        1,
+        "Candidate chat",
+        QUESTION,
+    )
+    assert shown["changes"] == changes.model_dump()
+    # The results of the rows that it adds, with those rows only and no quotes, so that each row
+    # quotes its own unit.
+    assert [row["id"] for item in shown["results"] for row in item["rows"]] == [
+        row.id for row in changes.rows_added
+    ]
+    assert changes.rows_added
+    assert all(item["quotes"] == [] for item in shown["results"])
+    assert shown["texts"] == {}
+    assert view_planned(SCHEMA, GATES, intake, RESULT, planned, False)["texts"] is None
+
+
+def test_each_conditional_row_of_a_planned_change_says_what_it_depends_on() -> None:
+    answers = {
+        "personal_data": "no",
+        "under_own_name": "yes",
+        "use_case_area": "none",
+        "own_use": "no",
+        "interacts_with_people": "yes",
+        "generates_content": "no",
+    }
+    intake = Intake(
+        answers=answers,
+        description=DESCRIPTION,
+        confirmed=True,
+        planned=[
+            Planned(
+                turn=1,
+                label="Reviewer suggestions",
+                changes=[Requested(fact="personal_data", value="yes")],
+            )
+        ],
+        conversation=[CHAT.model_copy(update={"answers": answers})],
+    )
+
+    shown = view_planned(
+        SCHEMA, GATES, intake, decide(GATES, SCHEMA, intake), intake.planned[0], True
+    )
+
+    rows = [row for item in shown["results"] for row in item["rows"]]
+    assert rows and all(row["status"] == "conditional" for row in rows)
+    assert shown["depends_on"]["controller:gdpr:art6(1)"] == [
+        "the open answer about Decides why and how personal data is processed"
+    ]
+    assert set(shown["depends_on"]) == {row["id"] for row in rows}
+
+
+@pytest.mark.parametrize(
+    ("changed", "error"),
+    [
+        (("automated_decisions", "yes"), "same_answer"),
+        (("personal_data", "no"), "not_asked"),
+    ],
+    ids=["now_the_recorded_answer", "no_longer_asked"],
+)
+def test_a_planned_change_is_computed_for_the_answers_of_the_intake_and_names_an_answer_that_cannot_be_applied(
+    changed: tuple[str, str], error: str
+) -> None:
+    turn = CHAT.model_copy(
+        update={"changes": [Requested(fact="automated_decisions", value="yes")]}
+    )
+    intake = plan_change(
+        SCHEMA,
+        INTAKE.model_copy(update={"conversation": [turn]}),
+        1,
+        ["automated_decisions"],
+    )
+    # A change on the screen of the answers, as the service records it (INTAKE-5).
+    after = change_answer(SCHEMA, intake, *changed, None)
+
+    shown = view_planned(
+        SCHEMA, GATES, after, decide(GATES, SCHEMA, after), after.planned[0], True
+    )
+
+    assert (
+        shown["changes"]
+        == what_if(GATES, SCHEMA, after, after.planned[0].changes).model_dump()
+    )
+    assert [(item["fact"], item["error"]) for item in shown["changes"]["refused"]] == [
+        ("automated_decisions", error)
+    ]
+
+
+def test_a_planned_change_shows_only_the_rows_that_it_adds_to_a_result_that_has_rows_already() -> (
+    None
+):
+    turn = CHAT.model_copy(
+        update={"changes": [Requested(fact="special_categories", value="yes")]}
+    )
+    intake = plan_change(
+        SCHEMA,
+        INTAKE.model_copy(update={"conversation": [turn]}),
+        1,
+        ["special_categories"],
+    )
+
+    shown = view_planned(SCHEMA, GATES, intake, RESULT, intake.planned[0], True)
+
+    # The controller has its rows already; the change adds the row of special categories to it.
+    assert [
+        (item["gate"], [row["id"] for row in item["rows"]]) for item in shown["results"]
+    ] == [("controller", ["controller:gdpr:art9(1)"])]
+    # A row that applies depends on nothing, so it has no entry.
+    assert shown["depends_on"] == {}

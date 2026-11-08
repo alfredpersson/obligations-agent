@@ -11,7 +11,15 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from obligations_agent.conversation import QUESTION_LIMIT, ask, view_turn
+from obligations_agent.conversation import (
+    LABEL_LIMIT,
+    QUESTION_LIMIT,
+    ask,
+    plan_change,
+    view_planned,
+    view_turn,
+    words,
+)
 from obligations_agent.gates import Gates, decide, load_gates, what_if
 from obligations_agent.guidance import Guidance, load_guidance
 from obligations_agent.intake_model import new_client, next_question
@@ -23,7 +31,9 @@ from obligations_agent.intakes import (
     Form,
     Intake,
     IntakeError,
+    Plan,
     Question,
+    Rename,
     Requested,
     change_answer,
     create_intake,
@@ -33,7 +43,7 @@ from obligations_agent.intakes import (
     waiting,
 )
 from obligations_agent.schema import NOT_SURE, Schema, load_schema
-from obligations_agent.writer import write_texts
+from obligations_agent.writer import write_planned, write_texts
 
 READY_TO_CONFIRM = {"type": "ready_to_confirm"}
 
@@ -159,6 +169,14 @@ def create_app(
             ]
             if client is not None and result
             else None,
+            # The changes to the product that the user plans, each computed for the answers of the
+            # intake with its own answers, beside the result (#63).
+            "planned": [
+                view_planned(schema, gates, intake, result, item, client is not None)
+                for item in intake.planned
+            ]
+            if result
+            else None,
         }
 
     @app.get("/intakes/{intake_id}")
@@ -214,13 +232,33 @@ def create_app(
                 raise IntakeError("not_found")
             if not intake.confirmed:
                 raise IntakeError("not_confirmed")
-            if client is not None and intake.texts is None:
-                texts = write_texts(
-                    client, schema, intake, decide(gates, schema, intake)
-                )
-                intake = intake.model_copy(update={"texts": texts})
+            if client is not None and (
+                intake.texts is None
+                or any(item.texts is None for item in intake.planned)
+            ):
+                result = decide(gates, schema, intake)
+                texts = intake.texts
+                if texts is None:
+                    texts = write_texts(client, schema, intake, result)
+                # The texts of the rows of each planned change that has none yet (#63).
+                planned = [
+                    item
+                    if item.texts is not None
+                    else item.model_copy(
+                        update={
+                            "texts": write_planned(
+                                client, schema, gates, intake, result, item
+                            )
+                        }
+                    )
+                    for item in intake.planned
+                ]
+                intake = intake.model_copy(update={"texts": texts, "planned": planned})
                 intakes[intake_id] = intake
-        return {"texts": intake.texts}
+        return {
+            "texts": intake.texts,
+            "planned": {str(item.turn): item.texts for item in intake.planned},
+        }
 
     @app.post("/intakes/{intake_id}/questions")
     def post_question(intake_id: str, body: Ask) -> dict[str, Any]:
@@ -246,6 +284,58 @@ def create_app(
             intakes[intake_id] = intake
         result = decide(gates, schema, intake)
         return {"turn": view_turn(schema, guidance, gates, intake, result, turn)}
+
+    def planned_intake(intake_id: str) -> Intake:
+        intake = intakes.get(intake_id)
+        if intake is None:
+            raise IntakeError("not_found")
+        if not intake.confirmed:
+            raise IntakeError("not_confirmed")
+        return intake
+
+    @app.post("/intakes/{intake_id}/planned")
+    def post_planned(intake_id: str, body: Plan) -> dict[str, Any]:
+        with answering:
+            intake = planned_intake(intake_id)
+            if not 1 <= body.turn <= len(intake.conversation):
+                raise IntakeError("invalid_value", "turn")
+            intake = plan_change(schema, intake, body.turn, body.facts)
+            intakes[intake_id] = intake
+        return view(intake_id, intake)
+
+    @app.put("/intakes/{intake_id}/planned/{turn}")
+    def put_planned(intake_id: str, turn: int, body: Rename) -> dict[str, Any]:
+        label = words(body.label)
+        if not label or len(label) > LABEL_LIMIT:
+            raise IntakeError("invalid_value", "label")
+        with answering:
+            intake = planned_intake(intake_id)
+            if not any(item.turn == turn for item in intake.planned):
+                raise IntakeError("not_found")
+            intake = intake.model_copy(
+                update={
+                    "planned": [
+                        item.model_copy(update={"label": label})
+                        if item.turn == turn
+                        else item
+                        for item in intake.planned
+                    ]
+                }
+            )
+            intakes[intake_id] = intake
+        return view(intake_id, intake)
+
+    @app.delete("/intakes/{intake_id}/planned/{turn}")
+    def delete_planned(intake_id: str, turn: int) -> dict[str, Any]:
+        with answering:
+            intake = planned_intake(intake_id)
+            intake = intake.model_copy(
+                update={
+                    "planned": [item for item in intake.planned if item.turn != turn]
+                }
+            )
+            intakes[intake_id] = intake
+        return view(intake_id, intake)
 
     return app
 

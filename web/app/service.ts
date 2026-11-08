@@ -68,7 +68,12 @@ export type Row = {
   date: string;
   date_unit: Cited;
   condition: (Cited & { title: string; text: string }) | null;
-  needs: { slot: string | null; value: string | null; gate: string | null; status: string | null } | null;
+  needs: {
+    slot: string | null;
+    value: string | null;
+    gate: string | null;
+    status: Outcome["status"] | null;
+  } | null;
   drafting: boolean;
   category: "legal" | "technical" | "organisation";
 };
@@ -111,13 +116,16 @@ export type Result = {
 // Article 6(3) gives for a listed use.
 export type State = { status: Outcome["status"]; open: string[]; article_6_3: string | null };
 
-// A row in a what-if, with the label of its result and its date in words.
-type RowChange = {
+// A row in a what-if, with the label of its result, its citation with its link to EUR-Lex (MEMO-7)
+// and its date in words.
+export type RowChange = {
+  id: string;
   label: string;
   result: string;
   category: Row["category"];
   status: Row["status"];
   citation: string;
+  link: string;
   date: string;
 };
 
@@ -164,7 +172,24 @@ export type Turn = {
   quotes: { citation: string; link: string; text: string }[];
   guidance: Example[];
   scenario: Scenario | null;
+  // The label that a planned change of this question gets (#63).
+  label: string;
   for_earlier_answers: boolean;
+};
+
+// A change to the product that the user plans, added from a question in the panel (#63): the number
+// of its question, its label and its question; what its answers would change in the result of the
+// recorded answers, as code computes it for QA-1, with the answers that can no longer be applied;
+// the results of the rows that it would add, each with those rows only and no quotes, what each
+// conditional row of them depends on, in words, and their texts, as for the result's rows.
+export type Planned = {
+  turn: number;
+  label: string;
+  question: string;
+  changes: WhatIf;
+  results: Outcome[];
+  depends_on: Record<string, string[]>;
+  texts: Texts;
 };
 
 export type Intake = {
@@ -188,4 +213,6 @@ export type Intake = {
   // The questions about the result, in order, each with its answer. Null without the key, and until
   // the answers are confirmed (QA-2, QA-9).
   conversation: Turn[] | null;
+  // The changes that the user plans, in the order added. Null until the answers are confirmed (#63).
+  planned: Planned[] | null;
 };

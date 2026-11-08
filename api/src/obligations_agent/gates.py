@@ -569,11 +569,13 @@ class ResultChange(BaseModel):
 class RowChange(BaseModel):
     """A row that a change of answers would add or remove, with its result, its category, its status, its citation and the date from which it applies, in words."""
 
+    id: str
     label: str
     result: str
     category: Category
     status: str
     citation: str
+    link: str
     date: str
 
 
@@ -668,6 +670,23 @@ def apply_answers(
     return after, changed, refused
 
 
+def after_changes(
+    gates: Gates,
+    schema: Schema,
+    intake: Intake,
+    before: Result,
+    changes: list[Requested],
+) -> tuple[Intake, list[AppliedAnswer], Result, set[str]]:
+    """The intake with the answers changed as apply_answers changes them, the answers changed, its result, and the ids of the rows of that result that the result before has not: the rows that a planned change adds (#63)."""
+    after, changed, _ = apply_answers(schema, intake, changes)
+    result = decide(gates, schema, after)
+    old = {row.id for outcome in before.gates for row in outcome.rows}
+    added = {
+        row.id for outcome in result.gates for row in outcome.rows if row.id not in old
+    }
+    return after, changed, result, added
+
+
 def what_if(
     gates: Gates,
     schema: Schema,
@@ -696,11 +715,13 @@ def what_if(
     def rows(result: Result) -> dict[str, RowChange]:
         return {
             row.id: RowChange(
+                id=row.id,
                 label=row.label,
                 result=outcome.label,
                 category=row.category,
                 status=row.status,
                 citation=row.unit.citation,
+                link=row.unit.link,
                 date=in_words(row.date),
             )
             for outcome in result.gates

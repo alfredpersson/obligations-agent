@@ -10,8 +10,14 @@ import anthropic
 from anthropic.types import ToolParam
 from pydantic import BaseModel, ValidationError
 
-from obligations_agent.gates import ObligationRow, Outcome, Result
-from obligations_agent.intakes import Intake, Text
+from obligations_agent.gates import (
+    Gates,
+    ObligationRow,
+    Outcome,
+    Result,
+    after_changes,
+)
+from obligations_agent.intakes import Intake, Planned, Text
 from obligations_agent.schema import Schema
 
 MODEL = "claude-sonnet-5-5"
@@ -52,6 +58,13 @@ WRITE: ToolParam = {
 }
 
 logger = logging.getLogger(__name__)
+
+
+class PlannedChange(BaseModel):
+    """A change to the product that the user plans, in the user's words, and the answers that it changes, each as "fact label: value label" (#63)."""
+
+    change: str
+    answers: list[str]
 
 
 class Written(BaseModel):
@@ -97,7 +110,12 @@ def depends_on(
 
 
 def user_message(
-    schema: Schema, intake: Intake, result: Result, outcome: Outcome, row: ObligationRow
+    schema: Schema,
+    intake: Intake,
+    result: Result,
+    outcome: Outcome,
+    row: ObligationRow,
+    planned: PlannedChange | None = None,
 ) -> str:
     """The description, the answers with their labels, the notes, and the row, as JSON data (INTAKE-4)."""
     slots = [*schema.slots, *schema.follow_up_slots]
@@ -120,6 +138,7 @@ def user_message(
             }
             for slot_id, entry in intake.not_sure.items()
         ],
+        **({"planned_change": planned.model_dump()} if planned else {}),
         "rows": [
             {
                 "id": row.id,
@@ -144,6 +163,7 @@ def write_row(
     result: Result,
     outcome: Outcome,
     row: ObligationRow,
+    planned: PlannedChange | None = None,
 ) -> Text | None:
     """The meaning and the action of one row, or None when the call fails or gives no valid texts for it."""
     reason = "model"
@@ -161,7 +181,9 @@ def write_row(
             messages=[
                 {
                     "role": "user",
-                    "content": user_message(schema, intake, result, outcome, row),
+                    "content": user_message(
+                        schema, intake, result, outcome, row, planned
+                    ),
                 }
             ],
         )
@@ -194,16 +216,28 @@ def write_row(
 
 
 def write_texts(
-    client: anthropic.Anthropic, schema: Schema, intake: Intake, result: Result
+    client: anthropic.Anthropic,
+    schema: Schema,
+    intake: Intake,
+    result: Result,
+    planned: PlannedChange | None = None,
+    rows: set[str] | None = None,
 ) -> dict[str, Text | None]:
-    """The texts of every row of the result, by the row's id, written by one call for each row, all at once."""
-    items = [(outcome, row) for outcome in result.gates for row in outcome.rows]
+    """The texts of every row of the result, or of the rows given, by the row's id, written by one call for each row, all at once, with the planned change of the rows, if any."""
+    items = [
+        (outcome, row)
+        for outcome in result.gates
+        for row in outcome.rows
+        if rows is None or row.id in rows
+    ]
     if not items:
         return {}
     start = time.monotonic()
     with ThreadPoolExecutor(max_workers=len(items)) as pool:
         futures = [
-            pool.submit(write_row, client, schema, intake, result, outcome, row)
+            pool.submit(
+                write_row, client, schema, intake, result, outcome, row, planned
+            )
             for outcome, row in items
         ]
         texts = [future.result() for future in futures]
@@ -214,3 +248,22 @@ def write_texts(
         time.monotonic() - start,
     )
     return {row.id: text for (_, row), text in zip(items, texts, strict=True)}
+
+
+def write_planned(
+    client: anthropic.Anthropic,
+    schema: Schema,
+    gates: Gates,
+    intake: Intake,
+    result: Result,
+    planned: Planned,
+) -> dict[str, Text | None]:
+    """The texts of the rows that a planned change adds to the result of the intake, written for the answers with the change and with the change's question and answers as data (#63)."""
+    after, changed, after_result, added = after_changes(
+        gates, schema, intake, result, planned.changes
+    )
+    change = PlannedChange(
+        change=intake.conversation[planned.turn - 1].question,
+        answers=[f"{item.fact}: {item.to}" for item in changed],
+    )
+    return write_texts(client, schema, after, after_result, change, added)

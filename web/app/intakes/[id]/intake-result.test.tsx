@@ -1,7 +1,7 @@
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import type { Intake, NotSure, Outcome, Row, Texts, WhatIf } from "../../service";
-import { testIntake, testQuestions, testResult, testRows, testSchema } from "../../testing";
+import type { Intake, NotSure, Outcome, Planned, Row, Texts, WhatIf } from "../../service";
+import { stubFetch, testIntake, testPlanned, testQuestions, testResult, testRows, testSchema } from "../../testing";
 import IntakeResult from "./intake-result";
 import styles from "./intake-result.module.css";
 import { memo } from "./memo-file";
@@ -54,10 +54,12 @@ function show(
         texts,
         open_changes: openChanges,
         conversation: null,
+        planned: null,
       }}
       schema={testSchema}
       answers={ANSWERS}
       onTurn={() => {}}
+      onIntake={() => {}}
     />,
   );
 }
@@ -362,22 +364,26 @@ const PUBLIC = changes("public", "The public", {
   ],
   rows_removed: [
     {
+      id: "audience_rules:rule:art2(1)",
       label: "Staff training",
       result: "Audience rules apply",
       category: "organisation",
       status: "conditional",
       citation: "Camera Law Rule 2(1)",
+      link: "https://eur-lex.europa.eu/rule#002.001",
       date: "2 February 2025",
     },
   ],
   rows_changed: [
     {
+      id: "storage:rule:art5(1)",
       label: "Delete video after a month",
       result: "Storage role",
       category: "technical",
       status: "applies",
       before: "conditional",
       citation: "Camera Law Rule 5(1)",
+      link: "https://eur-lex.europa.eu/rule#005.001",
       date: "2 August 2026",
     },
   ],
@@ -1010,7 +1016,9 @@ test("the list of the results has the three parts: the results that apply, the i
 // The bar of the categories (issue #62), on the intake of testing.ts: the storage role applies with
 // a row of the organisation, and its legal row depends on the open answer about sharing video.
 function showIntake() {
-  return render(<IntakeResult intake={testIntake} schema={testSchema} answers={ANSWERS} onTurn={() => {}} />);
+  return render(
+    <IntakeResult intake={testIntake} schema={testSchema} answers={ANSWERS} onTurn={() => {}} onIntake={() => {}} />,
+  );
 }
 
 function bar() {
@@ -1154,4 +1162,288 @@ test("a result without rows has no bar, and the body keeps no space for it", () 
 
   expect(screen.queryByRole("radiogroup", { name: "Show" })).toBeNull();
   expect(document.body.dataset.bar).toBeUndefined();
+});
+
+// Issue #63: the planned changes, on the intake of testing.ts with the planned change of a screen at
+// the door.
+
+const PLANNED = "Planned changes";
+const PLANNED_URL = `/api/intakes/${testIntake.id}/planned/1`;
+
+function showPlanned(planned: Planned[] = [testPlanned], onIntake: (intake: Intake) => void = () => {}) {
+  return render(
+    <IntakeResult
+      intake={{ ...testIntake, planned }}
+      schema={testSchema}
+      answers={ANSWERS}
+      onTurn={() => {}}
+      onIntake={onIntake}
+    />,
+  );
+}
+
+// The section of the planned change of the screen at the door.
+function doorScreen() {
+  return region("Door screen", region(PLANNED));
+}
+
+// A row on the screen, from its label.
+function rowOf(label: string, inside: HTMLElement) {
+  return within(inside).getByText(label).closest("li") as HTMLElement;
+}
+
+test("the planned changes follow what may also apply in a part of their own, before the items not checked, and the parts before them do not change", () => {
+  const { unmount } = showIntake();
+  const before = [APPLIES, CHECK, ALSO].map((name) => region(name).textContent);
+  unmount();
+
+  showPlanned();
+
+  expect(headings(2)).toEqual([APPLIES, CHECK, ALSO, PLANNED, "What the tool does not check yet"]);
+  expect([APPLIES, CHECK, ALSO].map((name) => region(name).textContent)).toEqual(before);
+  expect(region(PLANNED).textContent).toContain(
+    "What the rules would give for each change that you plan, each computed for your answers with its own. Your answers and the parts above stay as they are.",
+  );
+});
+
+test("without planned changes, the result has no part for them", () => {
+  showIntake();
+
+  expect(screen.queryByRole("heading", { name: PLANNED })).toBeNull();
+});
+
+test("a planned change shows its label as its heading, the line with the numbers of obligations that it would add and remove, and its question with the answers that it uses", () => {
+  showPlanned();
+
+  const change = doorScreen();
+  expect(within(change).getByRole("heading", { level: 3 }).textContent).toBe("Door screen");
+  expect(change.textContent).toContain("Adds 2 obligations and removes 1.");
+  expect(change.textContent).toContain(`You asked: ${testPlanned.question}`);
+  expect(change.textContent).toContain("With Video sharing: Yes (now no answer).");
+});
+
+test.each([
+  [{ added: 1, removed: 0 }, "Adds 1 obligation."],
+  [{ added: 0, removed: 2 }, "Removes 2 obligations."],
+  [{ added: 0, removed: 0 }, "Adds no obligation and removes none."],
+])("with %o rows the line says %s", ({ added, removed }, line) => {
+  const changes = {
+    ...testPlanned.changes,
+    rows_added: testPlanned.changes.rows_added.slice(0, added),
+    rows_removed: Array.from({ length: removed }, (_, index) => ({
+      ...testPlanned.changes.rows_removed[0],
+      id: `removed-${index}`,
+    })),
+  };
+  showPlanned([{ ...testPlanned, changes }]);
+
+  expect(doorScreen().textContent).toContain(line);
+});
+
+test("the rows that a planned change adds show by result as the result's rows, with their actions, their details and the change's label", () => {
+  showPlanned();
+  const change = doorScreen();
+
+  expect(within(change).getByRole("heading", { level: 4 }).textContent).toBe("Storage role");
+  const row = rowOf("Blur faces on the screen", change);
+  expect(row.textContent).toContain("Blur the faces on the door screen.");
+  expect(within(row).getByText("Technical").className).toContain(styles.tag_technical);
+  expect(within(row).getByText("Planned: Door screen").className).toContain(styles.plannedTag);
+  fireEvent.click(within(row).getByRole("button", { name: "Details" }));
+  expect(row.textContent).toContain("What it means: Faces on the screen must not be recognisable.");
+  expect(within(row).getByRole("link", { name: "Rule 7(1)" }).getAttribute("href")).toBe(testPlanned.results[0].rows[0].unit.link);
+  expect(within(row).getByText("Faces are blurred.").tagName).toBe("BLOCKQUOTE");
+  // The status of the result that the row needs is the one that the answers with the change give.
+  expect(row.textContent).toContain("Needs Listed camera use: Applies.");
+});
+
+test("a conditional row of a planned change shows its action and what it depends on, with the change's label", () => {
+  showPlanned();
+
+  const row = rowOf("A record of who watches", doorScreen());
+
+  expect(row.textContent).toContain("Keep a record of who watches the door screen.");
+  expect(row.textContent).toContain("Depends on the open answer about Audience.");
+  expect(within(row).getByText("Planned: Door screen")).toBeTruthy();
+});
+
+test("the rows whose status a planned change would change and those that would no longer apply show with the change's label, each removed row linked through the dialog about EUR-Lex", () => {
+  showPlanned();
+  const change = doorScreen();
+  const shown = change.textContent ?? "";
+
+  expect(shown.indexOf("Obligations whose status would change")).toBeLessThan(shown.indexOf("A notice at the door: Conditional to Applies"));
+  const changed = within(change).getByText(/^A notice at the door: Conditional to Applies/).closest("li") as HTMLElement;
+  expect(within(changed).getByText("Planned: Door screen")).toBeTruthy();
+  expect(within(changed).getByRole("link", { name: "Camera Law Rule 6(1)" }).getAttribute("href")).toBe(
+    "https://eur-lex.europa.eu/rule#006.001",
+  );
+  expect(shown.indexOf("Obligations that would no longer apply")).toBeLessThan(shown.indexOf("Staff training"));
+  const removed = rowOf("Staff training", change);
+  expect(within(removed).getByText("Planned: Door screen")).toBeTruthy();
+  const link = within(removed).getByRole("link", { name: "Camera Law Rule 2(1)" });
+  expect(link.getAttribute("href")).toBe("https://eur-lex.europa.eu/rule#002.001");
+  expect(fireEvent.click(link)).toBe(false);
+  expect((screen.getByRole("dialog", { name: "Opening EUR-Lex", hidden: true }) as HTMLDialogElement).open).toBe(true);
+});
+
+test.each([
+  ["same_answer", "Video sharing: Yes is your answer now, so this change no longer changes it."],
+  ["not_asked", "Video sharing is no longer asked with your answers, so the change's answer Yes cannot be applied."],
+] as const)("an answer of a planned change that can no longer be applied (%s) is named in its section", (error, line) => {
+  showPlanned([
+    { ...testPlanned, changes: { ...testPlanned.changes, refused: [{ fact: "shares_video", value: "yes", error }] } },
+  ]);
+
+  expect(doorScreen().textContent).toContain(line);
+});
+
+test("Rename opens a field of at most 60 characters with the label, and Save sends the new label and shows the intake that the service returns", async () => {
+  const renamed = { ...testIntake, planned: [{ ...testPlanned, label: "Screen at the door" }] };
+  const fetchMock = stubFetch({ [PLANNED_URL]: Response.json(renamed) });
+  const onIntake = vi.fn<(intake: Intake) => void>();
+  showPlanned([testPlanned], onIntake);
+
+  fireEvent.click(within(doorScreen()).getByRole("button", { name: "Rename" }));
+  const field = screen.getByRole("textbox", { name: "Label of the planned change" }) as HTMLInputElement;
+  expect(field.value).toBe("Door screen");
+  expect(field.maxLength).toBe(60);
+  fireEvent.change(field, { target: { value: "Screen at the door" } });
+  fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+  await waitFor(() => expect(onIntake).toHaveBeenCalledWith(renamed));
+  expect(fetchMock.mock.calls.map(([input, init]) => [String(input), init?.method, JSON.parse(String(init?.body))])).toEqual([
+    [PLANNED_URL, "PUT", { label: "Screen at the door" }],
+  ]);
+  expect(screen.queryByRole("textbox", { name: "Label of the planned change" })).toBeNull();
+});
+
+test("Cancel keeps the label and sends nothing", () => {
+  const fetchMock = stubFetch({});
+  showPlanned();
+
+  fireEvent.click(within(doorScreen()).getByRole("button", { name: "Rename" }));
+  fireEvent.change(screen.getByRole("textbox", { name: "Label of the planned change" }), { target: { value: "Other" } });
+  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+  expect(within(doorScreen()).getByRole("heading", { level: 3 }).textContent).toBe("Door screen");
+  expect(fetchMock).not.toHaveBeenCalled();
+});
+
+test("Remove takes the planned change away with the service, with no confirmation", async () => {
+  const removed = { ...testIntake, planned: [] };
+  const fetchMock = stubFetch({ [PLANNED_URL]: Response.json(removed) });
+  const onIntake = vi.fn<(intake: Intake) => void>();
+  showPlanned([testPlanned], onIntake);
+
+  fireEvent.click(within(doorScreen()).getByRole("button", { name: "Remove" }));
+
+  await waitFor(() => expect(onIntake).toHaveBeenCalledWith(removed));
+  expect(fetchMock.mock.calls.map(([input, init]) => [String(input), init?.method])).toEqual([[PLANNED_URL, "DELETE"]]);
+});
+
+test("a label that could not be saved, or a change that could not be removed, says so", async () => {
+  stubFetch({ [PLANNED_URL]: new Response(null, { status: 500 }) });
+  showPlanned();
+
+  fireEvent.click(within(doorScreen()).getByRole("button", { name: "Remove" }));
+  expect((await screen.findByRole("alert")).textContent).toBe("The change could not be removed. Try again.");
+
+  fireEvent.click(within(doorScreen()).getByRole("button", { name: "Rename" }));
+  fireEvent.click(screen.getByRole("button", { name: "Save" }));
+  await waitFor(() =>
+    expect(screen.getAllByRole("alert").map((alert) => alert.textContent)).toContain("The label could not be saved. Try again."),
+  );
+});
+
+test("with a category chosen, a planned change shows only its rows of that category, each with its label, and its line keeps its totals", () => {
+  showPlanned();
+
+  choose("Technical");
+  const change = doorScreen();
+  expect(rowLabels()).toEqual(["Blur faces on the screen"]);
+  expect(within(change).getByText("Planned: Door screen")).toBeTruthy();
+  expect(change.textContent).toContain("Adds 2 obligations and removes 1.");
+  expect(change.textContent).not.toContain("Staff training");
+  expect(change.textContent).not.toContain("A notice at the door: Conditional to Applies");
+  // The bar's line counts the rows of the result only.
+  expect(within(bar()).getByText("0 of 2 obligations")).toBeTruthy();
+
+  choose("Legal");
+  expect(change.textContent).toContain("No legal obligations here.");
+  expect(change.textContent).toContain("A notice at the door: Conditional to Applies");
+});
+
+test("the list of the results has the part of the planned changes, with each label and the number of its rows that show", () => {
+  showPlanned();
+  const list = screen.getByRole("navigation", { name: "The results" });
+
+  const part = within(list).getByRole("link", { name: PLANNED });
+  expect(part.getAttribute("href")).toBe("#planned");
+  const item = within(list).getByRole("link", { name: "Door screen" }).closest("li") as HTMLElement;
+  expect(within(item).getByRole("link").getAttribute("href")).toBe("#planned-1");
+  expect(item.textContent).toBe("Door screen2");
+  choose("Organisation");
+  expect(item.textContent).toBe("Door screen1");
+});
+
+test("the file of one category holds the rows of the planned change that the screen shows for it, in the same order", () => {
+  showPlanned();
+  for (const [category, name] of [
+    [null, "All"],
+    ["technical", "Technical"],
+    ["organisation", "Organisation"],
+  ] as const) {
+    choose(name);
+    const file = memo({ ...testIntake, planned: [testPlanned] }, testSchema, { category, quotes: true, meanings: true }, new Date());
+    expect(rowLabels()).toEqual(file.flatMap((block) => (block.kind === "heading" && block.level === 5 ? [block.text] : [])));
+    expect(rowLabels()).toContain(category === "organisation" ? "A record of who watches" : "Blur faces on the screen");
+  }
+});
+
+test("each row in the folds under an open answer links its citation through the dialog about EUR-Lex", () => {
+  show(testResult.gates, null, OPEN, { audience: { public: PUBLIC } });
+  const fold = within(region("Audience", region(CHECK))).getByText(/^If The public/, { selector: "summary" }).closest("details") as HTMLElement;
+
+  const link = within(fold).getByRole("link", { name: "Camera Law Rule 2(1)" });
+
+  expect(link.getAttribute("href")).toBe("https://eur-lex.europa.eu/rule#002.001");
+  expect(fireEvent.click(link)).toBe(false);
+  expect((screen.getByRole("dialog", { name: "Opening EUR-Lex", hidden: true }) as HTMLDialogElement).open).toBe(true);
+});
+
+test("a planned change whose answers can all no longer be applied names them, and has no line of the answers that it uses", () => {
+  const changes = {
+    ...testPlanned.changes,
+    changed: [],
+    rows_added: [],
+    rows_removed: [],
+    rows_changed: [],
+    refused: [{ fact: "shares_video", value: "yes", error: "same_answer" as const }],
+  };
+  showPlanned([{ ...testPlanned, changes, results: [], texts: {} }]);
+
+  const change = doorScreen();
+  expect(change.textContent).toContain("Video sharing: Yes is your answer now, so this change no longer changes it.");
+  expect(change.textContent).toContain("Adds no obligation and removes none.");
+  expect(change.textContent).not.toContain("With ");
+});
+
+test("a row of a planned change that depends on two items names both", () => {
+  showPlanned([{ ...testPlanned, depends_on: { "storage:rule:art8(1)": ["the open answer about Audience", "the open answer about Video storage"] } }]);
+
+  expect(rowOf("A record of who watches", doorScreen()).textContent).toContain(
+    "Depends on the open answer about Audience, and on the open answer about Video storage.",
+  );
+});
+
+test("each row whose status would change, in the folds under an open answer, links its citation through the dialog about EUR-Lex", () => {
+  show(testResult.gates, null, OPEN, { audience: { public: PUBLIC } });
+  const fold = within(region("Audience", region(CHECK))).getByText(/^If The public/, { selector: "summary" }).closest("details") as HTMLElement;
+
+  const link = within(fold).getByRole("link", { name: "Camera Law Rule 5(1)" });
+
+  expect(link.getAttribute("href")).toBe("https://eur-lex.europa.eu/rule#005.001");
+  expect(fireEvent.click(link)).toBe(false);
+  expect((screen.getByRole("dialog", { name: "Opening EUR-Lex", hidden: true }) as HTMLDialogElement).open).toBe(true);
 });

@@ -1,13 +1,13 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { NOT_LEGAL_ADVICE } from "../../not-legal-advice";
-import type { Example, Intake, Result, Turn, WhatIf } from "../../service";
-import { stubFetch, testIntake, testSchema } from "../../testing";
+import type { Example, Intake, Planned, Result, Turn, WhatIf } from "../../service";
+import { stubFetch, testIntake, testPlanned, testSchema } from "../../testing";
 import IntakeResult from "./intake-result";
 import styles from "./intake-result.module.css";
 
 // The panel beside the result, with questions about the result and about a change to the product
-// (issue #44: QA-2 to QA-10).
+// (issue #44: QA-2 to QA-10), and a change added to the result as a planned change (issue #63).
 
 const ANSWERS = `/intakes/${testIntake.id}/answers`;
 const ASKED = `/api/intakes/${testIntake.id}/questions`;
@@ -46,6 +46,7 @@ const ANSWERED: Turn = {
   quotes: [{ citation: "Camera Law Rule 5(1)", link: `${LINK}:~:text=Video`, text: "Video shall be deleted after one month." }],
   guidance: [ENTRY],
   scenario: null,
+  label: "What does the storage rule say?",
   for_earlier_answers: false,
 };
 
@@ -56,6 +57,7 @@ const FAILED: Turn = {
   quotes: [],
   guidance: [],
   scenario: null,
+  label: "Which national law applies to us?",
   for_earlier_answers: false,
 };
 
@@ -75,21 +77,25 @@ const CHANGES: WhatIf = {
   ],
   rows_added: [
     {
+      id: "storage:rule:art6(1)",
       label: "A notice at the door",
       result: "Storage role",
       category: "legal",
       status: "applies",
       citation: "Camera Law Rule 6(1)",
+      link: "https://eur-lex.europa.eu/rule#006.001",
       date: "2 August 2026",
     },
   ],
   rows_removed: [
     {
+      id: "audience_rules:rule:art2(1)",
       label: "Staff training",
       result: "Audience rules apply",
       category: "organisation",
       status: "conditional",
       citation: "Camera Law Rule 2(1)",
+      link: "https://eur-lex.europa.eu/rule#002.001",
       date: "2 February 2025",
     },
   ],
@@ -125,6 +131,7 @@ const CHANGE: Turn = {
     ],
     changes: CHANGES,
   },
+  label: "Door screen",
   for_earlier_answers: false,
 };
 
@@ -148,9 +155,14 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function show(conversation: Turn[] | null, onTurn: (turn: Turn) => void = () => {}) {
-  const intake: Intake & { result: Result } = { ...testIntake, conversation };
-  render(<IntakeResult intake={intake} schema={testSchema} answers={ANSWERS} onTurn={onTurn} />);
+function show(
+  conversation: Turn[] | null,
+  onTurn: (turn: Turn) => void = () => {},
+  onIntake: (intake: Intake) => void = () => {},
+  planned: Planned[] = [],
+) {
+  const intake: Intake & { result: Result } = { ...testIntake, conversation, planned };
+  render(<IntakeResult intake={intake} schema={testSchema} answers={ANSWERS} onTurn={onTurn} onIntake={onIntake} />);
   return intake;
 }
 
@@ -390,4 +402,111 @@ test("an answer given for earlier answers says so", () => {
   opened();
 
   expect(turnOf(CHANGE.question).textContent).toContain("Answered for your earlier answers.");
+});
+
+// Issue #63: a change added to the result as a planned change.
+
+const PLANNED_URL = `/api/intakes/${testIntake.id}/planned`;
+const ADD = "Add to the result as “Door screen”";
+
+test("each answer that a change may change has a tick box, all ticked, and the button adds the change with the ticked answers and shows the intake that the service returns", async () => {
+  const added = { ...testIntake, conversation: [CHANGE], planned: [testPlanned] };
+  const fetchMock = stubFetch({ [PLANNED_URL]: Response.json(added) });
+  const onIntake = vi.fn<(intake: Intake) => void>();
+  show([CHANGE], () => {}, onIntake);
+  opened();
+  const turn = turnOf(CHANGE.question);
+
+  const boxes = within(turn).getAllByRole("checkbox") as HTMLInputElement[];
+  expect(boxes.map((box) => [box.closest("label")?.textContent, box.checked])).toEqual([
+    ["Audience: now Not sure, may become The public", true],
+    ["Video sharing: now no answer, may become Yes", true],
+  ]);
+  fireEvent.click(boxes[0]);
+  fireEvent.click(within(turn).getByRole("button", { name: ADD }));
+
+  await waitFor(() => expect(onIntake).toHaveBeenCalledWith(added));
+  expect(sent(fetchMock)).toEqual([[PLANNED_URL, "POST", { turn: 1, facts: ["shares_video"] }]]);
+});
+
+test("with no answer ticked, the button waits", () => {
+  show([CHANGE]);
+  opened();
+  const turn = turnOf(CHANGE.question);
+
+  for (const box of within(turn).getAllByRole("checkbox")) fireEvent.click(box);
+
+  expect((within(turn).getByRole("button", { name: ADD }) as HTMLButtonElement).disabled).toBe(true);
+});
+
+test("an added change says so with a link to its section in place of the button, and its tick boxes cannot change", () => {
+  show([CHANGE], () => {}, () => {}, [testPlanned]);
+  opened();
+  const turn = turnOf(CHANGE.question);
+
+  expect(turn.textContent).toContain("Added to the result as Door screen.");
+  expect(within(turn).getByRole("link", { name: "Door screen" }).getAttribute("href")).toBe("#planned-1");
+  expect(within(turn).queryByRole("button", { name: ADD })).toBeNull();
+  const boxes = within(turn).getAllByRole("checkbox") as HTMLInputElement[];
+  expect(boxes.every((box) => box.disabled)).toBe(true);
+  // The planned change holds only the answer about sharing video (review of #71).
+  expect(boxes.map((box) => [box.closest("label")?.textContent?.split(":")[0], box.checked])).toEqual([
+    ["Audience", false],
+    ["Video sharing", true],
+  ]);
+});
+
+test("a change that could not be added says so, and the button stays", async () => {
+  stubFetch({ [PLANNED_URL]: new Error("offline") });
+  show([CHANGE]);
+  opened();
+  const turn = turnOf(CHANGE.question);
+
+  fireEvent.click(within(turn).getByRole("button", { name: ADD }));
+
+  expect((await within(turn).findByRole("alert")).textContent).toBe("The change could not be added. Try again.");
+  expect(within(turn).getByRole("button", { name: ADD })).toBeTruthy();
+});
+
+test("a change answered for earlier answers can be added too, computed for the answers now", () => {
+  show([{ ...CHANGE, for_earlier_answers: true }]);
+  opened();
+
+  expect(within(turnOf(CHANGE.question)).getByRole("button", { name: ADD })).toBeTruthy();
+});
+
+test("a question that is not about a change has no tick boxes and no button", () => {
+  show([ANSWERED]);
+  opened();
+  const turn = turnOf(ANSWERED.question);
+
+  expect(within(turn).queryByRole("checkbox")).toBeNull();
+  expect(within(turn).queryByRole("button", { name: /^Add to the result/ })).toBeNull();
+});
+
+test("each row in the changes of a change links its citation through the dialog about EUR-Lex", () => {
+  show([CHANGE]);
+  opened();
+
+  const link = within(turnOf(CHANGE.question)).getByRole("link", { name: "Camera Law Rule 6(1)" });
+
+  expect(link.getAttribute("href")).toBe("https://eur-lex.europa.eu/rule#006.001");
+  expect(fireEvent.click(link)).toBe(false);
+  expect((screen.getByRole("dialog", { name: "Opening EUR-Lex", hidden: true }) as HTMLDialogElement).open).toBe(true);
+});
+
+test("an added change ticks also its answer that can no longer be applied", () => {
+  const refused = {
+    ...testPlanned,
+    changes: {
+      ...testPlanned.changes,
+      changed: [],
+      refused: [{ fact: "shares_video", value: "yes", error: "same_answer" as const }],
+    },
+  };
+  show([CHANGE], () => {}, () => {}, [refused]);
+  opened();
+
+  const boxes = within(turnOf(CHANGE.question)).getAllByRole("checkbox") as HTMLInputElement[];
+  expect(boxes.map((box) => box.checked)).toEqual([false, true]);
 });

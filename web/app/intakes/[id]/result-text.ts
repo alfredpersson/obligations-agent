@@ -1,3 +1,5 @@
+import type { WhatIf } from "../../service";
+
 // What a result says (GATE-2), the question of the second part for a high-risk result for an area
 // of Annex III (GATE-4), and the names of the three parts of the result (MEMO-6). The result screen
 // and the excerpt on the start page use them.
@@ -79,3 +81,55 @@ export const ifListed = (profiling: string | undefined, derogation: "always" | "
         ? "applies, unless one of the conditions of Article 6(3) applies"
         : "applies"
   }.`;
+
+// The statuses without the full stop that the result's sentences end with, as in "Conditional to
+// Applies".
+export const STATE = { applies: "Applies", does_not_apply: "Does not apply", conditional: "Conditional" };
+
+// A number with its word, such as "1 obligation" or "2 questions".
+export function many(count: number, word: string) {
+  return `${count} ${word}${count === 1 ? "" : "s"}`;
+}
+
+// The titles of the rows that changed answers would remove, and of those whose status they would
+// change, in the panel, under an open answer, in a planned change and in its file (#44, #63).
+export const NO_LONGER_APPLY = "Obligations that would no longer apply";
+export const STATUS_WOULD_CHANGE = "Obligations whose status would change";
+
+// The part of the planned changes, after the three parts (#63), and its line.
+export const PLANNED = "Planned changes";
+export const PLANNED_LINE =
+  "What the rules would give for each change that you plan, each computed for your answers with its own. Your answers and the parts above stay as they are.";
+
+// The line under the label of a planned change: the number of obligations that it would add and
+// remove (#63).
+export function plannedCount(change: WhatIf) {
+  const added = change.rows_added.length;
+  const removed = change.rows_removed.length;
+  if (added === 0 && removed === 0) return "Adds no obligation and removes none.";
+  if (removed === 0) return `Adds ${many(added, "obligation")}.`;
+  if (added === 0) return `Removes ${many(removed, "obligation")}.`;
+  return `Adds ${many(added, "obligation")} and removes ${removed}.`;
+}
+
+// The question of a planned change, and the answers that it uses with the answers now (#63).
+export const youAsked = (question: string) => `You asked: ${question}`;
+export const withAnswers = (changed: WhatIf["changed"]) =>
+  `With ${changed.map((item) => `${item.fact}: ${item.to} (now ${item.now})`).join("; ")}.`;
+
+// What a row depends on, in the file, and on the screen for a row of a planned change.
+export const dependsOn = (items: string[]) => `Depends on ${items.join(", and on ")}.`;
+
+// An answer of a planned change that can no longer be applied, once the answers of the intake changed
+// (#63).
+export function cannotApply(
+  item: WhatIf["refused"][number],
+  labelOf: (slot: string) => string | undefined,
+  valueOf: (slot: string, value: string) => string | undefined,
+) {
+  const fact = labelOf(item.fact) ?? item.fact;
+  const value = valueOf(item.fact, item.value) ?? item.value;
+  if (item.error === "same_answer") return `${fact}: ${value} is your answer now, so this change no longer changes it.`;
+  if (item.error === "not_asked") return `${fact} is no longer asked with your answers, so the change's answer ${value} cannot be applied.`;
+  return `${fact}: ${value} cannot be applied.`;
+}

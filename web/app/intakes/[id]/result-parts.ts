@@ -95,7 +95,7 @@ export const applying = (outcome: Outcome) => outcome.rows.filter((row) => row.s
 // Whether a row shows for a category, or for all when the category is null: the rule of a file of one
 // category (MEMO-10) and of the result screen with a category chosen (MEMO-11), so that both hold the
 // same rows.
-export const ofCategory = (category: Row["category"] | null) => (row: Row) =>
+export const ofCategory = (category: Row["category"] | null) => (row: Pick<Row, "category">) =>
   category === null || row.category === category;
 
 // Whether a row's unit is a unit that its result quotes, such as AI Act Article 50(2) for the marking of

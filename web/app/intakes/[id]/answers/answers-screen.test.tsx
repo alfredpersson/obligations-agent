@@ -66,6 +66,7 @@ const intake = {
   texts: null,
   open_changes: null,
   conversation: null,
+  planned: null,
 } satisfies Intake;
 
 // The elements that the screen scrolled into view. jsdom does not scroll.

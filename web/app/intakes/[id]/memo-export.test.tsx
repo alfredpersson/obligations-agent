@@ -48,7 +48,7 @@ afterEach(() => {
 
 // Opens the export's dialog with its control, and gives the dialog.
 function show(intake: Intake & { result: Result } = testIntake) {
-  render(<IntakeResult intake={intake} schema={testSchema} answers="/intakes/x/answers" onTurn={() => {}} />);
+  render(<IntakeResult intake={intake} schema={testSchema} answers="/intakes/x/answers" onTurn={() => {}} onIntake={() => {}} />);
   fireEvent.click(screen.getByRole("button", { name: "Download the result" }));
   return screen.getByRole("dialog", { name: "Download the result" }) as HTMLDialogElement;
 }
@@ -82,7 +82,7 @@ const SEGMENTS = [
 ] as const;
 
 test("Download the result opens the export's three choices and its two downloads in a dialog over the result, in place of the fold", () => {
-  render(<IntakeResult intake={testIntake} schema={testSchema} answers="/intakes/x/answers" onTurn={() => {}} />);
+  render(<IntakeResult intake={testIntake} schema={testSchema} answers="/intakes/x/answers" onTurn={() => {}} onIntake={() => {}} />);
   const control = screen.getByRole("button", { name: "Download the result" });
   expect(control.hasAttribute("aria-expanded")).toBe(false);
   expect(screen.queryByRole("dialog", { name: "Download the result" })).toBeNull();

@@ -2,13 +2,13 @@ import { Fragment, useEffect, useId, useRef, useState } from "react";
 import actions from "../../actions.module.css";
 import LoadingStatus from "../../loading-status";
 import { NOT_LEGAL_ADVICE } from "../../not-legal-advice";
-import type { Example, Intake, Scenario, Segment, State, Turn, WhatIf } from "../../service";
+import type { Example, Intake, Planned, Scenario, Segment, State, Turn, WhatIf } from "../../service";
 import styles from "./conversation.module.css";
 import { Entries } from "./guidance-examples";
 import examples from "./guidance-examples.module.css";
-import { Category, type Open } from "./intake-result";
+import { Category, Links, type Open } from "./intake-result";
 import result from "./intake-result.module.css";
-import { CASE } from "./result-text";
+import { CASE, NO_LONGER_APPLY, STATE, STATUS_WOULD_CHANGE, many } from "./result-text";
 
 const ASKING = "Reading your result and the regulations. This takes a few seconds.";
 const WHAT_IF = "What if…?";
@@ -71,14 +71,8 @@ function Fork() {
     </svg>
   );
 }
-// The statuses without the full stop that the result's sentences end with, as in "Conditional to Applies".
-const STATE = { applies: "Applies", does_not_apply: "Does not apply", conditional: "Conditional" };
 
 type Block = Turn["blocks"][number];
-
-function many(count: number, word: string) {
-  return `${count} ${word}${count === 1 ? "" : "s"}`;
-}
 
 // What changed answers would change, in a few words, one part for each kind of change; none when
 // nothing changes.
@@ -98,14 +92,36 @@ export function changed(change: WhatIf) {
   return parts(change).join(", ") || "changes nothing";
 }
 
+// The label of a planned change beside each of its rows, so that they read apart from the result's
+// own rows, also in a view of one category (#63).
+export function PlannedTag({ label }: { label: string }) {
+  return (
+    <>
+      {" "}
+      <span className={result.plannedTag}>Planned: {label}</span>
+    </>
+  );
+}
+
 function StateOf({ state }: { state: State | null }) {
   if (state === null) return <strong>Not in the result</strong>;
   return <strong className={`${result.status} ${result[`badge_${state.status}`]}`}>{STATE[state.status]}</strong>;
 }
 
 // The obligations that changed answers would add or remove, by result, each with its category, its
-// citation and the date from which it applies.
-function Obligations({ title, rows }: { title: string; rows: WhatIf["rows_added"] }) {
+// citation linked to EUR-Lex through the dialog (MEMO-7) and the date from which it applies; in a
+// planned change, each with the change's label (#63).
+export function Obligations({
+  title,
+  rows,
+  onOpen,
+  planned,
+}: {
+  title: string;
+  rows: WhatIf["rows_added"];
+  onOpen: Open;
+  planned?: string;
+}) {
   if (rows.length === 0) return null;
   return (
     <>
@@ -117,11 +133,12 @@ function Obligations({ title, rows }: { title: string; rows: WhatIf["rows_added"
             {rows
               .filter((row) => row.result === name)
               .map((row) => (
-                <li key={row.label}>
+                <li key={row.id}>
                   <Category category={row.category} /> {row.label}
+                  {planned && <PlannedTag label={planned} />}
                   <span className={result.meta}>
                     {" "}
-                    {row.citation}, from {row.date}
+                    <Links links={[{ citation: row.citation, link: row.link, quote: null }]} onOpen={onOpen} />, from {row.date}
                     {row.status === "conditional" && ", conditional"}
                   </span>
                 </li>
@@ -133,28 +150,40 @@ function Obligations({ title, rows }: { title: string; rows: WhatIf["rows_added"
   );
 }
 
+// The obligations whose status changed answers would change, each with its status now and then and
+// its citation linked to EUR-Lex through the dialog (MEMO-7); in a planned change, each with the
+// change's label (#63).
+export function ChangedRows({ rows, onOpen, planned }: { rows: WhatIf["rows_changed"]; onOpen: Open; planned?: string }) {
+  if (rows.length === 0) return null;
+  return (
+    <>
+      <p className={styles.changesTitle}>{STATUS_WOULD_CHANGE}</p>
+      <ul className={styles.obligations}>
+        {rows.map((row) => (
+          <li key={row.id}>
+            {row.label}: {STATE[row.before]} to {STATE[row.status]}
+            <span className={result.meta}>
+              {" "}
+              ({row.result}, <Links links={[{ citation: row.citation, link: row.link, quote: null }]} onOpen={onOpen} />)
+            </span>
+            {planned && <PlannedTag label={planned} />}
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
+
 // What changed answers would change in the whole result, as the rules in code compute it with no
 // model: the obligations that would be added, removed or change their status, the results whose
 // status would change, and the questions that would become open or no longer be asked (QA-1, QA-4).
-export function Changes({ change }: { change: WhatIf }) {
+export function Changes({ change, onOpen }: { change: WhatIf; onOpen: Open }) {
   return (
     <div className={styles.changes}>
       {parts(change).length === 0 && <p className={styles.quiet}>Nothing in the result would change.</p>}
-      <Obligations title="Obligations this would add" rows={change.rows_added} />
-      <Obligations title="Obligations that would no longer apply" rows={change.rows_removed} />
-      {change.rows_changed.length > 0 && (
-        <>
-          <p className={styles.changesTitle}>Obligations whose status would change</p>
-          <ul className={styles.obligations}>
-            {change.rows_changed.map((row) => (
-              <li key={`${row.result}:${row.label}`}>
-                {row.label}: {STATE[row.before]} to {STATE[row.status]}
-                <span className={result.meta}> ({row.result})</span>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
+      <Obligations title="Obligations this would add" rows={change.rows_added} onOpen={onOpen} />
+      <Obligations title={NO_LONGER_APPLY} rows={change.rows_removed} onOpen={onOpen} />
+      <ChangedRows rows={change.rows_changed} onOpen={onOpen} />
       {change.results.length > 0 && (
         <>
           <p className={styles.changesTitle}>Results that would change</p>
@@ -262,9 +291,41 @@ function summary(scenario: Scenario) {
 // The answer to one question: for a change, the line with its numbers, then its text, each answer
 // that it may change with its question and its examples, and what the rules would then change; then
 // the quotes and the other examples (QA-4 to QA-6, QA-9).
-function Answer({ turn, onOpen }: { turn: Turn; onOpen: Open }) {
+function Answer({
+  turn,
+  onOpen,
+  planned,
+  onAdd,
+}: {
+  turn: Turn;
+  onOpen: Open;
+  // The planned change of this question, once it is added (#63).
+  planned: Planned | undefined;
+  onAdd: (facts: string[]) => Promise<void>;
+}) {
+  const [ticked, setTicked] = useState<string[] | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [failed, setFailed] = useState(false);
   if (!turn.answered) return <p className={styles.failed}>This question could not be answered. Ask it again.</p>;
   const scenario = turn.scenario !== null && turn.scenario.questions.length > 0 ? turn.scenario : null;
+  // Every answer that the change may change is ticked until the user unticks it; once the change is
+  // added, the answers that it holds, also one that can no longer be applied.
+  const held = planned && [
+    ...planned.changes.changed.map((item) => item.fact_id),
+    ...planned.changes.refused.map((item) => item.fact),
+  ];
+  const chosen = held ?? ticked ?? scenario?.questions.map((question) => question.fact_id) ?? [];
+  async function add() {
+    setAdding(true);
+    setFailed(false);
+    try {
+      await onAdd(chosen);
+    } catch {
+      setFailed(true);
+    } finally {
+      setAdding(false);
+    }
+  }
   // An entry that the answer names for an answer that may change shows under that answer.
   const placed = new Set(scenario?.questions.flatMap((question) => question.guidance.map((entry) => entry.id)));
   const others = turn.guidance.filter((entry) => !placed.has(entry.id));
@@ -278,14 +339,45 @@ function Answer({ turn, onOpen }: { turn: Turn; onOpen: Open }) {
           <p className={styles.changesTitle}>Answers this change may change</p>
           {scenario.questions.map((question) => (
             <div key={question.fact_id} className={styles.question}>
-              <p>
-                <strong>{question.fact}</strong>: now {question.now}, may become {question.to}
-              </p>
+              <label className={styles.tick}>
+                <input
+                  type="checkbox"
+                  checked={chosen.includes(question.fact_id)}
+                  disabled={planned !== undefined || adding}
+                  onChange={(event) =>
+                    setTicked(
+                      event.target.checked
+                        ? [...chosen, question.fact_id]
+                        : chosen.filter((fact) => fact !== question.fact_id),
+                    )
+                  }
+                />
+                <span>
+                  <strong>{question.fact}</strong>: now {question.now}, may become {question.to}
+                </span>
+              </label>
               <p className={styles.questionText}>{question.question}</p>
               {question.guidance.length > 0 && <Examples entries={question.guidance} />}
             </div>
           ))}
-          <Changes change={scenario.changes} />
+          <Changes change={scenario.changes} onOpen={onOpen} />
+          {/* The change goes into the result as a planned change, with the ticked answers; the recorded
+              answers stay as they are (#63). */}
+          <div className={`${actions.actions} ${styles.add}`}>
+            {planned ? (
+              <p className={styles.added}>
+                Added to the result as <a href={`#planned-${planned.turn}`}>{planned.label}</a>.
+              </p>
+            ) : (
+              <>
+                <button type="button" className={actions.secondary} disabled={adding || chosen.length === 0} onClick={() => void add()}>
+                  Add to the result as “{turn.label}”
+                </button>
+                <LoadingStatus message={adding ? "Adding the change to the result." : null} />
+              </>
+            )}
+          </div>
+          {failed && <p role="alert">The change could not be added. Try again.</p>}
         </div>
       )}
       {turn.quotes.map((quote) => (
@@ -317,11 +409,14 @@ export default function Conversation({
   intake,
   onOpen,
   onTurn,
+  onIntake,
 }: {
   intake: Intake & { conversation: Turn[] };
   onOpen: Open;
   // A new turn, which the screen adds to the intake as it is when the answer arrives.
   onTurn: (turn: Turn) => void;
+  // The intake with a planned change added (#63).
+  onIntake: (intake: Intake) => void;
 }) {
   const turns = intake.conversation;
   const [open, setOpen] = useState(false);
@@ -447,7 +542,20 @@ export default function Conversation({
                   <p>{turn.question}</p>
                 </div>
                 <div className={styles.answer}>
-                  <Answer turn={turn} onOpen={onOpen} />
+                  <Answer
+                    turn={turn}
+                    onOpen={onOpen}
+                    planned={intake.planned?.find((item) => item.turn === index + 1)}
+                    onAdd={async (facts) => {
+                      const response = await fetch(`/api/intakes/${intake.id}/planned`, {
+                        method: "POST",
+                        headers: { "content-type": "application/json" },
+                        body: JSON.stringify({ turn: index + 1, facts }),
+                      });
+                      if (!response.ok) throw new Error(String(response.status));
+                      onIntake((await response.json()) as Intake);
+                    }}
+                  />
                 </div>
               </li>
             ))}
