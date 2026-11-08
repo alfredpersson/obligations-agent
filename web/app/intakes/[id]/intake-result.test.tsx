@@ -264,50 +264,63 @@ test("a result that applies or does not apply shows in the first part under its 
   );
 
   const first = region(APPLIES);
-  expect(headings(3, first)).toEqual(["Camera Law"]);
-  expect(headings(4, first)).toEqual(["Audience rules apply", "Storage role"]);
-  expect(under("Audience rules apply", first)[0].textContent).toBe("Does not apply. Your answer: Audience: The public.");
-  expect(text(under("Storage role", first))).toContain("Delete old video");
+  expect(headings(3, first)).toEqual(["Camera Law Applies."]);
+  expect(headings(4, first)).toEqual(["Audience rules apply Does not apply.", "Storage role Applies."]);
+  expect(under("Audience rules apply Does not apply.", first)[0].textContent).toBe("Audience The public");
+  expect(text(under("Storage role Applies.", first))).toContain("Delete old video");
   // The conditional row stands in the third part only.
-  expect(text(under("Storage role", first))).not.toContain("A notice at the door");
+  expect(text(under("Storage role Applies.", first))).not.toContain("A notice at the door");
   expect(within(region(ALSO)).getByText("A notice at the door")).toBeTruthy();
 });
 
-test("each result in the first part shows its label as a heading under its regulation, what it gives, and the answers that decided it with their labels", () => {
+test("each result in the first part shows its label and what it gives as its heading under its regulation, and each answer that decided it as a chip: its question's label, then its answer in bold", () => {
   show([
     {
       ...testResult.gates[0],
       status: "applies",
       result: "applies",
-      answers: { uses_camera: "yes" },
+      answers: { uses_camera: "yes", audience: "public" },
       conditions: [],
     },
   ]);
 
   const first = region(APPLIES);
-  expect(within(first).getByRole("heading", { level: 4, name: "Audience rules apply" })).toBeTruthy();
-  expect(under("Audience rules apply", first)[0].textContent).toBe("Applies. Your answer: Camera: Yes.");
+  const heading = within(first).getByRole("heading", { level: 4, name: "Audience rules apply Applies." });
+  expect(within(heading).getByText("Applies.").className).toContain(styles.badge_applies);
+  const line = under("Audience rules apply Applies.", first)[0];
+  expect(chips(line)).toEqual([
+    [
+      ["SPAN", "Camera"],
+      ["STRONG", "Yes"],
+    ],
+    [
+      ["SPAN", "Audience"],
+      ["STRONG", "The public"],
+    ],
+  ]);
+  // No sentence and no colons (#69).
+  expect(line.textContent).toBe("Camera Yes Audience The public");
 });
 
 test("a conditional result does not show in the first part, nor a regulation whose results are all conditional, except one that the result assumes", () => {
   show();
 
   const first = region(APPLIES);
-  expect(headings(3, first)).toEqual(["Camera Law", "Listing Law"]);
+  expect(headings(3, first)).toEqual(["Camera Law Applies.", "Listing Law Assumed."]);
   expect(headings(4, first)).toEqual([]);
-  expect(under("Camera Law", first)[0].textContent).toBe("Applies. Your answer: Camera: Yes.");
-  const camera = within(under("Camera Law", first)[1] as HTMLElement);
+  expect(under("Camera Law Applies.", first)[0].textContent).toBe("Camera Yes");
+  const camera = within(under("Camera Law Applies.", first)[1] as HTMLElement);
   expect(camera.getByText("Details").tagName).toBe("SUMMARY");
   expect(camera.getByRole("link", { name: "Rule 1(1)" })).toBeTruthy();
-  expect(under("Listing Law", first)[0].textContent).toBe(
-    "Assumed. No check decides yet whether the Listing Law applies to the product: the result assumes that it does, as said above.",
+  expect(under("Listing Law Assumed.", first)[0].textContent).toBe(
+    "No check decides yet whether the Listing Law applies to the product: the result assumes that it does, as said above.",
   );
   cleanup();
 
   const [audience, storage, listed, head] = testResult.gates;
   show([{ ...head, status: "conditional", result: null, answers: { uses_camera: "not_sure" } }, audience, storage, listed]);
 
-  expect(headings(3, region(APPLIES))).toEqual(["Listing Law"]);
+  expect(headings(3, region(APPLIES))).toEqual(["Listing Law Assumed."]);
 });
 
 // The second part: each open answer once (criterion 3).
@@ -1141,9 +1154,9 @@ test("with a category chosen, a result that has rows, none of them of the catego
 
   choose("Legal");
 
-  expect(text(under("Storage role"))).toContain("No legal obligations here.");
-  expect(within(region("Storage role")).queryAllByRole("listitem")).toEqual([]);
-  expect(text(under("Audience rules apply"))).not.toContain("obligations here");
+  expect(text(under("Storage role Applies."))).toContain("No legal obligations here.");
+  expect(within(region("Storage role Applies.")).queryAllByRole("listitem")).toEqual([]);
+  expect(text(under("Audience rules apply Does not apply."))).not.toContain("obligations here");
   choose("Organisation");
   expect(screen.queryByText(/obligations here/)).toBeNull();
 });
@@ -1219,7 +1232,14 @@ test("a planned change shows its label as its heading, the line with the numbers
   expect(within(change).getByRole("heading", { level: 3 }).textContent).toBe("Door screen");
   expect(change.textContent).toContain("Adds 2 obligations and removes 1.");
   expect(change.textContent).toContain(`You asked: ${testPlanned.question}`);
-  expect(change.textContent).toContain("With Video sharing: Yes (now no answer).");
+  expect(change.textContent).toContain("With Video sharing Yes (now no answer)");
+  // Each answer of the change as a chip, as the answers that decided a result (#69).
+  expect(chips(change)).toEqual([
+    [
+      ["SPAN", "Video sharing"],
+      ["STRONG", "Yes"],
+    ],
+  ]);
 });
 
 test.each([
@@ -1446,4 +1466,78 @@ test("each row whose status would change, in the folds under an open answer, lin
   expect(link.getAttribute("href")).toBe("https://eur-lex.europa.eu/rule#005.001");
   expect(fireEvent.click(link)).toBe(false);
   expect((screen.getByRole("dialog", { name: "Opening EUR-Lex", hidden: true }) as HTMLDialogElement).open).toBe(true);
+});
+
+// Issue #69: a regulation's status in its heading with its results inside it, the answers as chips,
+// and the heading row over the rows of the first part.
+
+// The chips of the answers in an element: the parts of each chip, by tag and text.
+function chips(inside: Element) {
+  return [...inside.querySelectorAll(`.${styles.answer}`)].map((chip) =>
+    [...chip.children].map((part) => [part.tagName, part.textContent]),
+  );
+}
+
+test("a regulation's own result shows as a status label in its heading, and Assumed. for one that the result assumes", () => {
+  show();
+
+  const first = region(APPLIES);
+  const camera = within(first).getByRole("heading", { level: 3, name: "Camera Law Applies." });
+  expect(within(camera).getByText("Applies.").className).toContain(styles.badge_applies);
+  const listing = within(first).getByRole("heading", { level: 3, name: "Listing Law Assumed." });
+  expect(within(listing).getByText("Assumed.").className).toContain(styles.status);
+});
+
+test("a regulation's results stand inside it, in one block after the regulation's heading, its answers and its Details", () => {
+  const [audience, storage, , head] = testResult.gates;
+  show(
+    [
+      head,
+      { ...audience, status: "does_not_apply", result: "does_not_apply", answers: { audience: "public" }, conditions: [] },
+      { ...storage, status: "applies", result: "applies", conditions: [], rows: testRows },
+    ],
+    null,
+    ["shares_video"],
+  );
+
+  const camera = region("Camera Law Applies.", region(APPLIES));
+  expect([...camera.children].map((child) => child.tagName)).toEqual(["H3", "P", "DETAILS", "DIV"]);
+  const block = camera.lastElementChild as HTMLElement;
+  expect(block.className).toContain(styles.results);
+  expect(headings(4, block)).toEqual(["Audience rules apply Does not apply.", "Storage role Applies."]);
+});
+
+test("each card of the rows of a result in the first part starts with a heading row, Obligation over the labels and Action over the actions, hidden from screen readers", () => {
+  show(applying(), TEXTS, []);
+
+  // The two rows have two dates, so two cards.
+  const cards = [...region(APPLIES).querySelectorAll(`.${styles.rows}`)] as HTMLElement[];
+  expect(cards).toHaveLength(2);
+  for (const card of cards) {
+    const head = card.firstElementChild as HTMLElement;
+    expect(head.className).toContain(styles.columns);
+    expect([...head.children].map((name) => name.textContent)).toEqual(["Obligation", "Action"]);
+    expect(head.getAttribute("aria-hidden")).toBe("true");
+    expect(within(card).getAllByRole("listitem")).toHaveLength(1);
+  }
+});
+
+test("the rows that a planned change adds start with the same heading row", () => {
+  showPlanned();
+
+  const card = rowOf("Blur faces on the screen", doorScreen()).parentElement as HTMLElement;
+  expect([...(card.firstElementChild as HTMLElement).children].map((name) => name.textContent)).toEqual(["Obligation", "Action"]);
+});
+
+test("without the key the rows have no heading row, and with it the folded rows of the third part have none", () => {
+  show(applying(), null, []);
+
+  expect(document.querySelector(`.${styles.columns}`)).toBeNull();
+  cleanup();
+
+  const [, storage, , head] = testResult.gates;
+  show([head, { ...storage, status: "applies", result: "applies", conditions: [], rows: testRows }], TEXTS, ["shares_video"]);
+
+  expect(region(APPLIES).querySelector(`.${styles.columns}`)).not.toBeNull();
+  expect(region(ALSO).querySelector(`.${styles.columns}`)).toBeNull();
 });

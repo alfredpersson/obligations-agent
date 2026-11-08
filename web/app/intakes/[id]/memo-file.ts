@@ -34,7 +34,6 @@ import {
   STATE,
   STATUS,
   STATUS_WOULD_CHANGE,
-  answered,
   assumed,
   cannotApply,
   caseOf,
@@ -47,7 +46,6 @@ import {
   needsResult,
   noneOf,
   plannedCount,
-  withAnswers,
   youAsked,
 } from "./result-text";
 
@@ -129,11 +127,21 @@ export function memo(intake: Intake & { result: Result }, schema: Schema, choice
   const texts = intake.texts;
   const kept = ofCategory(choices.category);
 
-  // A result's status and the answers that decided it, then its units.
+  // A result's status, then the answers that decided it as a list, each answer in bold after its
+  // question's label (#69), then its units.
   function head(outcome: Outcome): Block[] {
-    const answers = Object.entries(outcome.answers).map(([slot, value]) => `${labelOf(slot)}: ${valueOf(slot, value)}`);
+    const answers = Object.entries(outcome.answers);
     return [
-      line({ strong: STATUS[outcome.status] }, ...(answers.length > 0 ? [` ${answered(answers)}`] : [])),
+      line({ strong: STATUS[outcome.status] }),
+      ...(answers.length > 0
+        ? [
+            line(answers.length === 1 ? "Your answer" : "Your answers"),
+            {
+              kind: "list" as const,
+              items: answers.map(([slot, value]): Span[] => [`${labelOf(slot)}: `, { strong: `${valueOf(slot, value)}` }]),
+            },
+          ]
+        : []),
       ...definition(outcome.quotes, choices),
     ];
   }
@@ -238,7 +246,15 @@ export function memo(intake: Intake & { result: Result }, schema: Schema, choice
       heading(3, item.label),
       line(plannedCount(changes)),
       line(youAsked(item.question)),
-      ...(changes.changed.length > 0 ? [line(withAnswers(changes.changed))] : []),
+      ...(changes.changed.length > 0
+        ? [
+            line("With these answers"),
+            {
+              kind: "list" as const,
+              items: changes.changed.map((entry): Span[] => [`${entry.fact}: `, { strong: entry.to }, ` (now ${entry.now})`]),
+            },
+          ]
+        : []),
       ...changes.refused.map((entry) => line(cannotApply(entry, labelOf, valueOf))),
       ...item.results.flatMap((outcome) => {
         const here = outcome.rows.filter(kept);

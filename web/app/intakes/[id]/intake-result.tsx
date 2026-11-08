@@ -33,7 +33,6 @@ import {
   cannotApply,
   dependsOn,
   plannedCount,
-  withAnswers,
   youAsked,
   AREAS,
   CATEGORY,
@@ -47,7 +46,6 @@ import {
   QUOTED_ABOVE,
   STATUS,
   alsoOn,
-  answered,
   assumed,
   caseOf,
   counted,
@@ -147,17 +145,32 @@ function Definition({ quotes, onOpen }: { quotes: Cited[]; onOpen: Open }) {
   );
 }
 
-// What a result that the answers decide says, the answers that decided it, and the units that define
-// it, folded (GATE-4).
+// An answer as a chip: the label of its question, then the answer in bold (#69).
+function Answer({ label, answer }: { label: string | undefined; answer: string | undefined }) {
+  return (
+    <span className={styles.answer}>
+      <span>{label}</span> <strong>{answer}</strong>
+    </span>
+  );
+}
+
+// Under the heading of a result that the answers decide, with its status: the answers that decided
+// it, and the units that define it, folded (GATE-4).
 function ResultHead({ outcome, ctx }: { outcome: Outcome; ctx: Context }) {
   const { labelOf, valueOf, onOpen } = ctx;
   const answers = Object.entries(outcome.answers);
   return (
     <>
-      <p>
-        <Status status={outcome.status} />
-        {answers.length > 0 && ` ${answered(answers.map(([slot, value]) => `${labelOf(slot)}: ${valueOf(slot, value)}`))}`}
-      </p>
+      {answers.length > 0 && (
+        <p>
+          {answers.map(([slot, value], index) => (
+            <Fragment key={slot}>
+              {index > 0 && " "}
+              <Answer label={labelOf(slot)} answer={valueOf(slot, value)} />
+            </Fragment>
+          ))}
+        </p>
+      )}
       <Definition quotes={outcome.quotes} onOpen={onOpen} />
     </>
   );
@@ -331,6 +344,14 @@ function Rows({ rows, folded, ctx }: { rows: { row: Row; also: string[] }[]; fol
               </details>
             )}
             <ul className={styles.rows}>
+              {/* The names of the two columns, for the eye: a screen reader reads each row's label
+                  before its action (#69). Without the key the rows have no actions. */}
+              {!folded && ctx.texts !== null && (
+                <li className={styles.columns} aria-hidden="true">
+                  <span>Obligation</span>
+                  <span>Action</span>
+                </li>
+              )}
               {run.map(({ row, also }) => (
                 <Obligation key={row.id} row={row} also={also} folded={folded} ctx={ctx} />
               ))}
@@ -342,8 +363,10 @@ function Rows({ rows, folded, ctx }: { rows: { row: Row; also: string[] }[]; fol
   );
 }
 
-// A regulation in the first part: the result that decides whether it applies, or the line that the
-// result assumes it, then its results that the answers decide, each with its rows that apply.
+// A regulation in the first part: its heading with the status from the result that decides whether
+// it applies, or "Assumed." for one that the result assumes, then the answers or the line on the
+// assumption; then, inside it, its results that the answers decide, each with its status in its
+// heading and its rows that apply (#69).
 function RegulationPart({
   regulation,
   head,
@@ -355,42 +378,46 @@ function RegulationPart({
   parts: Outcome[];
   ctx: Context;
 }) {
+  const status = head ? (
+    <Status status={head.status} />
+  ) : (
+    regulation.gate === null && <strong className={styles.status}>Assumed.</strong>
+  );
   return (
     <section
       id={`regulation-${regulation.id}`}
       aria-labelledby={`regulation-${regulation.id}-title`}
       className={styles.regulation}
     >
-      <h3 id={`regulation-${regulation.id}-title`}>{regulation.name}</h3>
-      {head ? (
-        <ResultHead outcome={head} ctx={ctx} />
-      ) : (
-        regulation.gate === null && (
-          <p>
-            <strong className={styles.status}>Assumed.</strong> {assumed(regulation.name)}
-          </p>
-        )
-      )}
-      {parts.map((outcome) => {
-        const rows = applying(outcome);
-        const shown = rows.filter(ctx.kept);
-        return (
-          <section
-            key={outcome.gate}
-            id={`result-${outcome.gate}`}
-            aria-labelledby={`result-${outcome.gate}-title`}
-            className={`${styles.result} ${styles[outcome.status]}`}
-          >
-            <h4 id={`result-${outcome.gate}-title`}>{outcome.label}</h4>
-            <ResultHead outcome={outcome} ctx={ctx} />
-            {rows.length > 0 && shown.length === 0 ? (
-              <None ctx={ctx} />
-            ) : (
-              <Rows rows={shown.map((row) => ({ row, also: [] }))} folded={false} ctx={ctx} />
-            )}
-          </section>
-        );
-      })}
+      <h3 id={`regulation-${regulation.id}-title`}>
+        {regulation.name}
+        {status && <> {status}</>}
+      </h3>
+      {head ? <ResultHead outcome={head} ctx={ctx} /> : regulation.gate === null && <p>{assumed(regulation.name)}</p>}
+      <div className={styles.results}>
+        {parts.map((outcome) => {
+          const rows = applying(outcome);
+          const shown = rows.filter(ctx.kept);
+          return (
+            <section
+              key={outcome.gate}
+              id={`result-${outcome.gate}`}
+              aria-labelledby={`result-${outcome.gate}-title`}
+              className={`${styles.result} ${styles[outcome.status]}`}
+            >
+              <h4 id={`result-${outcome.gate}-title`}>
+                {outcome.label} <Status status={outcome.status} />
+              </h4>
+              <ResultHead outcome={outcome} ctx={ctx} />
+              {rows.length > 0 && shown.length === 0 ? (
+                <None ctx={ctx} />
+              ) : (
+                <Rows rows={shown.map((row) => ({ row, also: [] }))} folded={false} ctx={ctx} />
+              )}
+            </section>
+          );
+        })}
+      </div>
     </section>
   );
 }
@@ -626,7 +653,13 @@ function PlannedChange({
         {changes.changed.length > 0 && (
           <>
             <br />
-            {withAnswers(changes.changed)}
+            With{" "}
+            {changes.changed.map((item, index) => (
+              <Fragment key={item.fact_id}>
+                {index > 0 && " "}
+                <Answer label={item.fact} answer={item.to} /> (now {item.now})
+              </Fragment>
+            ))}
           </>
         )}
       </p>
