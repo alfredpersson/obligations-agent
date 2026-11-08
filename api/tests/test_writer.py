@@ -1,4 +1,4 @@
-"""Tests for the writer of the meaning and the action of each row: acceptance criteria 7, 8 and 11 to 14 of issue #41, and failure cases from its plan; and the texts for each confirmation of the answers, acceptance criterion 7 of issue #50, with the notes written on the screen of the answers; and each row's category in the user message with the meaning of the three categories in the prompt, acceptance criterion 4 of issue #52. The model client sends each request to a fake transport, so no test calls the provider."""
+"""Tests for the writer of the meaning and the action of each row: acceptance criteria 7, 8 and 11 to 14 of issue #41, and failure cases from its plan; and the texts for each confirmation of the answers, acceptance criterion 7 of issue #50, with the notes written on the screen of the answers; and each row's category in the user message with the meaning of the three categories in the prompt, acceptance criterion 4 of issue #52; and the rows of a planned change, written with its question and its answers as data in the user message, acceptance criteria 6 and 7 of issue #63. The model client sends each request to a fake transport, so no test calls the provider."""
 
 import json
 import logging
@@ -14,7 +14,15 @@ from fastapi.testclient import TestClient
 from obligations_agent.gates import load_gates
 from obligations_agent.guidance import load_guidance
 from obligations_agent.intake_model import new_client
-from obligations_agent.intakes import Intake, NotSure, Option, Question
+from obligations_agent.intakes import (
+    Intake,
+    NotSure,
+    Option,
+    Planned,
+    Question,
+    Requested,
+    Turn,
+)
 from obligations_agent.schema import load_schema
 from obligations_agent.server import create_app
 from obligations_agent.writer import PROMPT, PROMPT_VERSION
@@ -234,7 +242,7 @@ def test_without_the_key_the_rows_have_no_texts_and_no_placeholder() -> None:
     client = service(None, ended())
 
     assert client.get("/intakes/one").json()["texts"] is None
-    assert client.post("/intakes/one/texts").json() == {"texts": None}
+    assert client.post("/intakes/one/texts").json() == {"texts": None, "planned": {}}
     assert len(row_ids(client)) == ROWS
 
 
@@ -661,3 +669,189 @@ def test_the_screen_of_the_answers_and_the_confirmation_call_no_model() -> None:
     assert client.post("/intakes/one/confirm").status_code == 200
 
     assert requests == []
+
+
+# Issue #63: the rows of a planned change.
+
+# A marker in the question of a planned change. It may reach the model only in the user message.
+CHANGE_MARKER = "Tapir-3141"
+NO_CHAT = {**ALL_YES, "interacts_with_people": "no"}
+CHAT_QUESTION = f"What if we add a chat where candidates ask about their application? {CHANGE_MARKER}"
+
+
+def with_chat(answers: dict[str, str] = NO_CHAT) -> Intake:
+    """An intake with a planned change from a question about a chat for candidates."""
+    return ended(answers).model_copy(
+        update={
+            "conversation": [
+                Turn(
+                    question=CHAT_QUESTION,
+                    reason="answered",
+                    text="One answer may change.",
+                    changes=[Requested(fact="interacts_with_people", value="yes")],
+                    label="Candidate chat",
+                    answers=answers,
+                )
+            ],
+            "planned": [
+                Planned(
+                    turn=1,
+                    label="Candidate chat",
+                    changes=[Requested(fact="interacts_with_people", value="yes")],
+                )
+            ],
+        }
+    )
+
+
+def planned_rows(client: TestClient) -> list[str]:
+    """The ids of the rows that the planned change of the intake "one" adds."""
+    [planned] = client.get("/intakes/one").json()["planned"]
+    return [row["id"] for item in planned["results"] for row in item["rows"]]
+
+
+def test_the_rows_of_a_planned_change_are_written_with_its_question_and_its_answers_as_data() -> (
+    None
+):
+    requests: list[httpx2.Request] = []
+    client = service(recording(requests), with_chat())
+    added = planned_rows(client)
+
+    written = client.post("/intakes/one/texts").json()
+
+    planned = [
+        request for request in requests if "planned_change" in user_data(request)
+    ]
+    assert added
+    assert sorted(row_of(request)["id"] for request in planned) == sorted(added)
+    data = user_data(planned[0])
+    assert data["planned_change"] == {
+        "change": CHAT_QUESTION,
+        "answers": ["Interacts with people: Yes"],
+    }
+    # The answers are those of the product with the change.
+    assert {"fact": "Interacts with people", "answer": "Yes"} in data["answers"]
+    # The rows of the result are written as before, without the planned change.
+    assert len(requests) == len(row_ids(client)) + len(added)
+    assert written["planned"] == {"1": {row_id: texts_of(row_id) for row_id in added}}
+    assert (
+        client.get("/intakes/one").json()["planned"][0]["texts"]
+        == (written["planned"]["1"])
+    )
+    # A later request returns the stored texts and calls nothing.
+    assert client.post("/intakes/one/texts").json() == written
+    assert len(requests) == len(row_ids(client)) + len(added)
+
+
+def test_the_question_of_a_planned_change_reaches_the_writer_only_in_the_user_message(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    requests: list[httpx2.Request] = []
+    caplog.set_level(logging.INFO)
+
+    service(recording(requests), with_chat()).post("/intakes/one/texts")
+
+    for request in requests:
+        sent = json.loads(request.content)
+        assert CHANGE_MARKER not in json.dumps(sent["system"])
+    assert any(CHANGE_MARKER in json.dumps(user_data(item)) for item in requests)
+    assert CHANGE_MARKER not in caplog.text
+
+
+def test_the_texts_of_a_planned_change_are_written_once_it_is_added_after_those_of_the_result() -> (
+    None
+):
+    requests: list[httpx2.Request] = []
+    intake = with_chat()
+    intakes = {"one": intake.model_copy(update={"planned": []})}
+    model = new_client().with_options(
+        http_client=anthropic.DefaultHttpxClient(
+            transport=httpx2.MockTransport(recording(requests))
+        )
+    )
+    client = TestClient(create_app(SCHEMA, GUIDANCE, GATES, intakes, model))
+    client.post("/intakes/one/texts")
+    result_calls = len(requests)
+
+    client.post(
+        "/intakes/one/planned", json={"turn": 1, "facts": ["interacts_with_people"]}
+    )
+    assert client.get("/intakes/one").json()["planned"][0]["texts"] == {}
+    written = client.post("/intakes/one/texts").json()
+
+    added = planned_rows(client)
+    assert len(requests) == result_calls + len(added)
+    assert set(written["planned"]["1"]) == set(added)
+
+
+def test_after_a_change_of_an_answer_the_texts_of_a_planned_change_are_written_again_for_the_new_answers() -> (
+    None
+):
+    requests: list[httpx2.Request] = []
+    client = service(recording(requests), with_chat())
+    client.post("/intakes/one/texts")
+    first = len(requests)
+
+    changed = client.put(
+        "/intakes/one/answers/processes_for_customer", json={"value": "no"}
+    ).json()
+    client.post("/intakes/one/confirm")
+
+    assert changed["planned"] is None
+    assert client.get("/intakes/one").json()["planned"][0]["texts"] == {}
+    written = client.post("/intakes/one/texts").json()
+    added = planned_rows(client)
+    assert set(written["planned"]["1"]) == set(added)
+    again = [
+        request
+        for request in requests[first:]
+        if "planned_change" in user_data(request)
+    ]
+    assert sorted(row_of(request)["id"] for request in again) == sorted(added)
+    assert {"fact": "Processes personal data for a customer", "answer": "No"} in (
+        user_data(again[0])["answers"]
+    )
+
+
+def test_a_failed_call_leaves_only_its_row_of_a_planned_change_without_texts() -> None:
+    failed = "transparency_interaction:aia:art50(5)"
+
+    def reply(request: httpx2.Request) -> httpx2.Response:
+        if "planned_change" in user_data(request) and row_of(request)["id"] == failed:
+            return refused(request)
+        return writes(request)
+
+    client = service(recording([], reply), with_chat())
+
+    written = client.post("/intakes/one/texts").json()["planned"]["1"]
+
+    assert written[failed] is None
+    assert all(
+        texts is not None for row_id, texts in written.items() if row_id != failed
+    )
+
+
+def test_the_rows_of_a_planned_change_of_a_later_question_get_that_question() -> None:
+    requests: list[httpx2.Request] = []
+    intake = with_chat()
+    earlier = Turn(
+        question="Why is the high-risk result conditional?",
+        reason="answered",
+        answers=NO_CHAT,
+    )
+    later = intake.model_copy(
+        update={
+            "conversation": [earlier, *intake.conversation],
+            "planned": [intake.planned[0].model_copy(update={"turn": 2})],
+        }
+    )
+
+    service(recording(requests), later).post("/intakes/one/texts")
+
+    planned = [
+        request for request in requests if "planned_change" in user_data(request)
+    ]
+    assert planned
+    assert {user_data(request)["planned_change"]["change"] for request in planned} == {
+        CHAT_QUESTION
+    }

@@ -1,4 +1,4 @@
-"""Tests for the gates: reading gates.yaml, each gate table against the regulation text, the result of an intake that has ended, and the quote and the link of each unit (issue #37: GATE-1 to GATE-4, MEMO-6 to MEMO-8, VALID-2), and the rows of the obligations with their dates and the grouping by regulation (issue #41: MEMO-5, MEMO-6), the category of each row (issue #52: GATE-5, MEMO-5), and the deployer, the marking of generated content, their rows and the conditions of their dates (issue #45: GATE-4, GATE-5, MEMO-5, MEMO-8), and the changes that one or more changed answers would make to the result (issue #44: QA-1, GATE-1, INTAKE-1, INTAKE-3)."""
+"""Tests for the gates: reading gates.yaml, each gate table against the regulation text, the result of an intake that has ended, and the quote and the link of each unit (issue #37: GATE-1 to GATE-4, MEMO-6 to MEMO-8, VALID-2), and the rows of the obligations with their dates and the grouping by regulation (issue #41: MEMO-5, MEMO-6), the category of each row (issue #52: GATE-5, MEMO-5), and the deployer, the marking of generated content, their rows and the conditions of their dates (issue #45: GATE-4, GATE-5, MEMO-5, MEMO-8), and the changes that one or more changed answers would make to the result (issue #44: QA-1, GATE-1, INTAKE-1, INTAKE-3), each changed row with its id and its link (issue #63: MEMO-7)."""
 
 import re
 from collections.abc import Sequence
@@ -1793,6 +1793,10 @@ def citation_of(unit_id: str) -> str:
     return next(unit.citation for unit in GATES.units if unit.id == unit_id)
 
 
+def link_of(unit_id: str) -> str:
+    return link(next(unit for unit in GATES.units if unit.id == unit_id))
+
+
 def test_under_own_name_no_removes_the_rows_of_the_provider_and_its_follow_up_questions() -> (
     None
 ):
@@ -1837,11 +1841,13 @@ def test_under_own_name_no_removes_the_rows_of_the_provider_and_its_follow_up_qu
         ),
     ]
     assert changes.rows_removed[0] == RowChange(
+        id="provider:aia:art4(1)",
         label="AI literacy of staff",
         result="Provider",
         category="organisation",
         status="conditional",
         citation=citation_of("aia:art4(1)"),
+        link=link_of("aia:art4(1)"),
         date="2 February 2025",
     )
     removed = [(row.result, row.label) for row in changes.rows_removed]
@@ -2088,3 +2094,22 @@ def test_a_fact_named_twice_keeps_only_its_last_value() -> None:
         ("personal_data", "Not sure")
     ]
     assert changes.refused == []
+
+
+def test_each_row_in_the_changes_has_the_id_and_the_link_of_its_row_in_the_result() -> (
+    None
+):
+    # The panel, the folds under an open answer and a planned change link each row to EUR-Lex, as
+    # the result's rows are linked (MEMO-7, the comment on issue #63).
+    changes = changes_of(
+        WITHOUT_DATA, ("personal_data", "yes"), ("generates_content", "yes")
+    )
+    after = result_of(
+        {**WITHOUT_DATA, "personal_data": "yes", "generates_content": "yes"}
+    )
+    rows = {row.id: row for outcome in after.gates for row in outcome.rows}
+
+    assert changes.rows_added
+    for row in changes.rows_added:
+        assert row.link == rows[row.id].unit.link
+        assert row.citation == rows[row.id].unit.citation

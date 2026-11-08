@@ -1,6 +1,6 @@
 import { NOT_LEGAL_ADVICE } from "../../not-legal-advice";
 import { REASONS } from "../../not-sure-reason";
-import type { Cited, Intake, Outcome, Result, Row, Schema } from "../../service";
+import type { Cited, Intake, Outcome, Planned, Result, Row, Schema } from "../../service";
 import {
   type Item,
   alsoRows,
@@ -25,19 +25,30 @@ import {
   IF_NOT_LISTED,
   LISTED_USE,
   NOT_WRITTEN,
+  NO_LONGER_APPLY,
   NOTHING_OPEN,
   PARTS,
+  PLANNED,
+  PLANNED_LINE,
   QUOTED_ABOVE,
+  STATE,
   STATUS,
+  STATUS_WOULD_CHANGE,
   answered,
   assumed,
+  cannotApply,
   caseOf,
   counted,
   eachAlsoOn,
   ifListed,
   ifYes,
   needsFact,
+  dependsOn,
   needsResult,
+  noneOf,
+  plannedCount,
+  withAnswers,
+  youAsked,
 } from "./result-text";
 
 // The file of the export (#53): the memo as blocks, which the Markdown and the PDF both draw, so that
@@ -79,7 +90,7 @@ const TODAY = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", 
 
 const line = (...spans: Span[]): Block => ({ kind: "line", spans });
 const heading = (level: 1 | 2 | 3 | 4 | 5, text: string): Block => ({ kind: "heading", level, text });
-const link = (unit: Cited): Span => ({ text: unit.citation, link: unit.link });
+const link = (unit: Pick<Cited, "citation" | "link">): Span => ({ text: unit.citation, link: unit.link });
 
 // Units as links in a sentence, such as "AI Act Article 6(2), AI Act Article 6(3)".
 function links(units: Cited[]) {
@@ -129,12 +140,14 @@ export function memo(intake: Intake & { result: Result }, schema: Schema, choice
 
   // One section for each row, which can be pasted as one ticket: its label as its heading, its
   // result, category, clause, date and status, what it depends on or needs, then the quote, the
-  // meaning and the action (MEMO-5).
-  function section(outcome: Outcome, row: Row, on: string[]): Block[] {
+  // meaning and the action (MEMO-5); a row of a planned change starts with the change's label, and
+  // has the texts and the items of the change (#63).
+  function section(outcome: Outcome, row: Row, on: string[], planned?: Planned): Block[] {
     const regulation = result.regulations.find((item) => item.id === outcome.regulation);
     const needs = row.needs;
     const gate = needs?.gate ? result.gates.find((item) => item.gate === needs.gate) : undefined;
-    const text = texts?.[row.id];
+    const text = (planned ? planned.texts : texts)?.[row.id];
+    const depends = planned ? (planned.depends_on[row.id] ?? []) : on.map((item) => said(item, ctx));
     // The file quotes the row's unit with the result above when its result quotes it (MEMO-8).
     const above = choices.quotes && quotedAbove(outcome, row);
     return [
@@ -142,15 +155,16 @@ export function memo(intake: Intake & { result: Result }, schema: Schema, choice
       {
         kind: "list",
         items: [
+          ...(planned ? [[`Planned change: ${planned.label}`]] : []),
           [`Result: ${outcome.label}${regulation && outcome.label !== regulation.name ? ` (${regulation.name})` : ""}`],
           [`Category: ${CATEGORY[row.category]}`],
           ["Clause: ", link(row.unit), ...(above ? [QUOTED_ABOVE] : [])],
           [`From ${DAY.format(new Date(row.date))} (`, link(row.date_unit), ")."],
           ...(row.condition ? [[`${row.condition.title}: ${row.condition.text} (`, link(row.condition), ")."]] : []),
           [`Status: ${STATUS[row.status]}`],
-          ...(on.length > 0 ? [[`Depends on ${on.map((item) => said(item, ctx)).join(", and on ")}.`]] : []),
+          ...(depends.length > 0 ? [[dependsOn(depends)]] : []),
           ...(needs?.slot ? [[needsFact(labelOf(needs.slot), needs.value ? valueOf(needs.slot, needs.value) : undefined)]] : []),
-          ...(gate ? [[needsResult(gate.label, gate.status)]] : []),
+          ...(gate ? [[needsResult(gate.label, needs?.status ?? gate.status)]] : []),
         ],
       },
       ...(choices.quotes && row.unit.quote && !above ? [{ kind: "quote" as const, text: row.unit.quote }] : []),
@@ -212,6 +226,59 @@ export function memo(intake: Intake & { result: Result }, schema: Schema, choice
     ];
   }
 
+  // A planned change: its label, the line with the number of obligations that it would add and
+  // remove, its question and its answers, each answer that can no longer be applied, the rows that it
+  // would add by result, and the rows whose status would change or that would no longer apply, each
+  // with the change's label (#63).
+  function plannedChange(item: Planned): Block[] {
+    const { changes } = item;
+    const changedRows = changes.rows_changed.filter(kept);
+    const removedRows = changes.rows_removed.filter(kept);
+    return [
+      heading(3, item.label),
+      line(plannedCount(changes)),
+      line(youAsked(item.question)),
+      ...(changes.changed.length > 0 ? [line(withAnswers(changes.changed))] : []),
+      ...changes.refused.map((entry) => line(cannotApply(entry, labelOf, valueOf))),
+      ...item.results.flatMap((outcome) => {
+        const here = outcome.rows.filter(kept);
+        return [
+          heading(4, outcome.label),
+          ...(here.length > 0
+            ? here.flatMap((row) => section(outcome, row, [], item))
+            : choices.category
+              ? [line(noneOf(choices.category))]
+              : []),
+        ];
+      }),
+      ...(changedRows.length > 0
+        ? [
+            line({ strong: STATUS_WOULD_CHANGE }),
+            {
+              kind: "list" as const,
+              items: changedRows.map((row) => [
+                `${row.label}: ${STATE[row.before]} to ${STATE[row.status]} (${row.result}). Planned change: ${item.label}.`,
+              ]),
+            },
+          ]
+        : []),
+      ...(removedRows.length > 0
+        ? [
+            line({ strong: NO_LONGER_APPLY }),
+            {
+              kind: "list" as const,
+              items: removedRows.map((row): Span[] => [
+                `${row.label} (${row.result}, `,
+                link(row),
+                `, from ${row.date}). Planned change: ${item.label}.`,
+              ]),
+            },
+          ]
+        : []),
+    ];
+  }
+
+  const planned = intake.planned ?? [];
   const rows = result.gates.flatMap((outcome) => outcome.rows);
   const relevant = slots.filter((slot) => slot.id in intake.answers || intake.open_slots.includes(slot.id));
   const third = also
@@ -277,6 +344,7 @@ export function memo(intake: Intake & { result: Result }, schema: Schema, choice
           ]),
         ]
       : []),
+    ...(planned.length > 0 ? [heading(2, PLANNED), line(PLANNED_LINE), ...planned.flatMap(plannedChange)] : []),
     heading(2, "What the tool does not check yet"),
     { kind: "list", items: result.not_checked.map((item) => [`${item.text}: `, ...links(item.links)]) },
   ];

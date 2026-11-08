@@ -19,6 +19,7 @@ from obligations_agent.gates import (
     Result,
     Unit,
     WhatIf,
+    after_changes,
     apply_answers,
     decide,
     in_words,
@@ -30,6 +31,8 @@ from obligations_agent.intakes import (
     Ending,
     Example,
     Intake,
+    IntakeError,
+    Planned,
     Quoted,
     Requested,
     Turn,
@@ -61,6 +64,8 @@ PROMPT_VERSION = PROMPT.split("\n", 1)[0].removeprefix("Version: ")
 TOOL_LIMIT = 6
 TIME_LIMIT = 60.0
 QUESTION_LIMIT = 20
+# The longest label of a planned change (#63).
+LABEL_LIMIT = 60
 # The message that code sends once when the model ends its turn with plain text, whose quotes code
 # could not check.
 REMINDER = "End your turn with the answer tool, with the text, quotes, guidance and changes of your answer."
@@ -145,7 +150,7 @@ TOOLS: list[ToolParam] = [
     },
     {
         "name": "answer",
-        "description": "Ends your turn with the answer that the user sees. text: the answer in plain words, with each citation in square brackets, for example [GDPR Article 21(1)] or [AI Act Annex III, point 4]. quotes: passages to show under the text, each word for word from the result or from a text that the article tool returned, with the regulation, kind and number of its article or annex. guidance: the ids of the guidance entries to show; code adds their quotes and sources. changes: for a described change to the product, each answer that it may change, as a fact id and the value id that it may take; code shows each question and what the rules would give with all of them together; an empty list when the change touches no question or the question is not about a change. Code drops a quote that it does not find word for word in the stored copy.",
+        "description": 'Ends your turn with the answer that the user sees. text: the answer in plain words, with each citation in square brackets, for example [GDPR Article 21(1)] or [AI Act Annex III, point 4]. quotes: passages to show under the text, each word for word from the result or from a text that the article tool returned, with the regulation, kind and number of its article or annex. guidance: the ids of the guidance entries to show; code adds their quotes and sources. changes: for a described change to the product, each answer that it may change, as a fact id and the value id that it may take; code shows each question and what the rules would give with all of them together; an empty list when the change touches no question or the question is not about a change. label: for a described change to the product, the change in a few words as the user names it, at most 60 characters, for example "Weekly report email to managers"; an empty string for another question. Code drops a quote that it does not find word for word in the stored copy.',
         "strict": True,
         "input_schema": {
             "type": "object",
@@ -170,8 +175,9 @@ TOOLS: list[ToolParam] = [
                 },
                 "guidance": {"type": "array", "items": {"type": "string"}},
                 "changes": CHANGES,
+                "label": {"type": "string"},
             },
-            "required": ["text", "quotes", "guidance", "changes"],
+            "required": ["text", "quotes", "guidance", "changes", "label"],
             "additionalProperties": False,
         },
     },
@@ -204,6 +210,7 @@ class AnswerInput(BaseModel):
     quotes: list[QuoteInput]
     guidance: list[str]
     changes: list[Requested]
+    label: str = ""
 
 
 class Segment(BaseModel):
@@ -812,6 +819,7 @@ def ask(
                         if entry in known
                     ],
                     changes=given.changes,
+                    label=given.label,
                     answers=answers,
                 )
                 break
@@ -926,5 +934,76 @@ def view_turn(
         "quotes": [quote.model_dump() for quote in turn.quotes],
         "guidance": [data for _, data in shown],
         "scenario": scenario,
+        "label": label_of(turn),
         "for_earlier_answers": earlier,
+    }
+
+
+def label_of(turn: Turn) -> str:
+    """The label of a planned change: the label of the model's answer, or the start of the question when that label is empty or longer than 60 characters (#63)."""
+    label = words(turn.label)
+    if 0 < len(label) <= LABEL_LIMIT:
+        return label
+    question = words(turn.question)
+    if len(question) <= LABEL_LIMIT:
+        return question
+    return question[: LABEL_LIMIT - 1].rsplit(" ", 1)[0] + "…"
+
+
+def plan_change(
+    schema: Schema, intake: Intake, number: int, facts: list[str]
+) -> Intake:
+    """The intake with the change of the question as a planned change, with the answers of the facts given among those that the panel shows for it, by their fact ids; a question that is a planned change already changes nothing (#63). The recorded answers do not change."""
+    if any(item.turn == number for item in intake.planned):
+        return intake
+    turn = intake.conversation[number - 1]
+    _, changed, _ = apply_answers(schema, at_question(intake, turn), turn.changes)
+    changes = [
+        Requested(fact=item.fact_id, value=item.value)
+        for item in changed
+        if item.fact_id in facts
+    ]
+    if not changes:
+        raise IntakeError("invalid_value", "facts")
+    planned = Planned(turn=number, label=label_of(turn), changes=changes)
+    return intake.model_copy(update={"planned": [*intake.planned, planned]})
+
+
+def view_planned(
+    schema: Schema,
+    gates: Gates,
+    intake: Intake,
+    result: Result,
+    planned: Planned,
+    keyed: bool,
+) -> dict[str, Any]:
+    """A planned change as GET /intakes/{id} shows it: its label and its question, what its answers change in the result of the recorded answers as code computes it for QA-1, with each answer that can no longer be applied, the results of the rows that it adds with those rows and no quotes of their own, what each conditional row depends on, and the texts of the rows: none without the key, an empty map until they are written (#63)."""
+    changes = what_if(gates, schema, intake, planned.changes, result)
+    _, _, after_result, added = after_changes(
+        gates, schema, intake, result, planned.changes
+    )
+    labels = {slot.id: slot.label for slot in [*schema.slots, *schema.follow_up_slots]}
+    outcomes = [
+        outcome.model_copy(
+            update={
+                "quotes": [],
+                "rows": [row for row in outcome.rows if row.id in added],
+            }
+        )
+        for outcome in after_result.gates
+        if any(row.id in added for row in outcome.rows)
+    ]
+    return {
+        "turn": planned.turn,
+        "label": planned.label,
+        "question": intake.conversation[planned.turn - 1].question,
+        "changes": changes.model_dump(),
+        "results": [outcome.model_dump() for outcome in outcomes],
+        "depends_on": {
+            row.id: depends_on(labels, after_result, outcome, row)
+            for outcome in after_result.gates
+            for row in outcome.rows
+            if row.id in added and row.status == "conditional"
+        },
+        "texts": (planned.texts or {}) if keyed else None,
     }

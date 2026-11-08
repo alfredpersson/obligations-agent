@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import { Activity } from "react";
 import { afterEach, expect, test, vi } from "vitest";
 import type { Intake, Question, Texts, Turn } from "../../service";
-import { PLAIN, stubFetch, testResult, testRows, testSchema } from "../../testing";
+import { PLAIN, stubFetch, testPlanned, testResult, testRows, testSchema } from "../../testing";
 import IntakeScreen from "./intake-screen";
 
 const router = vi.hoisted(() => ({ replace: vi.fn(), push: vi.fn() }));
@@ -47,6 +47,7 @@ const waiting = {
   texts: null,
   open_changes: null,
   conversation: null,
+  planned: null,
 } satisfies Intake;
 const ended = {
   ...waiting,
@@ -259,6 +260,7 @@ test("texts that arrive while a question about the result waits stay after its a
     quotes: [],
     guidance: [],
     scenario: null,
+    label: "What if we add a screen?",
     for_earlier_answers: false,
   } satisfies Turn;
   const fetchMock = vi.fn<typeof fetch>(async (input) => {
@@ -404,4 +406,89 @@ test("the texts of a request that ends after its page was hidden do not show on 
   };
   second.resolve(Response.json({ texts: later }));
   expect(await screen.findByText("Order the sign.")).toBeTruthy();
+});
+
+// Issue #63: the texts of the rows of a planned change, which the screen asks for as it asks for the
+// texts of the result's rows.
+
+const PLANNED_TEXTS = testPlanned.texts;
+
+test("a planned change without texts makes the screen ask for them once, also when the result's texts are written, and its rows then show them", async () => {
+  const fetchMock = stubFetch({
+    [INTAKE_URL]: Response.json({ ...endedWith(TEXTS), planned: [{ ...testPlanned, texts: {} }] }),
+    "/api/schema": Response.json(testSchema),
+    [TEXTS_URL]: Response.json({ texts: TEXTS, planned: { "1": PLANNED_TEXTS } }),
+  });
+  render(<IntakeScreen />);
+
+  expect(await screen.findByText("Blur the faces on the door screen.")).toBeTruthy();
+  expect(screen.getByText("Keep a record of who watches the door screen.")).toBeTruthy();
+  expect(screen.getByText("Draft the notice.")).toBeTruthy();
+  expect(textRequests(fetchMock)).toHaveLength(1);
+  expect(screen.queryByText(PLACEHOLDER)).toBeNull();
+});
+
+test("a planned change whose texts are stored shows them at once, with no request", async () => {
+  const fetchMock = stubFetch({
+    [INTAKE_URL]: Response.json({ ...endedWith(TEXTS), planned: [testPlanned] }),
+    "/api/schema": Response.json(testSchema),
+  });
+  render(<IntakeScreen />);
+
+  expect(await screen.findByText("Blur the faces on the door screen.")).toBeTruthy();
+  expect(textRequests(fetchMock)).toHaveLength(0);
+});
+
+test("a failed request for the texts leaves each row of the planned change with the line that its texts could not be written, and keeps the result's texts", async () => {
+  stubFetch({
+    [INTAKE_URL]: Response.json({ ...endedWith(TEXTS), planned: [{ ...testPlanned, texts: {} }] }),
+    "/api/schema": Response.json(testSchema),
+    [TEXTS_URL]: new Response(null, { status: 500 }),
+  });
+  render(<IntakeScreen />);
+
+  expect(await screen.findAllByText("The meaning and the action of this row could not be written.")).toHaveLength(2);
+  expect(screen.getByText("Draft the notice.")).toBeTruthy();
+});
+
+test("a planned change that the panel adds joins the screen, which then asks for the texts of its rows", async () => {
+  const turn = {
+    question: testPlanned.question,
+    answered: true,
+    blocks: [{ kind: "paragraph", segments: [{ text: "One answer may change.", link: null }] }],
+    quotes: [],
+    guidance: [],
+    scenario: {
+      questions: [
+        {
+          fact: "Video sharing",
+          fact_id: "shares_video",
+          question: "Does the product share video with others?",
+          now: "no answer",
+          to: "Yes",
+          guidance: [],
+        },
+      ],
+      changes: testPlanned.changes,
+    },
+    label: "Door screen",
+    for_earlier_answers: false,
+  } satisfies Turn;
+  const before = { ...endedWith(TEXTS), conversation: [turn], planned: [] };
+  const fetchMock = stubFetch({
+    [INTAKE_URL]: Response.json(before),
+    "/api/schema": Response.json(testSchema),
+    [`${INTAKE_URL}/planned`]: Response.json({ ...before, planned: [{ ...testPlanned, texts: {} }] }),
+    [TEXTS_URL]: Response.json({ texts: TEXTS, planned: { "1": PLANNED_TEXTS } }),
+  });
+  render(<IntakeScreen />);
+  await expectResult();
+  expect(textRequests(fetchMock)).toHaveLength(0);
+
+  fireEvent.click(screen.getByRole("button", { name: /^What if/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Add to the result as “Door screen”" }));
+
+  expect(await screen.findByText("Blur the faces on the door screen.")).toBeTruthy();
+  expect(textRequests(fetchMock)).toHaveLength(1);
+  expect(screen.getByText(/^Added to the result as/)).toBeTruthy();
 });

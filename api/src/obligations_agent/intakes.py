@@ -120,7 +120,17 @@ class Turn(BaseModel):
     quotes: list[Quoted] = []
     guidance: list[str] = []
     changes: list[Requested] = []
+    label: str = ""
     answers: dict[str, str]
+
+
+class Planned(BaseModel):
+    """A change to the product that the user plans, added from a question about the result: the number of the question, the label, and the answers that the change changes, each by the id of its fact; texts holds the meaning and the action of each row that the change adds, by the row's id, or None for a row whose texts could not be written, once they are written for the confirmed answers (#63)."""
+
+    turn: int
+    label: str
+    changes: list[Requested]
+    texts: dict[str, Text | None] | None = None
 
 
 class Intake(Form):
@@ -131,6 +141,7 @@ class Intake(Form):
     confirmed: bool = False
     texts: dict[str, Text | None] | None = None
     conversation: list[Turn] = []
+    planned: list[Planned] = []
 
 
 Writer = Callable[[Intake], Question | None]
@@ -155,6 +166,19 @@ class Ask(BaseModel):
     """The body of POST /intakes/{id}/questions: the user's question (QA-2)."""
 
     text: str = Field(max_length=500)
+
+
+class Plan(BaseModel):
+    """The body of POST /intakes/{id}/planned: the number of a question about the result, and the ids of the facts whose answers the change changes, all that the answer names or those that the user ticks (#63)."""
+
+    turn: int
+    facts: list[str]
+
+
+class Rename(BaseModel):
+    """The body of PUT /intakes/{id}/planned/{turn}: the new label of a planned change (#63)."""
+
+    label: str
 
 
 class IntakeError(Exception):
@@ -348,7 +372,17 @@ def change_answer(
             slot_id,
             (not_sure or NotSure()).reason,
         )
-    return changed.model_copy(update={"confirmed": False, "texts": None})
+    # The texts of the planned changes go with those of the result, since each planned change is
+    # computed for the answers of the intake (#63).
+    return changed.model_copy(
+        update={
+            "confirmed": False,
+            "texts": None,
+            "planned": [
+                item.model_copy(update={"texts": None}) for item in changed.planned
+            ],
+        }
+    )
 
 
 def last_questions(schema: Schema, intake: Intake) -> dict[str, Question]:

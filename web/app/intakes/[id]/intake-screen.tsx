@@ -4,7 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import layout from "../../layout.module.css";
 import LoadingStatus, { WRITING } from "../../loading-status";
-import type { Intake, Step, Texts } from "../../service";
+import type { Intake, Planned, Step, Texts } from "../../service";
 import FollowUpQuestion from "./follow-up-question";
 import IntakeResult from "./intake-result";
 import { useIntake } from "./use-intake";
@@ -28,11 +28,13 @@ export default function IntakeScreen() {
   // Once the result shows with rows and no texts yet, the screen asks the service to write them. The
   // service writes them once and returns the stored texts to a repeated request, so an effect that
   // runs again, as on a page that Next.js shows again, writes nothing more (MEMO-1).
+  const empty = (texts: Texts) => texts !== null && Object.keys(texts).length === 0;
+  const rowsOf = (planned: Planned) => planned.results.flatMap((outcome) => outcome.rows);
+  // The texts of the rows of a planned change are written the same way, once it is added (#63).
   const pending =
     data !== null &&
-    data.intake.texts !== null &&
-    Object.keys(data.intake.texts).length === 0 &&
-    (data.intake.result?.gates.some((outcome) => outcome.rows.length > 0) ?? false);
+    ((empty(data.intake.texts) && (data.intake.result?.gates.some((outcome) => outcome.rows.length > 0) ?? false)) ||
+      (data.intake.planned ?? []).some((item) => empty(item.texts) && rowsOf(item).length > 0));
   useEffect(() => {
     if (!pending) return;
     // A response that ends after the page was hidden changes nothing: the page shown again sends its
@@ -41,24 +43,31 @@ export default function IntakeScreen() {
     fetch(`/api/intakes/${id}/texts`, { method: "POST" })
       .then(async (response) => {
         if (!response.ok) throw new Error();
-        return ((await response.json()) as { texts: Texts }).texts;
+        return (await response.json()) as { texts: Texts; planned: Record<string, Texts> };
       })
       .catch(() => "failed" as const)
-      .then((texts) => {
+      .then((written) => {
         if (!current) return;
+        // A failed request leaves each row that waits for its texts without them, with a line that
+        // says so.
+        const failed = (texts: Texts, rows: { id: string }[]) =>
+          empty(texts) ? Object.fromEntries(rows.map((row) => [row.id, null])) : texts;
         setData(
           (old) =>
             old && {
               ...old,
               intake: {
                 ...old.intake,
-                // A failed request leaves each row without its texts, with a line that says so.
                 texts:
-                  texts === "failed"
-                    ? Object.fromEntries(
-                        (old.intake.result?.gates ?? []).flatMap((outcome) => outcome.rows.map((row) => [row.id, null])),
-                      )
-                    : texts,
+                  written === "failed"
+                    ? failed(old.intake.texts, (old.intake.result?.gates ?? []).flatMap((outcome) => outcome.rows))
+                    : written.texts,
+                planned:
+                  old.intake.planned?.map((item) => ({
+                    ...item,
+                    texts:
+                      written === "failed" ? failed(item.texts, rowsOf(item)) : (written.planned[item.turn] ?? item.texts),
+                  })) ?? null,
               },
             },
         );
@@ -130,6 +139,7 @@ export default function IntakeScreen() {
                 old && { ...old, intake: { ...old.intake, conversation: [...(old.intake.conversation ?? []), turn] } },
             )
           }
+          onIntake={(changed) => setData((old) => old && { ...old, intake: changed })}
         />
       )}
     </div>

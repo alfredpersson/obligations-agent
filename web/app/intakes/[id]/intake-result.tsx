@@ -4,8 +4,8 @@ import actions from "../../actions.module.css";
 import loading from "../../loading-status.module.css";
 import { REASONS } from "../../not-sure-reason";
 import segments from "../../segments.module.css";
-import type { Asked, Cited, Intake, NotSure, Outcome, Regulation, Result, Row, Schema, Texts, Turn } from "../../service";
-import Conversation, { Changes, Cross, changed } from "./conversation";
+import type { Asked, Cited, Intake, NotSure, Outcome, Planned, Regulation, Result, Row, Schema, Texts, Turn } from "../../service";
+import Conversation, { ChangedRows, Changes, Cross, Obligations, PlannedTag, changed } from "./conversation";
 import styles from "./intake-result.module.css";
 import MemoExport from "./memo-export";
 import {
@@ -27,6 +27,14 @@ import {
 import {
   ALSO_LINE,
   ALWAYS,
+  NO_LONGER_APPLY,
+  PLANNED,
+  PLANNED_LINE,
+  cannotApply,
+  dependsOn,
+  plannedCount,
+  withAnswers,
+  youAsked,
   AREAS,
   CATEGORY,
   DAY,
@@ -80,7 +88,7 @@ function remember(link: string) {
 
 export type Open = (event: MouseEvent<HTMLAnchorElement>, unit: Cited) => void;
 
-function Links({ links, onOpen }: { links: Cited[]; onOpen: Open }) {
+export function Links({ links, onOpen }: { links: Cited[]; onOpen: Open }) {
   return links.map((unit, index) => (
     <Fragment key={unit.citation}>
       {index > 0 && ", "}
@@ -105,7 +113,9 @@ type Context = Labels & {
   openChanges: Intake["open_changes"];
   // The category that the bar shows, or null for all, and whether a row shows (MEMO-11).
   category: Row["category"] | null;
-  kept: (row: Row) => boolean;
+  kept: (row: Pick<Row, "category">) => boolean;
+  // In a planned change: its label beside each row, and what each conditional row depends on (#63).
+  planned?: Planned;
 };
 
 // The line in place of the rows of a result that has rows, none of them of the chosen category.
@@ -215,7 +225,7 @@ function Details({ row, ctx }: { row: Row; ctx: Context }) {
       {needs?.slot && (
         <p className={styles.meta}>{needsFact(labelOf(needs.slot), needs.value ? valueOf(needs.slot, needs.value) : undefined)}</p>
       )}
-      {gate && <p className={styles.meta}>{needsResult(gate.label, gate.status)}</p>}
+      {gate && <p className={styles.meta}>{needsResult(gate.label, needs?.status ?? gate.status)}</p>}
     </>
   );
 }
@@ -244,7 +254,11 @@ function Obligation({
       <Category category={row.category} />
     </>
   );
-  const under = also.length > 0 && <span className={styles.dependsOn}>{alsoOn(also.map((item) => said(item, ctx)))}</span>;
+  const on = ctx.planned?.depends_on[row.id] ?? [];
+  const under =
+    (also.length > 0 && <span className={styles.dependsOn}>{alsoOn(also.map((item) => said(item, ctx)))}</span>) ||
+    (on.length > 0 && <span className={styles.dependsOn}>{dependsOn(on)}</span>);
+  const plannedTag = ctx.planned && <PlannedTag label={ctx.planned.label} />;
   return (
     <li className={`${styles.row} ${styles[row.status]} ${folded ? "" : styles.todo} ${open ? styles.open : ""}`}>
       {folded ? (
@@ -252,6 +266,7 @@ function Obligation({
           <span className={styles.rowLabel}>
             {row.label}
             {tag}
+            {plannedTag}
           </span>
           {under}
         </button>
@@ -261,6 +276,7 @@ function Obligation({
             <p className={styles.rowLabel}>
               {row.label}
               {tag}
+              {plannedTag}
             </p>
             {under}
           </div>
@@ -463,7 +479,7 @@ function OpenAnswer({
               <summary>
                 If {ctx.valueOf(slot, value)}: {changed(change)}
               </summary>
-              <Changes change={change} />
+              <Changes change={change} onOpen={ctx.onOpen} />
             </details>
           ))}
         </div>
@@ -517,6 +533,136 @@ function ListedUse({ item, outcome, where, ctx }: { item: Item; outcome: Outcome
   );
 }
 
+// A planned change (#63): its label as its heading, which the user can rename, and a button that
+// removes it; the line with the number of obligations that it would add and remove; the question
+// and the answers that it changes, with each answer that can no longer be applied; the obligations
+// that it would add, by result, each with its action and its details as a row of the result; then
+// the obligations whose status would change and those that would no longer apply. Each row has the
+// change's label, also in a view of one category (MEMO-11).
+function PlannedChange({
+  planned,
+  ctx,
+  intakeId,
+  onIntake,
+}: {
+  planned: Planned;
+  ctx: Context;
+  intakeId: string;
+  onIntake: (intake: Intake) => void;
+}) {
+  const [renaming, setRenaming] = useState(false);
+  const [label, setLabel] = useState(planned.label);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const { changes } = planned;
+  const here: Context = { ...ctx, texts: planned.texts, planned };
+  const title = `planned-${planned.turn}-title`;
+
+  async function send(init: RequestInit, failure: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/intakes/${intakeId}/planned/${planned.turn}`, init);
+      if (!response.ok) throw new Error(String(response.status));
+      onIntake((await response.json()) as Intake);
+      setRenaming(false);
+    } catch {
+      setError(failure);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section id={`planned-${planned.turn}`} aria-labelledby={title} className={styles.planned}>
+      {renaming ? (
+        <form
+          className={styles.rename}
+          onSubmit={(event) => {
+            event.preventDefault();
+            void send(
+              { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ label }) },
+              "The label could not be saved. Try again.",
+            );
+          }}
+        >
+          <input
+            aria-label="Label of the planned change"
+            value={label}
+            maxLength={60}
+            autoFocus
+            onChange={(event) => setLabel(event.target.value)}
+          />
+          <button type="submit" disabled={busy || !label.trim()}>
+            Save
+          </button>
+          <button
+            type="button"
+            className={actions.secondary}
+            onClick={() => {
+              setRenaming(false);
+              setLabel(planned.label);
+            }}
+          >
+            Cancel
+          </button>
+        </form>
+      ) : (
+        <div className={styles.plannedHead}>
+          <h3 id={title}>{planned.label}</h3>
+          <button type="button" className={styles.textButton} onClick={() => setRenaming(true)}>
+            Rename
+          </button>
+          <button type="button" className={styles.textButton} disabled={busy} onClick={() => void send({ method: "DELETE" }, "The change could not be removed. Try again.")}>
+            Remove
+          </button>
+        </div>
+      )}
+      {error && <p role="alert">{error}</p>}
+      <p className={styles.plannedCount}>{plannedCount(changes)}</p>
+      <p className={styles.meta}>
+        {youAsked(planned.question)}
+        {/* Once every answer of the change is the recorded one or no longer asked, none is left to name. */}
+        {changes.changed.length > 0 && (
+          <>
+            <br />
+            {withAnswers(changes.changed)}
+          </>
+        )}
+      </p>
+      {changes.refused.map((item) => (
+        <p key={item.fact} className={styles.refused}>
+          {cannotApply(item, ctx.labelOf, ctx.valueOf)}
+        </p>
+      ))}
+      {planned.results.map((outcome) => {
+        const rows = outcome.rows.filter(ctx.kept);
+        return (
+          <section
+            key={outcome.gate}
+            aria-labelledby={`planned-${planned.turn}-${outcome.gate}-title`}
+            className={`${styles.result} ${styles[outcome.status]}`}
+          >
+            <h4 id={`planned-${planned.turn}-${outcome.gate}-title`}>{outcome.label}</h4>
+            {rows.length > 0 ? <Rows rows={rows.map((row) => ({ row, also: [] }))} folded={false} ctx={here} /> : <None ctx={ctx} />}
+          </section>
+        );
+      })}
+      {(changes.rows_changed.length > 0 || changes.rows_removed.length > 0) && (
+        <div className={styles.plannedOther}>
+          <ChangedRows rows={changes.rows_changed.filter(ctx.kept)} planned={planned.label} />
+          <Obligations
+            title={NO_LONGER_APPLY}
+            rows={changes.rows_removed.filter(ctx.kept)}
+            onOpen={ctx.onOpen}
+            planned={planned.label}
+          />
+        </div>
+      )}
+    </section>
+  );
+}
+
 // The three parts as links, in the page's side margin where it is wide enough, so that the rows keep
 // the page's width, and else in one row above the results: the regulations and the results that the
 // answers decide, the items to check, and the results of the third part. The counts count the rows
@@ -526,12 +672,14 @@ function ResultList({
   placed,
   items,
   also,
+  planned,
   ctx,
 }: {
   list: ReturnType<typeof parts>["list"];
   placed: Placed[];
   items: Item[];
   also: { item: Item; rows: Placed[] }[];
+  planned: Planned[];
   ctx: Context;
 }) {
   // The rows that show of a result that applies, and of the conditional rows that depend on an item.
@@ -595,6 +743,22 @@ function ResultList({
               </ul>
             </li>
           )}
+          {planned.length > 0 && (
+            <li className={styles.partItem}>
+              <a href="#planned">{PLANNED}</a>
+              <ul>
+                {planned.map((item) => (
+                  <li key={item.turn}>
+                    <span className={`${styles.square} ${styles.mark_planned}`} aria-hidden="true" />
+                    <a href={`#planned-${item.turn}`}>{item.label}</a>
+                    <span className={styles.count}>
+                      {item.results.flatMap((outcome) => outcome.rows).filter(ctx.kept).length}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </li>
+          )}
           <li className={styles.partItem}>
             <a href="#not-checked">What the tool does not check yet</a>
           </li>
@@ -631,6 +795,7 @@ function ResultList({
             <a href="#also">{PARTS[2]}</a>
           </span>
         )}
+        {planned.length > 0 && <a href="#planned">{PLANNED}</a>}
         <a href="#not-checked">What the tool does not check yet</a>
       </nav>
     </>
@@ -716,12 +881,15 @@ export default function IntakeResult({
   schema,
   answers,
   onTurn,
+  onIntake,
 }: {
   intake: Intake & { result: Result };
   schema: Schema;
   answers: string;
   // A question in the panel with its answer.
   onTurn: (turn: Turn) => void;
+  // The intake after a planned change was added, renamed or removed (#63).
+  onIntake: (intake: Intake) => void;
 }) {
   const { result, not_sure: notSure, questions, open_slots: openSlots, texts } = intake;
   // The category that the bar shows, or null for all; not stored, so that a reload shows all.
@@ -807,7 +975,7 @@ export default function IntakeResult({
       )}
       {/* Fixed at the bottom of the window, and before the results in the page's order. */}
       {rows.length > 0 && <Filter category={category} choose={setCategory} shown={rows.filter(kept).length} total={rows.length} />}
-      <ResultList list={list} placed={placed} items={items} also={also} ctx={ctx} />
+      <ResultList list={list} placed={placed} items={items} also={also} planned={intake.planned ?? []} ctx={ctx} />
       <section id="applies" aria-labelledby="applies-title" className={styles.part}>
         <h2 id="applies-title">{PARTS[0]}</h2>
         {list.map((group) => (
@@ -867,6 +1035,15 @@ export default function IntakeResult({
           ))}
         </section>
       )}
+      {intake.planned && intake.planned.length > 0 && (
+        <section id="planned" aria-labelledby="planned-title" className={styles.part}>
+          <h2 id="planned-title">{PLANNED}</h2>
+          <p>{PLANNED_LINE}</p>
+          {intake.planned.map((item) => (
+            <PlannedChange key={item.turn} planned={item} ctx={ctx} intakeId={intake.id} onIntake={onIntake} />
+          ))}
+        </section>
+      )}
       <section id="not-checked" aria-labelledby="not-checked-title" className={styles.part}>
         <h2 id="not-checked-title">What the tool does not check yet</h2>
         <ul>
@@ -879,7 +1056,12 @@ export default function IntakeResult({
       </section>
       {/* Without the key, there is no conversation and no panel (QA-2). */}
       {intake.conversation && (
-        <Conversation intake={{ ...intake, conversation: intake.conversation }} onOpen={open} onTurn={onTurn} />
+        <Conversation
+          intake={{ ...intake, conversation: intake.conversation }}
+          onOpen={open}
+          onTurn={onTurn}
+          onIntake={onIntake}
+        />
       )}
       <dialog
         ref={exportDialog}

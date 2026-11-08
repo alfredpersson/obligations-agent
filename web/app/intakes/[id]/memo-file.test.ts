@@ -4,7 +4,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, expect, test } from "vitest";
 import { NOT_LEGAL_ADVICE } from "../../not-legal-advice";
 import type { Cited, Intake, Result, Row } from "../../service";
-import { testIntake, testRows, testSchema } from "../../testing";
+import { testIntake, testPlanned, testRows, testSchema } from "../../testing";
 import IntakeResult from "./intake-result";
 import { type Choices, fileName, markdown, memo } from "./memo-file";
 
@@ -95,7 +95,7 @@ test("a file ends with the line on legal advice, the official texts that its quo
 });
 
 test("between them, a file holds the three parts as the screen shows them: the same headings in the same order, and one section for each row of the screen, in the same order", () => {
-  render(createElement(IntakeResult, { intake: testIntake, schema: testSchema, answers: "/intakes/x/answers", onTurn: () => {} }));
+  render(createElement(IntakeResult, { intake: testIntake, schema: testSchema, answers: "/intakes/x/answers", onTurn: () => {}, onIntake: () => {} }));
   const shown = screen
     .getAllByRole("heading")
     .filter((heading) => ["H2", "H3", "H4"].includes(heading.tagName))
@@ -303,4 +303,115 @@ test("the day of a file is the user's day, also just after midnight", () => {
 
   expect(fileName(night, ALL, "md")).toBe("obligations-memo-2026-11-07.md");
   expect(file(ALL, testIntake, night).split("\n\n")[1]).toBe("7 November 2026");
+});
+
+// Issue #63: the planned changes in the file, after its three parts (MEMO-10).
+
+const WITH_PLANNED = { ...testIntake, planned: [testPlanned] };
+
+test("a file has the planned changes after its three parts and before the items not checked, each under its label with the line of its numbers, its question and its answers", () => {
+  const text = file(ALL, WITH_PLANNED);
+
+  const titles = headings(text).map(({ level, title }) => `${level} ${title}`);
+  expect(titles.indexOf("2 What may also apply")).toBeLessThan(titles.indexOf("2 Planned changes"));
+  expect(titles.indexOf("2 Planned changes")).toBeLessThan(titles.indexOf("2 What the tool does not check yet"));
+  expect(titles.slice(titles.indexOf("2 Planned changes"), titles.indexOf("2 What the tool does not check yet"))).toEqual([
+    "2 Planned changes",
+    "3 Door screen",
+    "4 Storage role",
+    "5 Blur faces on the screen",
+    "5 A record of who watches",
+  ]);
+  const start = text.indexOf("## Planned changes");
+  const part = text.slice(start, text.indexOf("#### Storage role", start));
+  expect(part).toContain(
+    "What the rules would give for each change that you plan, each computed for your answers with its own. Your answers and the parts above stay as they are.",
+  );
+  expect(part).toContain("Adds 2 obligations and removes 1.");
+  expect(part).toContain(`You asked: ${testPlanned.question}`);
+  expect(part).toContain("With Video sharing: Yes (now no answer).");
+});
+
+test("each row of a planned change is a section that starts with the change's label, with its texts, what it depends on and the status of a result that it needs with the change", () => {
+  const text = file(ALL, WITH_PLANNED);
+
+  const blur = section(text, "Blur faces on the screen");
+  expect(blur.split("\n")[2]).toBe("- Planned change: Door screen");
+  expect(blur).toContain("- Category: Technical");
+  expect(blur).toContain("- Clause: [Rule 7(1)](");
+  expect(blur).toContain("> Faces are blurred.");
+  expect(blur).toContain("**What it means:** Faces on the screen must not be recognisable.");
+  expect(blur).toContain("**Action:** Blur the faces on the door screen.");
+  expect(blur).toContain("Needs Listed camera use: Applies.");
+  const record = section(text, "A record of who watches");
+  expect(record).toContain("- Status: Conditional.");
+  expect(record).toContain("- Depends on the open answer about Audience.");
+});
+
+test("a file lists the rows whose status a planned change would change and those that would no longer apply, each with the change's label, the removed ones linked", () => {
+  const part = file(ALL, WITH_PLANNED).slice(file(ALL, WITH_PLANNED).indexOf("### Door screen"));
+
+  expect(part).toContain("**Obligations whose status would change**");
+  expect(part).toContain("- A notice at the door: Conditional to Applies (Storage role). Planned change: Door screen.");
+  expect(part).toContain("**Obligations that would no longer apply**");
+  expect(part).toContain(
+    "- Staff training (Audience rules apply, [Camera Law Rule 2(1)](https://eur-lex.europa.eu/rule#002.001), from 2 February 2025). Planned change: Door screen.",
+  );
+});
+
+test("an answer of a planned change that can no longer be applied is named in the file", () => {
+  const refused = {
+    ...testPlanned,
+    changes: { ...testPlanned.changes, refused: [{ fact: "shares_video", value: "yes", error: "same_answer" as const }] },
+  };
+
+  expect(file(ALL, { ...testIntake, planned: [refused] })).toContain(
+    "Video sharing: Yes is your answer now, so this change no longer changes it.",
+  );
+});
+
+test("with one category, a file keeps only the planned change's rows of that category, and its line of numbers keeps its totals", () => {
+  const text = file({ ...ALL, category: "technical" }, WITH_PLANNED);
+
+  const part = text.slice(text.indexOf("## Planned changes"), text.indexOf("## What the tool does not check yet"));
+  expect(headings(part).filter(({ level }) => level === 5).map(({ title }) => title)).toEqual(["Blur faces on the screen"]);
+  expect(part).toContain("Adds 2 obligations and removes 1.");
+  expect(part).not.toContain("Staff training");
+  expect(part).not.toContain("A notice at the door");
+  expect(file({ ...ALL, category: "legal" }, WITH_PLANNED)).toContain("No legal obligations here.");
+});
+
+test("without the texts of a planned change, its rows have no meaning and no action, and a row whose texts could not be written says so", () => {
+  const waiting = file(ALL, { ...testIntake, planned: [{ ...testPlanned, texts: {} }] });
+  const failed = file(ALL, {
+    ...testIntake,
+    planned: [{ ...testPlanned, texts: { "storage:rule:art7(1)": null, "storage:rule:art8(1)": null } }],
+  });
+
+  expect(section(waiting, "Blur faces on the screen")).not.toContain("**Action:**");
+  expect(section(failed, "Blur faces on the screen")).toContain("The meaning and the action of this row could not be written.");
+});
+
+test("a planned change whose answers can all no longer be applied has no line of the answers that it uses in the file", () => {
+  const changes = {
+    ...testPlanned.changes,
+    changed: [],
+    rows_added: [],
+    rows_removed: [],
+    rows_changed: [],
+    refused: [{ fact: "shares_video", value: "yes", error: "same_answer" as const }],
+  };
+  const text = file(ALL, { ...testIntake, planned: [{ ...testPlanned, changes, results: [], texts: {} }] });
+
+  const part = text.slice(text.indexOf("### Door screen"), text.indexOf("## What the tool does not check yet"));
+  expect(part).toContain("Video sharing: Yes is your answer now, so this change no longer changes it.");
+  expect(part).not.toContain("With ");
+});
+
+test("a row of a planned change that depends on two items names both in the file", () => {
+  const text = file(ALL, { ...testIntake, planned: [{ ...testPlanned, depends_on: { "storage:rule:art8(1)": ["the open answer about Audience", "the open answer about Video storage"] } }] });
+
+  expect(section(text, "A record of who watches")).toContain(
+    "- Depends on the open answer about Audience, and on the open answer about Video storage.",
+  );
 });

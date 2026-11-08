@@ -291,3 +291,20 @@
     padding-right: var(--space-4);
   }
 }
+
+/* The tick box of an answer that a planned change takes along (#63). */
+.tick {
+  display: flex;
+  gap: var(--space-2);
+  align-items: baseline;
+  margin: 0 0 var(--space-1);
+}
+
+.add {
+  margin: var(--space-3) 0 0;
+}
+
+.added {
+  margin: 0;
+  font-weight: 500;
+}

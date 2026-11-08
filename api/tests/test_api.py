@@ -1,4 +1,4 @@
-"""Tests for GET /schema, POST /intakes, GET /intakes/{id}, POST /intakes/{id}/answers, PUT /intakes/{id}/answers/{slot} and POST /intakes/{id}/confirm: acceptance criteria 2 to 7 of issue #7, the three description fields of issue #12, acceptance criteria 2 to 7 of issue #16, acceptance criteria 1 and 3 of issue #24, the result in GET /intakes/{id} of issue #37, acceptance criteria 1 to 6 of issue #50, the screen of the answers and the confirmation, and acceptance criteria 1, 2 and 9 of issue #45, the form's fourth question, the follow-up fact about generated content and the limit of ten questions, and the acceptance criteria of issue #44 on the changes of each open answer's values and the questions about the result."""
+"""Tests for GET /schema, POST /intakes, GET /intakes/{id}, POST /intakes/{id}/answers, PUT /intakes/{id}/answers/{slot} and POST /intakes/{id}/confirm: acceptance criteria 2 to 7 of issue #7, the three description fields of issue #12, acceptance criteria 2 to 7 of issue #16, acceptance criteria 1 and 3 of issue #24, the result in GET /intakes/{id} of issue #37, acceptance criteria 1 to 6 of issue #50, the screen of the answers and the confirmation, and acceptance criteria 1, 2 and 9 of issue #45, the form's fourth question, the follow-up fact about generated content and the limit of ten questions, and the acceptance criteria of issue #44 on the changes of each open answer's values and the questions about the result, and of issue #63 on adding, renaming and removing a planned change and its computation for the answers of the intake."""
 
 import json
 import logging
@@ -585,6 +585,7 @@ def test_get_intake_returns_the_answers_and_the_open_slots_in_schema_order(
         "texts": None,
         "open_changes": None,
         "conversation": None,
+        "planned": None,
     }
 
 
@@ -1923,3 +1924,255 @@ def test_a_change_of_an_answer_keeps_the_conversation_and_marks_each_earlier_ans
     ]
     # The changes of an earlier answer are those of the answers at the time of its question.
     assert shown["conversation"][0]["scenario"]["questions"][0]["now"] == "No"
+
+
+# Issue #63: planned changes.
+
+LABEL = "Candidate chat"
+
+
+def chat(answers: dict[str, str] = CLOSED) -> Turn:
+    """An answered question about a chat that may change two answers, with its label."""
+    return Turn(
+        question=CHANGE,
+        reason="answered",
+        text="The chat may change these answers.",
+        changes=[
+            Requested(fact="interacts_with_people", value="yes"),
+            Requested(fact="generates_content", value="yes"),
+        ],
+        label=LABEL,
+        answers=answers,
+    )
+
+
+def planned_client(intakes: dict[str, Intake], confirmed: bool = True) -> TestClient:
+    intakes["one"] = ended(CLOSED, confirmed=confirmed, conversation=[chat()])
+    return service(intakes, scripted([]))
+
+
+def test_a_planned_change_is_added_with_the_ticked_answers_and_changes_no_answer_and_no_result(
+    key: None,
+) -> None:
+    intakes: dict[str, Intake] = {}
+    client = planned_client(intakes)
+    before = client.get("/intakes/one").json()
+
+    response = client.post(
+        "/intakes/one/planned", json={"turn": 1, "facts": ["interacts_with_people"]}
+    )
+
+    assert response.status_code == 200
+    shown = response.json()
+    assert shown == client.get("/intakes/one").json()
+    [planned] = shown["planned"]
+    assert (planned["turn"], planned["label"], planned["question"]) == (
+        1,
+        LABEL,
+        CHANGE,
+    )
+    assert [item["fact_id"] for item in planned["changes"]["changed"]] == [
+        "interacts_with_people"
+    ]
+    # The recorded answers, the result and the other parts do not change.
+    assert before["planned"] == []
+    assert {**shown, "planned": []} == before
+    assert intakes["one"].answers == CLOSED
+
+
+def test_a_turn_shows_the_label_that_a_planned_change_of_it_gets(key: None) -> None:
+    client = planned_client({})
+
+    assert client.get("/intakes/one").json()["conversation"][0]["label"] == LABEL
+
+
+@pytest.mark.parametrize(
+    ("body", "field"),
+    [
+        ({"turn": 0, "facts": ["interacts_with_people"]}, "turn"),
+        ({"turn": 2, "facts": ["interacts_with_people"]}, "turn"),
+        ({"turn": 1, "facts": ["profiling"]}, "facts"),
+        ({"turn": 1, "facts": []}, "facts"),
+    ],
+    ids=["no_question_0", "no_question_2", "not_an_answer_of_it", "nothing_ticked"],
+)
+def test_a_planned_change_of_no_question_or_without_a_ticked_answer_is_refused(
+    key: None, body: dict[str, Any], field: str
+) -> None:
+    intakes: dict[str, Intake] = {}
+    client = planned_client(intakes)
+
+    response = client.post("/intakes/one/planned", json=body)
+
+    assert response.status_code == 422
+    assert response.json() == {"error": {"code": "invalid_value", "field": field}}
+    assert intakes["one"].planned == []
+
+
+def test_a_planned_change_waits_for_the_confirmation(key: None) -> None:
+    intakes: dict[str, Intake] = {}
+    client = planned_client(intakes, confirmed=False)
+
+    response = client.post(
+        "/intakes/one/planned", json={"turn": 1, "facts": ["interacts_with_people"]}
+    )
+
+    assert response.status_code == 409
+    assert response.json() == {"error": {"code": "not_confirmed"}}
+    assert client.get("/intakes/one").json()["planned"] is None
+
+
+def test_a_planned_change_of_an_intake_that_is_not_stored_is_not_found() -> None:
+    client = service({})
+
+    for response in [
+        client.post("/intakes/none/planned", json={"turn": 1, "facts": ["x"]}),
+        client.put("/intakes/none/planned/1", json={"label": LABEL}),
+        client.delete("/intakes/none/planned/1"),
+    ]:
+        assert response.status_code == 404
+        assert response.json() == {"error": {"code": "not_found"}}
+
+
+def test_a_question_added_twice_is_one_planned_change(key: None) -> None:
+    client = planned_client({})
+    body = {"turn": 1, "facts": ["interacts_with_people"]}
+
+    first = client.post("/intakes/one/planned", json=body).json()
+    second = client.post(
+        "/intakes/one/planned", json={"turn": 1, "facts": ["generates_content"]}
+    ).json()
+
+    assert second == first
+    assert len(second["planned"]) == 1
+
+
+def test_a_planned_change_is_renamed_with_runs_of_whitespace_as_one_space(
+    key: None,
+) -> None:
+    client = planned_client({})
+    client.post(
+        "/intakes/one/planned", json={"turn": 1, "facts": ["generates_content"]}
+    )
+
+    renamed = client.put("/intakes/one/planned/1", json={"label": " Status \n chat "})
+    longest = client.put("/intakes/one/planned/1", json={"label": "x" * 60})
+
+    assert renamed.status_code == 200
+    assert renamed.json()["planned"][0]["label"] == "Status chat"
+    assert longest.json()["planned"][0]["label"] == "x" * 60
+
+
+@pytest.mark.parametrize(
+    "label", ["", "   ", "x" * 61], ids=["empty", "only_spaces", "61_characters"]
+)
+def test_a_label_that_is_empty_or_longer_than_60_characters_is_refused(
+    key: None, label: str
+) -> None:
+    intakes: dict[str, Intake] = {}
+    client = planned_client(intakes)
+    client.post(
+        "/intakes/one/planned", json={"turn": 1, "facts": ["generates_content"]}
+    )
+
+    response = client.put("/intakes/one/planned/1", json={"label": label})
+
+    assert response.status_code == 422
+    assert response.json() == {"error": {"code": "invalid_value", "field": "label"}}
+    assert intakes["one"].planned[0].label == LABEL
+
+
+def test_renaming_a_question_that_is_not_a_planned_change_is_not_found(
+    key: None,
+) -> None:
+    response = planned_client({}).put("/intakes/one/planned/1", json={"label": LABEL})
+
+    assert response.status_code == 404
+    assert response.json() == {"error": {"code": "not_found"}}
+
+
+def test_a_planned_change_is_removed_and_removing_it_again_changes_nothing(
+    key: None,
+) -> None:
+    client = planned_client({})
+    before = client.get("/intakes/one").json()
+    client.post(
+        "/intakes/one/planned", json={"turn": 1, "facts": ["generates_content"]}
+    )
+
+    removed = client.delete("/intakes/one/planned/1")
+    again = client.delete("/intakes/one/planned/1")
+
+    assert removed.status_code == 200
+    assert removed.json() == before
+    assert again.json() == before
+
+
+def test_a_planned_change_stays_through_a_change_of_an_answer_and_is_computed_for_the_new_answers(
+    key: None,
+) -> None:
+    intakes: dict[str, Intake] = {}
+    client = planned_client(intakes)
+    client.post(
+        "/intakes/one/planned",
+        json={"turn": 1, "facts": ["interacts_with_people", "generates_content"]},
+    )
+
+    changed = client.put(
+        "/intakes/one/answers/interacts_with_people", json={"value": "yes"}
+    ).json()
+    shown = client.post("/intakes/one/confirm").json()
+
+    # Until the next confirmation there is no result, and so no planned change to show.
+    assert changed["planned"] is None
+    assert len(intakes["one"].planned) == 1
+    [planned] = shown["planned"]
+    assert (
+        planned["changes"]
+        == what_if(
+            GATES, SCHEMA, intakes["one"], intakes["one"].planned[0].changes
+        ).model_dump()
+    )
+    assert [
+        (item["fact"], item["error"]) for item in planned["changes"]["refused"]
+    ] == [("interacts_with_people", "same_answer")]
+
+
+def test_a_planned_change_of_a_later_question_shows_that_question_and_its_label(
+    key: None,
+) -> None:
+    later = Turn(
+        question="What if we add a summary of each candidate?",
+        reason="answered",
+        text="One answer may change.",
+        changes=[Requested(fact="generates_content", value="yes")],
+        label="Candidate summary",
+        answers=CLOSED,
+    )
+    intakes = {"one": ended(CLOSED, conversation=[chat(), later])}
+    client = service(intakes, scripted([]))
+
+    shown = client.post(
+        "/intakes/one/planned", json={"turn": 2, "facts": ["generates_content"]}
+    ).json()
+
+    [planned] = shown["planned"]
+    assert (planned["turn"], planned["label"], planned["question"]) == (
+        2,
+        "Candidate summary",
+        later.question,
+    )
+
+
+def test_removing_one_planned_change_keeps_the_others(key: None) -> None:
+    later = chat().model_copy(update={"question": "What if we add a summary?"})
+    intakes = {"one": ended(CLOSED, conversation=[chat(), later])}
+    client = service(intakes, scripted([]))
+    for turn in (1, 2):
+        client.post(
+            "/intakes/one/planned", json={"turn": turn, "facts": ["generates_content"]}
+        )
+
+    shown = client.delete("/intakes/one/planned/1").json()
+
+    assert [item["turn"] for item in shown["planned"]] == [2]

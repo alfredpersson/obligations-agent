@@ -1,5 +1,5 @@
 import { vi } from "vitest";
-import type { Asked, Intake, Result, Row, Schema } from "./service";
+import type { Asked, Intake, Planned, Result, Row, Schema } from "./service";
 
 // A schema with two description fields, two form slots and two follow-up slots that are not in
 // schema.yaml, and limits other than 500, so that the tests show that the web app follows the
@@ -271,6 +271,113 @@ export const testIntake: Intake & { result: Result } = {
   },
   open_changes: {},
   conversation: null,
+  planned: null,
+};
+
+// A planned change of the first question in the panel (#63): a screen at the door, with the answer
+// "yes" about sharing video. It adds two rows to the storage role: one that applies and needs the
+// listed camera use, which applies with the change while it is conditional in the result, and one
+// that is conditional on the open answer about the audience. It changes the status of the notice at
+// the door and removes the training of staff. The texts of its two rows are written.
+export const testPlannedRows: Row[] = [
+  {
+    id: "storage:rule:art7(1)",
+    label: "Blur faces on the screen",
+    status: "applies",
+    unit: {
+      citation: "Rule 7(1)",
+      link: "https://eur-lex.europa.eu/rule#007.001:~:text=Faces%20are%20blurred.",
+      quote: "Faces are blurred.",
+    },
+    date: "2026-08-02",
+    date_unit: { citation: "Rule 113", link: "https://eur-lex.europa.eu/rule#art_113", quote: null },
+    condition: null,
+    needs: { slot: null, value: null, gate: "camera_list", status: "applies" },
+    drafting: false,
+    category: "technical",
+  },
+  {
+    id: "storage:rule:art8(1)",
+    label: "A record of who watches",
+    status: "conditional",
+    unit: {
+      citation: "Rule 8(1)",
+      link: "https://eur-lex.europa.eu/rule#008.001:~:text=A%20record%20is%20kept.",
+      quote: "A record is kept.",
+    },
+    date: "2026-08-02",
+    date_unit: { citation: "Rule 113", link: "https://eur-lex.europa.eu/rule#art_113", quote: null },
+    condition: null,
+    needs: null,
+    drafting: false,
+    category: "organisation",
+  },
+];
+
+export const testPlanned: Planned = {
+  turn: 1,
+  label: "Door screen",
+  question: "What if we add a screen at the door that shows visitors?",
+  changes: {
+    changed: [{ fact: "Video sharing", fact_id: "shares_video", value: "yes", now: "no answer", to: "Yes" }],
+    refused: [],
+    results: [],
+    rows_added: testPlannedRows.map((row) => ({
+      id: row.id,
+      label: row.label,
+      result: "Storage role",
+      category: row.category,
+      status: row.status,
+      citation: `Camera Law ${row.unit.citation}`,
+      link: row.unit.link,
+      date: "2 August 2026",
+    })),
+    rows_removed: [
+      {
+        id: "audience_rules:rule:art2(1)",
+        label: "Staff training",
+        result: "Audience rules apply",
+        category: "organisation",
+        status: "conditional",
+        citation: "Camera Law Rule 2(1)",
+        link: "https://eur-lex.europa.eu/rule#002.001",
+        date: "2 February 2025",
+      },
+    ],
+    rows_changed: [
+      {
+        id: "storage:rule:art6(1)",
+        label: "A notice at the door",
+        result: "Storage role",
+        category: "legal",
+        status: "applies",
+        before: "conditional",
+        citation: "Camera Law Rule 6(1)",
+        link: "https://eur-lex.europa.eu/rule#006.001",
+        date: "2 December 2027",
+      },
+    ],
+    now_open: [],
+    no_longer_asked: [],
+  },
+  results: [
+    {
+      ...testResult.gates[1],
+      status: "applies",
+      result: "applies",
+      conditions: [],
+      quotes: [],
+      rows: testPlannedRows,
+    },
+  ],
+  depends_on: { "storage:rule:art8(1)": ["the open answer about Audience"] },
+  texts: {
+    "storage:rule:art7(1)": {
+      meaning: "Faces on the screen must not be recognisable.",
+      action: "Blur the faces on the door screen.",
+    },
+    "storage:rule:art8(1)": { meaning: "If staff watch, keep a record.", action: "Keep a record of who watches the door screen." },
+  },
 };
 
 // Replaces fetch in a test. Each URL gets a response, or an error for fetch to throw.
