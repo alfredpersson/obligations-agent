@@ -95,7 +95,7 @@ test("a file ends with the line on legal advice, the official texts that its quo
 });
 
 test("between them, a file holds the three parts as the screen shows them: the same headings in the same order, and one section for each row of the screen, in the same order", () => {
-  render(createElement(IntakeResult, { intake: testIntake, schema: testSchema, answers: "/intakes/x/answers" }));
+  render(createElement(IntakeResult, { intake: testIntake, schema: testSchema, answers: "/intakes/x/answers", onTurn: () => {} }));
   const shown = screen
     .getAllByRole("heading")
     .filter((heading) => ["H2", "H3", "H4"].includes(heading.tagName))

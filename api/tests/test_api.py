@@ -1,16 +1,30 @@
-"""Tests for GET /schema, POST /intakes, GET /intakes/{id}, POST /intakes/{id}/answers, PUT /intakes/{id}/answers/{slot} and POST /intakes/{id}/confirm: acceptance criteria 2 to 7 of issue #7, the three description fields of issue #12, acceptance criteria 2 to 7 of issue #16, acceptance criteria 1 and 3 of issue #24, the result in GET /intakes/{id} of issue #37, acceptance criteria 1 to 6 of issue #50, the screen of the answers and the confirmation, and acceptance criteria 1, 2 and 9 of issue #45, the form's fourth question, the follow-up fact about generated content and the limit of ten questions."""
+"""Tests for GET /schema, POST /intakes, GET /intakes/{id}, POST /intakes/{id}/answers, PUT /intakes/{id}/answers/{slot} and POST /intakes/{id}/confirm: acceptance criteria 2 to 7 of issue #7, the three description fields of issue #12, acceptance criteria 2 to 7 of issue #16, acceptance criteria 1 and 3 of issue #24, the result in GET /intakes/{id} of issue #37, acceptance criteria 1 to 6 of issue #50, the screen of the answers and the confirmation, and acceptance criteria 1, 2 and 9 of issue #45, the form's fourth question, the follow-up fact about generated content and the limit of ten questions, and the acceptance criteria of issue #44 on the changes of each open answer's values and the questions about the result."""
 
+import json
 import logging
 import re
+from collections.abc import Callable
 from typing import Any
 
+import anthropic
+import httpx2
 import pytest
 import yaml
 from fastapi.testclient import TestClient
 
-from obligations_agent.gates import Gates, link, load_gates
+from obligations_agent.gates import Gates, link, load_gates, what_if
 from obligations_agent.guidance import load_guidance
-from obligations_agent.intakes import Intake, NotSure, Option, Question
+from obligations_agent.intake_model import new_client
+from obligations_agent.intakes import (
+    Intake,
+    NotSure,
+    Option,
+    Question,
+    Quoted,
+    Requested,
+    Text,
+    Turn,
+)
 from obligations_agent.schema import load_schema, parse_schema
 from obligations_agent.server import create_app
 
@@ -569,6 +583,8 @@ def test_get_intake_returns_the_answers_and_the_open_slots_in_schema_order(
         # The intake has not ended.
         "result": None,
         "texts": None,
+        "open_changes": None,
+        "conversation": None,
     }
 
 
@@ -1543,3 +1559,367 @@ def test_a_not_sure_answer_on_the_screen_of_the_answers_has_a_log_line_with_its_
         in caplog.text
     )
     assert "Platypus-2718" not in caplog.text
+
+
+# Issue #44: the changes of the open answers and the questions about the result.
+
+KEY = "sk-ant-test-0123456789"
+# A product with two open answers, under own name and processing for a customer.
+OPEN = {
+    "personal_data": "yes",
+    "under_own_name": "not_sure",
+    "use_case_area": "employment",
+    "own_use": "yes",
+    "decides_purposes": "yes",
+    "processes_for_customer": "not_sure",
+    "special_categories": "no",
+    "automated_decisions": "no",
+    "interacts_with_people": "yes",
+    "generates_content": "no",
+    "profiling": "yes",
+}
+# A product under its own name that neither interacts with people nor generates content.
+CLOSED = {
+    **OPEN,
+    "under_own_name": "yes",
+    "processes_for_customer": "no",
+    "interacts_with_people": "no",
+}
+CHANGE = "What if we add a chat where candidates ask about their application?"
+
+Handler = Callable[[httpx2.Request], httpx2.Response]
+
+
+@pytest.fixture
+def key(monkeypatch: pytest.MonkeyPatch) -> None:
+    # The model client reads the key from the environment, as in the service.
+    monkeypatch.setenv("ANTHROPIC_API_KEY", KEY)
+
+
+def ended(
+    answers: dict[str, str],
+    confirmed: bool = True,
+    texts: dict[str, Text | None] | None = None,
+    conversation: list[Turn] | None = None,
+) -> Intake:
+    """An intake that has ended with these answers, confirmed unless told otherwise."""
+    return Intake(
+        answers=answers,
+        description=DESCRIPTION,
+        confirmed=confirmed,
+        texts=texts,
+        conversation=conversation or [],
+    )
+
+
+def message(content: list[dict[str, Any]], stop_reason: str) -> httpx2.Response:
+    """A response of the Messages API with the given content blocks."""
+    return httpx2.Response(
+        200,
+        json={
+            "id": "msg_test",
+            "type": "message",
+            "role": "assistant",
+            "model": "claude-sonnet-5-5",
+            "content": content,
+            "stop_reason": stop_reason,
+            "stop_sequence": None,
+            "usage": {"input_tokens": 1, "output_tokens": 1},
+        },
+    )
+
+
+def call(name: str, tool_input: dict[str, Any]) -> httpx2.Response:
+    block = {"type": "tool_use", "id": "toolu_test", "name": name, "input": tool_input}
+    return message([block], "tool_use")
+
+
+def answers_with(*changes: tuple[str, str]) -> httpx2.Response:
+    """A call of the tool answer that names the answers that a change may change."""
+    return call(
+        "answer",
+        {
+            "text": "The chat may change these answers.",
+            "quotes": [],
+            "guidance": [],
+            "changes": [{"fact": fact, "value": value} for fact, value in changes],
+        },
+    )
+
+
+def scripted(requests: list[httpx2.Request], *replies: Handler) -> Handler:
+    """A model that keeps each request and answers the requests with the given handlers, in order."""
+    remaining = iter(replies)
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        requests.append(request)
+        return next(remaining)(request)
+
+    return handler
+
+
+def service(intakes: dict[str, Intake], handler: Handler | None = None) -> TestClient:
+    """A client for the service with these intakes, and a model client that sends each request to the handler, or no model client, as without the key."""
+    model = None
+    if handler is not None:
+        # with_options keeps the timeout and the retries of the service's client.
+        model = new_client().with_options(
+            http_client=anthropic.DefaultHttpxClient(
+                transport=httpx2.MockTransport(handler)
+            )
+        )
+    return TestClient(create_app(SCHEMA, GUIDANCE, GATES, intakes, model))
+
+
+def values_of(slot_id: str) -> list[str]:
+    slot = next(
+        slot for slot in [*SCHEMA.slots, *SCHEMA.follow_up_slots] if slot.id == slot_id
+    )
+    return [value.id for value in slot.values if value.id != "not_sure"]
+
+
+def test_each_value_of_each_open_answer_gives_its_changes_also_without_the_key() -> (
+    None
+):
+    intake = ended(OPEN)
+    client = service({"one": intake})
+
+    shown = client.get("/intakes/one").json()
+
+    assert shown["open_changes"] == {
+        slot_id: {
+            value: what_if(
+                GATES, SCHEMA, intake, [Requested(fact=slot_id, value=value)]
+            ).model_dump()
+            for value in values_of(slot_id)
+        }
+        for slot_id in ["under_own_name", "processes_for_customer"]
+    }
+    changes = shown["open_changes"]
+    # Under own name "No" removes the rows of the provider.
+    assert "AI literacy of staff" in [
+        row["label"] for row in changes["under_own_name"]["no"]["rows_removed"]
+    ]
+    # Processing for a customer "Yes" changes the status of the processor's rows.
+    assert {
+        (row["before"], row["status"])
+        for row in changes["processes_for_customer"]["yes"]["rows_changed"]
+    } == {("conditional", "applies")}
+    # Without the key, there is no conversation.
+    assert shown["conversation"] is None
+
+
+def test_personal_data_no_gives_the_questions_that_would_no_longer_be_asked() -> None:
+    client = service({"one": ended({**OPEN, "personal_data": "not_sure"})})
+
+    changes = client.get("/intakes/one").json()["open_changes"]["personal_data"]["no"]
+
+    assert changes["no_longer_asked"] == [
+        "Decides why and how personal data is processed",
+        "Processes personal data for a customer",
+        "Special categories of personal data",
+        "Automated decisions about people",
+        "Profiling",
+    ]
+
+
+def test_the_changes_of_the_open_answers_and_the_conversation_wait_for_the_confirmation(
+    key: None,
+) -> None:
+    requests: list[httpx2.Request] = []
+    client = service({"one": ended(OPEN, confirmed=False)}, scripted(requests))
+
+    shown = client.get("/intakes/one").json()
+    refused = client.post("/intakes/one/questions", json={"text": CHANGE})
+
+    assert (shown["open_changes"], shown["conversation"]) == (None, None)
+    assert refused.status_code == 409
+    assert refused.json() == {"error": {"code": "not_confirmed"}}
+    assert requests == []
+
+
+def test_without_the_key_a_question_is_refused() -> None:
+    response = service({"one": ended(OPEN)}).post(
+        "/intakes/one/questions", json={"text": CHANGE}
+    )
+
+    assert response.status_code == 409
+    assert response.json() == {"error": {"code": "no_key"}}
+
+
+def test_a_question_is_answered_and_stored_and_changes_no_answer_the_result_or_the_texts(
+    key: None,
+) -> None:
+    texts: dict[str, Text | None] = {
+        "controller:gdpr:art6(1)": Text(meaning="A basis.", action="Write it.")
+    }
+    intakes = {"one": ended(CLOSED, texts=texts)}
+    requests: list[httpx2.Request] = []
+    client = service(
+        intakes,
+        scripted(
+            requests,
+            lambda request: call("contents", {"regulation": "ai_act"}),
+            lambda request: call(
+                "article", {"regulation": "ai_act", "kind": "article", "number": "50"}
+            ),
+            lambda request: call("guidance", {"fact": "under_own_name"}),
+            lambda request: call(
+                "what_if",
+                {"changes": [{"fact": "interacts_with_people", "value": "yes"}]},
+            ),
+            lambda request: answers_with(("interacts_with_people", "yes")),
+        ),
+    )
+    before = client.get("/intakes/one").json()
+    stored = intakes["one"].model_copy(deep=True)
+
+    response = client.post("/intakes/one/questions", json={"text": CHANGE})
+
+    assert response.status_code == 200
+    turn = response.json()["turn"]
+    assert (turn["question"], turn["answered"]) == (CHANGE, True)
+    assert turn["for_earlier_answers"] is False
+    assert [item["fact_id"] for item in turn["scenario"]["questions"]] == [
+        "interacts_with_people"
+    ]
+    after = client.get("/intakes/one").json()
+    assert after["conversation"] == [turn]
+    assert {**after, "conversation": []} == before
+    assert intakes["one"].model_copy(update={"conversation": []}) == stored
+    assert len(requests) == 5
+
+
+def test_a_question_that_could_not_be_answered_is_stored_and_the_next_one_can_be_asked(
+    key: None,
+) -> None:
+    def refused(request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(
+            500,
+            json={"type": "error", "error": {"type": "api_error", "message": "Error"}},
+        )
+
+    requests: list[httpx2.Request] = []
+    client = service(
+        {"one": ended(CLOSED)},
+        scripted(requests, refused, lambda request: answers_with()),
+    )
+
+    failed = client.post("/intakes/one/questions", json={"text": CHANGE})
+    again = client.post("/intakes/one/questions", json={"text": CHANGE})
+
+    assert failed.status_code == 200
+    assert failed.json()["turn"]["answered"] is False
+    assert again.json()["turn"]["answered"] is True
+    assert [
+        turn["answered"] for turn in client.get("/intakes/one").json()["conversation"]
+    ] == [False, True]
+    assert (
+        body_messages(requests[1])[1]["content"]
+        == "This question could not be answered."
+    )
+
+
+def body_messages(request: httpx2.Request) -> list[dict[str, Any]]:
+    return json.loads(request.content)["messages"]
+
+
+@pytest.mark.parametrize(
+    "text",
+    ["", "   ", "x" * 501],
+    ids=["empty", "only_spaces", "501_characters"],
+)
+def test_a_question_that_is_empty_or_too_long_is_refused(key: None, text: str) -> None:
+    requests: list[httpx2.Request] = []
+    client = service({"one": ended(CLOSED)}, scripted(requests))
+
+    response = client.post("/intakes/one/questions", json={"text": text})
+
+    assert response.status_code == 422
+    assert response.json() == {"error": {"code": "invalid_value", "field": "text"}}
+    assert requests == []
+
+
+def test_a_question_of_500_characters_is_answered(key: None) -> None:
+    client = service(
+        {"one": ended(CLOSED)}, scripted([], lambda request: answers_with())
+    )
+
+    response = client.post("/intakes/one/questions", json={"text": "x" * 500})
+
+    assert response.status_code == 200
+
+
+def test_a_question_about_an_intake_that_is_not_stored_is_not_found(key: None) -> None:
+    response = service({}, scripted([])).post(
+        "/intakes/none/questions", json={"text": CHANGE}
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"error": {"code": "not_found"}}
+
+
+def test_the_21st_question_of_an_intake_is_refused(key: None) -> None:
+    earlier = [
+        Turn(
+            question=f"Question {number}",
+            reason="answered",
+            text="An answer.",
+            answers=CLOSED,
+        )
+        for number in range(20)
+    ]
+    requests: list[httpx2.Request] = []
+    client = service({"one": ended(CLOSED, conversation=earlier)}, scripted(requests))
+
+    response = client.post("/intakes/one/questions", json={"text": CHANGE})
+
+    assert response.status_code == 409
+    assert response.json() == {"error": {"code": "limit_reached"}}
+    assert requests == []
+
+
+def changed_turn(*changes: tuple[str, str], answers: dict[str, str] = CLOSED) -> Turn:
+    """An answered question about a change that names these answers."""
+    return Turn(
+        question=CHANGE,
+        reason="answered",
+        text="The chat may change these answers.",
+        quotes=[],
+        guidance=[],
+        changes=[Requested(fact=fact, value=value) for fact, value in changes],
+        answers=answers,
+    )
+
+
+def test_a_change_of_an_answer_keeps_the_conversation_and_marks_each_earlier_answer(
+    key: None,
+) -> None:
+    quote = Quoted(citation="GDPR Article 21(1)", link="https://example.test", text="A")
+    earlier = [
+        changed_turn(("generates_content", "yes")),
+        Turn(
+            question="Why?",
+            reason="answered",
+            text="Because.",
+            quotes=[quote],
+            answers=CLOSED,
+        ),
+    ]
+    intakes = {"one": ended(CLOSED, conversation=earlier)}
+    client = service(intakes, scripted([]))
+
+    changed = client.put(
+        "/intakes/one/answers/automated_decisions", json={"value": "yes"}
+    ).json()
+    shown = client.post("/intakes/one/confirm").json()
+
+    # Until the next confirmation there is no result, and so no conversation.
+    assert changed["conversation"] is None
+    assert intakes["one"].conversation == earlier
+    assert [turn["for_earlier_answers"] for turn in shown["conversation"]] == [
+        True,
+        True,
+    ]
+    # The changes of an earlier answer are those of the answers at the time of its question.
+    assert shown["conversation"][0]["scenario"]["questions"][0]["now"] == "No"

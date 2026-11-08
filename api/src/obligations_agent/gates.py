@@ -1,6 +1,7 @@
-"""The gates: reads and checks gates.yaml, and works out the result of an intake that has ended: which regulations, roles and risk tiers apply, the answers that decided each one, and the units that each one quotes (GATE-1 to GATE-4, MEMO-6 to MEMO-8 in docs/spec.md)."""
+"""The gates: reads and checks gates.yaml, and works out the result of an intake that has ended: which regulations, roles and risk tiers apply, the answers that decided each one, and the units that each one quotes (GATE-1 to GATE-4, MEMO-6 to MEMO-8 in docs/spec.md), and what one or more changed answers would change in it (QA-1)."""
 
 import re
+from datetime import date
 from importlib.resources import files
 from typing import Literal
 from urllib.parse import quote
@@ -8,7 +9,14 @@ from urllib.parse import quote
 from pydantic import BaseModel
 
 from obligations_agent.guidance import TEXT_REQUIRED
-from obligations_agent.intakes import Intake, is_relevant
+from obligations_agent.intakes import (
+    Intake,
+    IntakeError,
+    Requested,
+    change_answer,
+    is_relevant,
+    open_slots,
+)
 from obligations_agent.schema import NOT_SURE, Schema, load_yaml, read_items
 
 EUR_LEX = "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:"
@@ -537,5 +545,203 @@ def decide(gates: Gates, schema: Schema, intake: Intake) -> Result:
         gates=outcomes,
         not_checked=[
             Shown(text=item.text, links=cited(item.links)) for item in gates.not_checked
+        ],
+    )
+
+
+class State(BaseModel):
+    """A result's status, its open answers and the outcome of Article 6(3), which a change of answers compares."""
+
+    status: str
+    open: list[str]
+    article_6_3: str | None
+
+
+class ResultChange(BaseModel):
+    """A result whose state a change of answers would change; None where the result is not shown."""
+
+    result: str
+    regulation: str
+    before: State | None
+    after: State | None
+
+
+class RowChange(BaseModel):
+    """A row that a change of answers would add or remove, with its result, its category, its status, its citation and the date from which it applies, in words."""
+
+    label: str
+    result: str
+    category: Category
+    status: str
+    citation: str
+    date: str
+
+
+class ChangedRow(RowChange):
+    """A row that would get another status: status is the new one, and before the one that it has now."""
+
+    before: str
+
+
+class AppliedAnswer(BaseModel):
+    """A changed answer: the label and the id of its fact, the value, the label of the answer now ("no answer" when it has none) and the label of the value."""
+
+    fact: str
+    fact_id: str
+    value: str
+    now: str
+    to: str
+
+
+class Refused(BaseModel):
+    """A change that cannot be applied: its fact is unknown, the fact is not asked with the answers before it, the fact does not allow the value, or the value is the answer that it has."""
+
+    fact: str
+    value: str
+    error: Literal["unknown_fact", "not_asked", "unknown_value", "same_answer"]
+
+
+class WhatIf(BaseModel):
+    """What changed answers would change in the result (QA-1)."""
+
+    changed: list[AppliedAnswer]
+    refused: list[Refused]
+    results: list[ResultChange]
+    rows_added: list[RowChange]
+    rows_removed: list[RowChange]
+    rows_changed: list[ChangedRow]
+    now_open: list[str]
+    no_longer_asked: list[str]
+
+
+def in_words(iso: str) -> str:
+    """A date in words, such as 2 August 2026."""
+    day = date.fromisoformat(iso)
+    return f"{day.day} {day.strftime('%B')} {day.year}"
+
+
+def apply_answers(
+    schema: Schema, intake: Intake, changes: list[Requested]
+) -> tuple[Intake, list[AppliedAnswer], list[Refused]]:
+    """The intake with the answers changed, each as a change on the screen of the answers records it (INTAKE-1), in the order of the facts, so that a fact may be one that an earlier change makes asked; the answers changed, and those that could not be. A fact is named by its id or its label, and a fact named twice keeps its last value. The intake given does not change."""
+    slots = [*schema.slots, *schema.follow_up_slots]
+    ids = {slot.label: slot.id for slot in slots} | {slot.id: slot.id for slot in slots}
+    labels = {slot.id: slot.label for slot in slots}
+    values = {
+        (slot.id, value.id): value.label for slot in slots for value in slot.values
+    }
+    order = [slot.id for slot in slots]
+    refused = [
+        Refused(fact=change.fact, value=change.value, error="unknown_fact")
+        for change in changes
+        if change.fact not in ids
+    ]
+    changed: list[AppliedAnswer] = []
+    after = intake
+    # A fact named twice, by its id and its label, keeps its last value.
+    latest = {ids[change.fact]: change for change in changes if change.fact in ids}
+    for slot_id, change in sorted(
+        latest.items(), key=lambda item: order.index(item[0])
+    ):
+        try:
+            changed_intake = change_answer(schema, after, slot_id, change.value, None)
+        except IntakeError as error:
+            reason = "not_asked" if error.code == "invalid_slot" else "unknown_value"
+            refused.append(Refused(fact=change.fact, value=change.value, error=reason))
+            continue
+        if changed_intake is after:
+            refused.append(
+                Refused(fact=change.fact, value=change.value, error="same_answer")
+            )
+            continue
+        now = intake.answers.get(slot_id)
+        changed.append(
+            AppliedAnswer(
+                fact=labels[slot_id],
+                fact_id=slot_id,
+                value=change.value,
+                now="no answer" if now is None else values[slot_id, now],
+                to=values[slot_id, change.value],
+            )
+        )
+        after = changed_intake
+    return after, changed, refused
+
+
+def what_if(
+    gates: Gates,
+    schema: Schema,
+    intake: Intake,
+    changes: list[Requested],
+    before: Result | None = None,
+) -> WhatIf:
+    """The changes of the result when the answers change together, as apply_answers changes them (QA-1). before is the result of the intake, when the caller has it already. The intake does not change."""
+    after, changed, refused = apply_answers(schema, intake, changes)
+    slots = [*schema.slots, *schema.follow_up_slots]
+    labels = {slot.id: slot.label for slot in slots}
+    before_result = before or decide(gates, schema, intake)
+    after_result = decide(gates, schema, after)
+    names = {regulation.id: regulation.name for regulation in gates.regulations}
+
+    def states(result: Result) -> dict[str, State]:
+        return {
+            outcome.gate: State(
+                status=outcome.status,
+                open=[labels[condition.slot] for condition in outcome.conditions],
+                article_6_3=outcome.derogation,
+            )
+            for outcome in result.gates
+        }
+
+    def rows(result: Result) -> dict[str, RowChange]:
+        return {
+            row.id: RowChange(
+                label=row.label,
+                result=outcome.label,
+                category=row.category,
+                status=row.status,
+                citation=row.unit.citation,
+                date=in_words(row.date),
+            )
+            for outcome in result.gates
+            for row in outcome.rows
+        }
+
+    old, new = states(before_result), states(after_result)
+    rows_before, rows_after = rows(before_result), rows(after_result)
+    opened = open_slots(schema, intake)
+    return WhatIf(
+        changed=changed,
+        refused=refused,
+        results=[
+            ResultChange(
+                result=gate.label,
+                regulation=names[gate.regulation],
+                before=old.get(gate.id),
+                after=new.get(gate.id),
+            )
+            for gate in gates.gates
+            if old.get(gate.id) != new.get(gate.id)
+        ],
+        rows_added=[
+            row for row_id, row in rows_after.items() if row_id not in rows_before
+        ],
+        rows_removed=[
+            row for row_id, row in rows_before.items() if row_id not in rows_after
+        ],
+        rows_changed=[
+            ChangedRow(**row.model_dump(), before=rows_before[row_id].status)
+            for row_id, row in rows_after.items()
+            if row_id in rows_before and rows_before[row_id].status != row.status
+        ],
+        now_open=[
+            labels[slot] for slot in open_slots(schema, after) if slot not in opened
+        ],
+        # The questions that are asked now, answered or open, and would no longer be (INTAKE-1).
+        no_longer_asked=[
+            slot.label
+            for slot in slots
+            if is_relevant(slot, intake.answers)
+            and not is_relevant(slot, after.answers)
         ],
     )

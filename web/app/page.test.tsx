@@ -121,6 +121,15 @@ test("the start page names the download of the result as a Markdown or a PDF fil
   );
 });
 
+test("the start page names the changes of the open answers and the questions about a change to the product among what the user gets (#44)", () => {
+  render(<Home />);
+
+  const get = screen.getByRole("heading", { level: 2, name: "What you get" }).parentElement as HTMLElement;
+  expect(within(get).getByText(/^Under each open answer/).textContent).toBe(
+    "Under each open answer, what each of its answers would change in the whole result. Beside the result, ask about a change to your product, such as a new feature: the answer names which of your answers it may change, with the examples that show what each question covers, and shows what the rules would then add.",
+  );
+});
+
 test("the steps name as many questions on the form as the schema has there, and the limit of follow-up questions", () => {
   render(<Home />);
 

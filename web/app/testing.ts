@@ -247,8 +247,9 @@ export const testRows: Row[] = [
 // An intake whose result has a row in each part that holds rows (#53): the storage role applies
 // with the two test rows, the first applies, and the second needs the answer of the fact about
 // sharing video, which has none; the other results as in testResult. The texts of both rows are
-// written.
+// written. It has no conversation, and no value of an open answer changes anything (#44).
 export const testIntake: Intake & { result: Result } = {
+  id: "kq2V8yZx0bP4mT7nLw3sAg",
   description: { purpose: "Counts *visitors* at [the] door.", people: "Staff watch the screens." },
   answers: { uses_camera: "yes", audience: "not_sure" },
   open_slots: ["audience", "stores_video", "shares_video"],
@@ -268,6 +269,8 @@ export const testIntake: Intake & { result: Result } = {
     "storage:rule:art5(1)": { meaning: "You must delete video after a month.", action: "Add a job that deletes old video." },
     "storage:rule:art6(1)": { meaning: "If you share video, show a notice.", action: "Draft the notice." },
   },
+  open_changes: {},
+  conversation: null,
 };
 
 // Replaces fetch in a test. Each URL gets a response, or an error for fetch to throw.

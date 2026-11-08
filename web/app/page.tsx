@@ -146,6 +146,12 @@ export default function Home() {
                 legal ones for a legal representative.
               </p>
               <p>
+                Under each open answer, what each of its answers would change in the whole result. Beside the result,
+                ask about a change to your product, such as a new feature: the answer names which of your answers it
+                may change, with the examples that show what each question covers, and shows what the rules would then
+                add.
+              </p>
+              <p>
                 The result assumes that the product is an AI system as the AI Act defines it, offered or used
                 in the EU, and it lists what the tool does not check yet.
               </p>

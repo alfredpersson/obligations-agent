@@ -26,7 +26,7 @@ The persona is based on the author's own experience of building AI solutions. Th
 
 In about fifteen minutes, and without reading either regulation, the engineer gets a list of the obligations for their own product, with one action per row, that they can check against the official text.
 
-Not goals for now: legal advice, regulations other than these two, answering questions about the memo, user accounts or saved history, and languages other than English.
+Not goals for now: legal advice, regulations other than these two, user accounts or saved history, and languages other than English. The tool answers questions about the result of an intake and about a change to the product, within the two regulations, in a panel beside the result; the form stays the main way to give the facts.
 
 ## Journey
 
@@ -36,7 +36,8 @@ Not goals for now: legal advice, regulations other than these two, answering que
 4. Check all the facts on one screen. Correct anything that is wrong, and answer any open question you can. Return to this screen from the memo when you have checked an open fact outside the tool, and confirm again.
 5. Wait for the memo, which takes less than a minute.
 6. Read the rows that matter to you, open the linked clause, and mark rows as confirmed or disputed.
-7. Export the memo as a Markdown or a PDF file, all of it or the obligations of one category. Do the actions outside the tool.
+7. Before you change the product, ask what the change would do: which of your answers it may change, the examples that show what each question covers, and what the rules would then add. Asking changes none of your answers.
+8. Export the memo as a Markdown or a PDF file, all of it or the obligations of one category. Do the actions outside the tool.
 
 ## What exists and why this is different
 

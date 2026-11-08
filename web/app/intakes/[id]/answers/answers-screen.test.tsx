@@ -40,6 +40,7 @@ const STORAGE = question("stores_video", "Does the door camera keep its video?",
   check: "Check where the camera sends its video.",
 });
 const intake = {
+  id: "kq2V8yZx0bP4mT7nLw3sAg",
   description: { purpose: "A door camera.", people: "Building staff." },
   answers: { uses_camera: "yes", audience: "not_sure", stores_video: "yes" },
   open_slots: ["audience", "shares_video"],
@@ -63,6 +64,8 @@ const intake = {
   confirmed: false,
   result: null,
   texts: null,
+  open_changes: null,
+  conversation: null,
 } satisfies Intake;
 
 // The elements that the screen scrolled into view. jsdom does not scroll.

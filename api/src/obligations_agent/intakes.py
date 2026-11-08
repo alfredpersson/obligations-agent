@@ -10,10 +10,26 @@ from obligations_agent.guidance import Quote, Source
 from obligations_agent.schema import NOT_SURE, Schema, Slot
 
 ErrorCode = Literal[
-    "invalid_slot", "invalid_value", "not_found", "not_ended", "not_confirmed"
+    "invalid_slot",
+    "invalid_value",
+    "not_found",
+    "not_ended",
+    "not_confirmed",
+    "no_key",
+    "limit_reached",
 ]
 # Why the model may not ask about a slot (TOOL-1).
 Refusal = Literal["not_askable", "limit_reached"]
+# Why the loop of a question about the result ended (QA-8).
+Ending = Literal[
+    "answered",
+    "tool_limit",
+    "deadline",
+    "no_answer",
+    "invalid_answer",
+    "timeout",
+    "call_failed",
+]
 
 # Follow-up questions per intake, and questions per slot, where the form's question is the first
 # question about a slot on the form (INTAKE-3).
@@ -80,13 +96,41 @@ class Text(BaseModel):
     action: str
 
 
+class Requested(BaseModel):
+    """An answer that a change to the product may change: the fact, by its id or its label, and the id of the value (QA-4)."""
+
+    fact: str
+    value: str
+
+
+class Quoted(BaseModel):
+    """A passage that an answer quotes, found word for word in a stored copy, with its citation and its link (QA-6)."""
+
+    citation: str
+    link: str
+    text: str
+
+
+class Turn(BaseModel):
+    """A question about the result with its answer: why the loop ended, the answer's text, its checked quotes, the ids of the guidance entries that it shows, the answers that a change may change, and the answers of the intake when the question was asked (QA-9)."""
+
+    question: str
+    reason: Ending
+    text: str = ""
+    quotes: list[Quoted] = []
+    guidance: list[str] = []
+    changes: list[Requested] = []
+    answers: dict[str, str]
+
+
 class Intake(Form):
-    """A stored intake. The answers hold one current value for each slot, the follow-up answers included, and not_sure the reason and the note of each slot whose current value is "not sure". questions holds each follow-up question, in the order asked, and replies the answer to each question that has one, in the same order. confirmed is true from the user's confirmation until the next change of an answer (INTAKE-5). texts holds the meaning and the action of each row by its id, or None for a row whose texts could not be written, once they are written for the confirmed answers."""
+    """A stored intake. The answers hold one current value for each slot, the follow-up answers included, and not_sure the reason and the note of each slot whose current value is "not sure". questions holds each follow-up question, in the order asked, and replies the answer to each question that has one, in the same order. confirmed is true from the user's confirmation until the next change of an answer (INTAKE-5). texts holds the meaning and the action of each row by its id, or None for a row whose texts could not be written, once they are written for the confirmed answers. conversation holds the questions about the result in order (QA-9)."""
 
     questions: list[Question] = []
     replies: list[str] = []
     confirmed: bool = False
     texts: dict[str, Text | None] | None = None
+    conversation: list[Turn] = []
 
 
 Writer = Callable[[Intake], Question | None]
@@ -105,6 +149,12 @@ class Change(BaseModel):
 
     value: str
     not_sure: NotSure | None = None
+
+
+class Ask(BaseModel):
+    """The body of POST /intakes/{id}/questions: the user's question (QA-2)."""
+
+    text: str = Field(max_length=500)
 
 
 class IntakeError(Exception):

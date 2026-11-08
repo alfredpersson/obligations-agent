@@ -1,4 +1,4 @@
-"""The HTTP API that the web app calls: GET /schema, POST /intakes, GET /intakes/{id}, POST /intakes/{id}/answers, PUT /intakes/{id}/answers/{slot}, POST /intakes/{id}/confirm and POST /intakes/{id}/texts."""
+"""The HTTP API that the web app calls: GET /schema, POST /intakes, GET /intakes/{id}, POST /intakes/{id}/answers, PUT /intakes/{id}/answers/{slot}, POST /intakes/{id}/confirm, POST /intakes/{id}/texts and POST /intakes/{id}/questions."""
 
 import logging
 import os
@@ -11,17 +11,20 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from obligations_agent.gates import Gates, decide, load_gates
+from obligations_agent.conversation import QUESTION_LIMIT, ask, view_turn
+from obligations_agent.gates import Gates, decide, load_gates, what_if
 from obligations_agent.guidance import Guidance, load_guidance
 from obligations_agent.intake_model import new_client, next_question
 from obligations_agent.intakes import (
     Answer,
+    Ask,
     Change,
     ErrorCode,
     Form,
     Intake,
     IntakeError,
     Question,
+    Requested,
     change_answer,
     create_intake,
     last_questions,
@@ -29,7 +32,7 @@ from obligations_agent.intakes import (
     record_answer,
     waiting,
 )
-from obligations_agent.schema import Schema, load_schema
+from obligations_agent.schema import NOT_SURE, Schema, load_schema
 from obligations_agent.writer import write_texts
 
 READY_TO_CONFIRM = {"type": "ready_to_confirm"}
@@ -40,7 +43,11 @@ STATUS: dict[ErrorCode, int] = {
     "not_found": 404,
     "not_ended": 409,
     "not_confirmed": 409,
+    "no_key": 409,
+    "limit_reached": 409,
 }
+
+logger = logging.getLogger(__name__)
 
 
 def error_response(code: ErrorCode, field: str | None = None) -> JSONResponse:
@@ -107,24 +114,50 @@ def create_app(
 
     def view(intake_id: str, intake: Intake) -> dict[str, Any]:
         """The intake as GET /intakes/{id} returns it."""
+        slots = {slot.id: slot for slot in [*schema.slots, *schema.follow_up_slots]}
+        opened = open_slots(schema, intake)
+        # The result is computed from the answers each time, once they are confirmed (GATE-4).
+        result = decide(gates, schema, intake) if intake.confirmed else None
         return {
             "id": intake_id,
             "description": intake.description,
             "answers": intake.answers,
-            "open_slots": open_slots(schema, intake),
+            "open_slots": opened,
             "not_sure": intake.not_sure,
             # The question that the screen of the answers shows for each relevant slot (INTAKE-5).
             "questions": last_questions(schema, intake),
             "step": step(intake),
             "confirmed": intake.confirmed,
-            # The result is computed from the answers each time, once they are confirmed (GATE-4).
-            "result": decide(gates, schema, intake).model_dump()
-            if intake.confirmed
-            else None,
+            "result": result.model_dump() if result else None,
             # The meaning and the action of each row: none without the key, and an empty map until
             # POST /intakes/{id}/texts has written them (MEMO-1).
             "texts": (intake.texts or {})
             if client is not None and intake.confirmed
+            else None,
+            # What each value of each open answer would change in the result, computed by code, also
+            # without the key (QA-1).
+            "open_changes": {
+                slot_id: {
+                    value.id: what_if(
+                        gates,
+                        schema,
+                        intake,
+                        [Requested(fact=slot_id, value=value.id)],
+                        result,
+                    ).model_dump()
+                    for value in slots[slot_id].values
+                    if value.id != NOT_SURE
+                }
+                for slot_id in opened
+            }
+            if result
+            else None,
+            # The questions about the result with their answers: none without the key (QA-2, QA-9).
+            "conversation": [
+                view_turn(schema, guidance, gates, intake, result, turn)
+                for turn in intake.conversation
+            ]
+            if client is not None and result
             else None,
         }
 
@@ -188,6 +221,31 @@ def create_app(
                 intake = intake.model_copy(update={"texts": texts})
                 intakes[intake_id] = intake
         return {"texts": intake.texts}
+
+    @app.post("/intakes/{intake_id}/questions")
+    def post_question(intake_id: str, body: Ask) -> dict[str, Any]:
+        intake = intakes.get(intake_id)
+        if intake is None:
+            raise IntakeError("not_found")
+        if not intake.confirmed:
+            raise IntakeError("not_confirmed")
+        if client is None:
+            raise IntakeError("no_key")
+        if not body.text.strip():
+            raise IntakeError("invalid_value", "text")
+        if len(intake.conversation) >= QUESTION_LIMIT:
+            raise IntakeError("limit_reached")
+        # The loop runs outside the lock, so that a question does not hold up the answers. The tools
+        # read only the intake of the address. The turn is stored under the lock.
+        turn = ask(client, schema, guidance, gates, intake, body.text.strip())
+        with answering:
+            intake = intakes[intake_id]
+            intake = intake.model_copy(
+                update={"conversation": [*intake.conversation, turn]}
+            )
+            intakes[intake_id] = intake
+        result = decide(gates, schema, intake)
+        return {"turn": view_turn(schema, guidance, gates, intake, result, turn)}
 
     return app
 

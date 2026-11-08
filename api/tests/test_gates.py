@@ -1,4 +1,4 @@
-"""Tests for the gates: reading gates.yaml, each gate table against the regulation text, the result of an intake that has ended, and the quote and the link of each unit (issue #37: GATE-1 to GATE-4, MEMO-6 to MEMO-8, VALID-2), and the rows of the obligations with their dates and the grouping by regulation (issue #41: MEMO-5, MEMO-6), the category of each row (issue #52: GATE-5, MEMO-5), and the deployer, the marking of generated content, their rows and the conditions of their dates (issue #45: GATE-4, GATE-5, MEMO-5, MEMO-8)."""
+"""Tests for the gates: reading gates.yaml, each gate table against the regulation text, the result of an intake that has ended, and the quote and the link of each unit (issue #37: GATE-1 to GATE-4, MEMO-6 to MEMO-8, VALID-2), and the rows of the obligations with their dates and the grouping by regulation (issue #41: MEMO-5, MEMO-6), the category of each row (issue #52: GATE-5, MEMO-5), and the deployer, the marking of generated content, their rows and the conditions of their dates (issue #45: GATE-4, GATE-5, MEMO-5, MEMO-8), and the changes that one or more changed answers would make to the result (issue #44: QA-1, GATE-1, INTAKE-1, INTAKE-3)."""
 
 import re
 from collections.abc import Sequence
@@ -12,6 +12,7 @@ import yaml
 
 from obligations_agent.gates import (
     EUR_LEX,
+    AppliedAnswer,
     Case,
     Condition,
     GatesError,
@@ -19,14 +20,20 @@ from obligations_agent.gates import (
     Needs,
     ObligationRow,
     Outcome,
+    Refused,
     Result,
+    ResultChange,
+    RowChange,
+    State,
     Unit,
+    WhatIf,
     decide,
     link,
     load_gates,
     parse_gates,
+    what_if,
 )
-from obligations_agent.intakes import Intake, NotSure
+from obligations_agent.intakes import Intake, NotSure, Requested
 from obligations_agent.schema import load_schema
 
 SCHEMA = load_schema()
@@ -1743,3 +1750,341 @@ def test_a_regulation_whose_gate_is_not_one_of_its_own_is_refused_with_its_name(
 ) -> None:
     with pytest.raises(GatesError, match=name):
         parse_gates(gates_text(regulations=regulations), SCHEMA)
+
+
+# A product with three open answers, in the area of employment (issue #44).
+WHAT_IF = {
+    "personal_data": "yes",
+    "under_own_name": "not_sure",
+    "use_case_area": "employment",
+    "own_use": "yes",
+    "decides_purposes": "yes",
+    "processes_for_customer": "not_sure",
+    "special_categories": "no",
+    "automated_decisions": "no",
+    "interacts_with_people": "yes",
+    "generates_content": "no",
+    "profiling": "yes",
+}
+# A product without personal data, under its own name, outside the areas of Annex III.
+WITHOUT_DATA = {
+    "personal_data": "no",
+    "under_own_name": "yes",
+    "use_case_area": "none",
+    "own_use": "no",
+    "interacts_with_people": "yes",
+    "generates_content": "no",
+}
+PROCESSOR_ROWS = [item.label for item in GATES.obligations if item.gate == "processor"]
+
+
+def changes_of(answers: dict[str, str], *changes: tuple[str, str]) -> WhatIf:
+    """What the changes, each a fact and a value, would make of the result of an intake that has ended with these answers."""
+    intake = Intake(answers=answers, description=DESCRIPTION)
+    return what_if(
+        GATES,
+        SCHEMA,
+        intake,
+        [Requested(fact=fact, value=value) for fact, value in changes],
+    )
+
+
+def citation_of(unit_id: str) -> str:
+    return next(unit.citation for unit in GATES.units if unit.id == unit_id)
+
+
+def test_under_own_name_no_removes_the_rows_of_the_provider_and_its_follow_up_questions() -> (
+    None
+):
+    changes = changes_of(WHAT_IF, ("under_own_name", "no"))
+
+    assert changes.changed == [
+        AppliedAnswer(
+            fact="Under own name or trademark",
+            fact_id="under_own_name",
+            value="no",
+            now="Not sure",
+            to="No",
+        )
+    ]
+    assert changes.refused == []
+    assert changes.results == [
+        ResultChange(
+            result="Provider",
+            regulation="AI Act",
+            before=State(
+                status="conditional",
+                open=["Under own name or trademark"],
+                article_6_3=None,
+            ),
+            after=State(status="does_not_apply", open=[], article_6_3=None),
+        ),
+        ResultChange(
+            result="Transparency: people interact with the product",
+            regulation="AI Act",
+            before=State(
+                status="conditional",
+                open=["Under own name or trademark"],
+                article_6_3=None,
+            ),
+            after=None,
+        ),
+        ResultChange(
+            result="Transparency: the product generates content",
+            regulation="AI Act",
+            before=State(status="does_not_apply", open=[], article_6_3=None),
+            after=None,
+        ),
+    ]
+    assert changes.rows_removed[0] == RowChange(
+        label="AI literacy of staff",
+        result="Provider",
+        category="organisation",
+        status="conditional",
+        citation=citation_of("aia:art4(1)"),
+        date="2 February 2025",
+    )
+    removed = [(row.result, row.label) for row in changes.rows_removed]
+    assert (
+        "Transparency: people interact with the product",
+        "Information at the first interaction",
+    ) in removed
+    # Each row of the high-risk tier needs the provider, and the deployer's rows stay.
+    assert [result for result, _ in removed].count("High-risk under Annex III") == 12
+    assert "Deployer" not in [result for result, _ in removed]
+    assert changes.rows_added == [] and changes.rows_changed == []
+    assert changes.no_longer_asked == [
+        "Interacts with people",
+        "Generates synthetic content",
+    ]
+    assert changes.now_open == []
+
+
+def test_personal_data_no_gives_the_questions_that_would_no_longer_be_asked() -> None:
+    changes = changes_of(
+        {**WHAT_IF, "personal_data": "not_sure"}, ("personal_data", "no")
+    )
+
+    assert changes.no_longer_asked == [
+        "Decides why and how personal data is processed",
+        "Processes personal data for a customer",
+        "Special categories of personal data",
+        "Automated decisions about people",
+        "Profiling",
+    ]
+    assert [item.result for item in changes.results] == [
+        "GDPR",
+        "Controller",
+        "Processor",
+        "High-risk under Annex III",
+    ]
+    assert changes.results[0].before == State(
+        status="conditional", open=["Personal data"], article_6_3=None
+    )
+    assert changes.results[0].after == State(
+        status="does_not_apply", open=[], article_6_3=None
+    )
+    assert changes.results[2].before == State(
+        status="conditional",
+        open=["Personal data", "Processes personal data for a customer"],
+        article_6_3=None,
+    )
+    assert changes.results[2].after is None
+    # Without the question of profiling, a listed use is high-risk unless a condition of Article
+    # 6(3) is met.
+    assert changes.results[3].before == State(
+        status="conditional", open=[], article_6_3="always"
+    )
+    assert changes.results[3].after == State(
+        status="conditional", open=[], article_6_3="unless"
+    )
+    assert {row.result for row in changes.rows_removed} == {"Controller", "Processor"}
+    assert changes.rows_added == [] and changes.now_open == []
+
+
+def test_processing_for_a_customer_yes_changes_the_status_of_the_processors_rows() -> (
+    None
+):
+    changes = changes_of(WHAT_IF, ("processes_for_customer", "yes"))
+
+    assert changes.results == [
+        ResultChange(
+            result="Processor",
+            regulation="GDPR",
+            before=State(
+                status="conditional",
+                open=["Processes personal data for a customer"],
+                article_6_3=None,
+            ),
+            after=State(status="applies", open=[], article_6_3=None),
+        )
+    ]
+    assert [(row.label, row.before, row.status) for row in changes.rows_changed] == [
+        (label, "conditional", "applies") for label in PROCESSOR_ROWS
+    ]
+    assert changes.rows_changed[0].date == "25 May 2018"
+    assert changes.rows_added == [] and changes.rows_removed == []
+
+
+def test_an_answer_that_makes_four_questions_relevant_makes_them_open() -> None:
+    changes = changes_of(WITHOUT_DATA, ("personal_data", "yes"))
+
+    assert changes.now_open == [
+        "Decides why and how personal data is processed",
+        "Processes personal data for a customer",
+        "Special categories of personal data",
+        "Automated decisions about people",
+    ]
+    assert changes.results[1] == ResultChange(
+        result="Controller",
+        regulation="GDPR",
+        before=None,
+        after=State(
+            status="conditional",
+            open=["Decides why and how personal data is processed"],
+            article_6_3=None,
+        ),
+    )
+    assert {row.status for row in changes.rows_added} == {"conditional"}
+    assert {row.result for row in changes.rows_added} == {"Controller", "Processor"}
+
+
+def test_several_answers_change_together_in_the_order_of_the_facts() -> None:
+    # Decides why and how is asked only once the product processes personal data.
+    changes = changes_of(
+        WITHOUT_DATA, ("decides_purposes", "yes"), ("personal_data", "yes")
+    )
+
+    assert changes.changed == [
+        AppliedAnswer(
+            fact="Personal data",
+            fact_id="personal_data",
+            value="yes",
+            now="No",
+            to="Yes",
+        ),
+        AppliedAnswer(
+            fact="Decides why and how personal data is processed",
+            fact_id="decides_purposes",
+            value="yes",
+            now="no answer",
+            to="Yes",
+        ),
+    ]
+    assert changes.refused == []
+    assert changes.now_open == [
+        "Processes personal data for a customer",
+        "Special categories of personal data",
+        "Automated decisions about people",
+    ]
+    assert changes.results[1].after == State(
+        status="applies", open=[], article_6_3=None
+    )
+    added = {(row.result, row.label): row for row in changes.rows_added}
+    legal_basis = added[("Controller", "A legal basis for each purpose")]
+    assert (legal_basis.status, legal_basis.category, legal_basis.date) == (
+        "applies",
+        "legal",
+        "25 May 2018",
+    )
+    assert legal_basis.citation == citation_of("gdpr:art6(1)")
+    # A row that also needs an open answer is conditional.
+    assert {
+        row.status for (result, _), row in added.items() if result == "Processor"
+    } == {"conditional"}
+
+
+def test_a_fact_named_by_its_label_is_applied() -> None:
+    changes = changes_of(WITHOUT_DATA, ("Generates synthetic content", "yes"))
+
+    assert [item.fact_id for item in changes.changed] == ["generates_content"]
+    assert changes.refused == []
+    assert [row.label for row in changes.rows_added] == [
+        "Machine-readable marking of generated content"
+    ]
+
+
+@pytest.mark.parametrize(
+    ("change", "error"),
+    [
+        (("price", "yes"), "unknown_fact"),
+        (("profiling", "yes"), "not_asked"),
+        (("personal_data", "maybe"), "unknown_value"),
+        (("under_own_name", "yes"), "same_answer"),
+    ],
+    ids=["unknown_fact", "not_asked", "unknown_value", "same_answer"],
+)
+def test_a_change_that_cannot_be_applied_is_refused_and_changes_nothing(
+    change: tuple[str, str], error: str
+) -> None:
+    changes = changes_of(WITHOUT_DATA, change)
+
+    assert changes == WhatIf(
+        changed=[],
+        refused=[
+            Refused.model_validate(
+                {"fact": change[0], "value": change[1], "error": error}
+            )
+        ],
+        results=[],
+        rows_added=[],
+        rows_removed=[],
+        rows_changed=[],
+        now_open=[],
+        no_longer_asked=[],
+    )
+
+
+def test_a_refused_change_leaves_the_others_applied() -> None:
+    changes = changes_of(WITHOUT_DATA, ("price", "yes"), ("generates_content", "yes"))
+
+    assert [item.fact_id for item in changes.changed] == ["generates_content"]
+    assert [item.error for item in changes.refused] == ["unknown_fact"]
+
+
+def test_the_intake_is_unchanged_after_the_changes_are_computed() -> None:
+    intake = Intake(answers=WHAT_IF, description=DESCRIPTION, confirmed=True)
+    before = intake.model_copy(deep=True)
+
+    what_if(
+        GATES,
+        SCHEMA,
+        intake,
+        [
+            Requested(fact="personal_data", value="no"),
+            Requested(fact="under_own_name", value="no"),
+        ],
+    )
+
+    assert intake == before
+    assert decide(GATES, SCHEMA, intake) == decide(GATES, SCHEMA, before)
+
+
+def test_an_open_question_that_a_change_makes_irrelevant_is_no_longer_asked() -> None:
+    # Personal data "Not sure" with the questions that follow from it not answered yet.
+    answers = {
+        "personal_data": "not_sure",
+        "under_own_name": "no",
+        "use_case_area": "none",
+        "own_use": "no",
+    }
+
+    changes = changes_of(answers, ("personal_data", "no"))
+
+    assert changes.no_longer_asked == [
+        "Decides why and how personal data is processed",
+        "Processes personal data for a customer",
+        "Special categories of personal data",
+        "Automated decisions about people",
+    ]
+
+
+def test_a_fact_named_twice_keeps_only_its_last_value() -> None:
+    changes = changes_of(
+        WITHOUT_DATA, ("personal_data", "yes"), ("Personal data", "not_sure")
+    )
+
+    assert [(item.fact_id, item.to) for item in changes.changed] == [
+        ("personal_data", "Not sure")
+    ]
+    assert changes.refused == []

@@ -272,6 +272,13 @@ test("a filled-in form and the answered follow-up questions lead to the screen o
   await expect(
     check.getByRole("link", { name: "Answer Interacts with people on the screen of the answers" }),
   ).toHaveAttribute("href", /\/intakes\/[A-Za-z0-9_-]{22}\/answers#interacts_with_people$/);
+  // What each answer of an open question would change in the whole result, which code computes also
+  // without the key, and no panel to ask about a change without the key (#44).
+  const openOwnName = check.getByRole("region", { name: "Under own name or trademark" });
+  await openOwnName.locator("summary").filter({ hasText: /^If No: / }).click();
+  await expect(openOwnName).toContainText("Obligations that would no longer apply");
+  await expect(openOwnName).toContainText("AI literacy of staff");
+  await expect(page.getByRole("button", { name: /^What if/ })).toHaveCount(0);
   // What may also apply: the provider's row and the row of the transparency under the first answer,
   // the second naming the other one.
   const mayAlso = page.getByRole("region", { name: "What may also apply" }).getByRole("region", { name: "Under own name or trademark" });

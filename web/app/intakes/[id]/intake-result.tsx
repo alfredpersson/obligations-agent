@@ -3,7 +3,8 @@ import { Fragment, type MouseEvent, useEffect, useId, useRef, useState } from "r
 import actions from "../../actions.module.css";
 import loading from "../../loading-status.module.css";
 import { REASONS } from "../../not-sure-reason";
-import type { Asked, Cited, Intake, NotSure, Outcome, Regulation, Result, Row, Schema, Texts } from "../../service";
+import type { Asked, Cited, Intake, NotSure, Outcome, Regulation, Result, Row, Schema, Texts, Turn } from "../../service";
+import Conversation, { Changes, changed } from "./conversation";
 import styles from "./intake-result.module.css";
 import MemoExport from "./memo-export";
 import {
@@ -74,7 +75,7 @@ function remember(link: string) {
   }
 }
 
-type Open = (event: MouseEvent<HTMLAnchorElement>, unit: Cited) => void;
+export type Open = (event: MouseEvent<HTMLAnchorElement>, unit: Cited) => void;
 
 function Links({ links, onOpen }: { links: Cited[]; onOpen: Open }) {
   return links.map((unit, index) => (
@@ -97,6 +98,8 @@ type Context = Labels & {
   onOpen: Open;
   // The address of the screen of the answers, where an open fact has an anchor by its id.
   answers: string;
+  // What each value of each open answer would change in the whole result, by slot and value (QA-1).
+  openChanges: Intake["open_changes"];
 };
 
 // A status as a label in the color of the status.
@@ -144,7 +147,7 @@ function ResultHead({ outcome, ctx }: { outcome: Outcome; ctx: Context }) {
 }
 
 // A row's category as a tag in the category's colour: who carries out its action (MEMO-5).
-function Category({ category }: { category: Row["category"] }) {
+export function Category({ category }: { category: Row["category"] }) {
   return <span className={`${styles.tag} ${styles[`tag_${category}`]}`}>{CATEGORY[category]}</span>;
 }
 
@@ -396,8 +399,9 @@ function Count({ item, where }: { item: Item; where: string | undefined }) {
 }
 
 // An open answer: the text of the last question asked about it, the reason and the note of its "not
-// sure" answer, what each answer gives for each result and each row that depends on it, and the link
-// to the fact on the screen of the answers (VALID-2, INTAKE-6).
+// sure" answer, what each answer gives for each result and each row that depends on it, what each
+// answer would change in the whole result, folded, and the link to the fact on the screen of the
+// answers (VALID-2, INTAKE-6, QA-1).
 function OpenAnswer({
   item,
   slot,
@@ -436,6 +440,19 @@ function OpenAnswer({
         </div>
       ))}
       <Count item={item} where={where} />
+      {ctx.openChanges?.[slot] && (
+        <div className={styles.whatIf}>
+          <p className={styles.whatIfTitle}>What each answer would change in the whole result</p>
+          {Object.entries(ctx.openChanges[slot]).map(([value, change]) => (
+            <details key={value} className={styles.definition}>
+              <summary>
+                If {ctx.valueOf(slot, value)}: {changed(change)}
+              </summary>
+              <Changes change={change} />
+            </details>
+          ))}
+        </div>
+      )}
       <p className={actions.actions}>
         <Link
           href={`${ctx.answers}#${slot}`}
@@ -605,10 +622,13 @@ export default function IntakeResult({
   intake,
   schema,
   answers,
+  onTurn,
 }: {
   intake: Intake & { result: Result };
   schema: Schema;
   answers: string;
+  // A question in the panel with its answer.
+  onTurn: (turn: Turn) => void;
 }) {
   const { result, not_sure: notSure, questions, open_slots: openSlots, texts } = intake;
   // Whether the choices and the controls of the export show (#53).
@@ -641,6 +661,7 @@ export default function IntakeResult({
     valueOf,
     onOpen: open,
     answers,
+    openChanges: intake.open_changes,
   };
   const rows = result.gates.flatMap((outcome) => outcome.rows);
   const { list, placed, items, also } = parts(result, openSlots, slots);
@@ -749,6 +770,10 @@ export default function IntakeResult({
           ))}
         </ul>
       </section>
+      {/* Without the key, there is no conversation and no panel (QA-2). */}
+      {intake.conversation && (
+        <Conversation intake={{ ...intake, conversation: intake.conversation }} onOpen={open} onTurn={onTurn} />
+      )}
       <dialog ref={dialog} aria-labelledby={title} onClose={() => setOpening(null)} className={styles.dialog}>
         <h2 id={title}>Opening EUR-Lex</h2>
         <p>
